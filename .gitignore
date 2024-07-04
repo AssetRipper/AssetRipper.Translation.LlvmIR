@@ -1,0 +1,12 @@
+**/.vs/
+**/*.csproj.user
+packages/
+**/packages.config
+obj
+bin
+*.user
+.idea/
+**/build/
+.vscode/
+launchSettings.json
+.DS_Store
