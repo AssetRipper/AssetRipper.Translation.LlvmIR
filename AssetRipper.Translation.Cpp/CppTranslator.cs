@@ -11,14 +11,17 @@ using System.Runtime.InteropServices;
 
 namespace AssetRipper.Translation.Cpp;
 
-internal static unsafe class Program
+public static unsafe class CppTranslator
 {
-	static void Main(string[] args)
+	static CppTranslator()
 	{
 		Patches.Apply();
+	}
 
+	public static void Translate(string inputPath, string outputPath)
+	{
 		ModuleDefinition moduleDefinition = new("ConvertedCpp");
-		LLVMMemoryBufferRef buffer = LoadIR(@"E:\repos\AssetRipper.Translation.Cpp\Samples\simple.ll");
+		LLVMMemoryBufferRef buffer = LoadIR(inputPath);
 		try
 		{
 			LLVMContextRef context = LLVMContextRef.Create();
@@ -341,9 +344,7 @@ internal static unsafe class Program
 			//LLVM.DisposeMemoryBuffer(buffer);
 		}
 
-		moduleDefinition.Write("ConvertedCpp.dll");
-
-		Console.WriteLine("Done!");
+		moduleDefinition.Write(outputPath);
 	}
 
 	private static string Demangle(string name)
