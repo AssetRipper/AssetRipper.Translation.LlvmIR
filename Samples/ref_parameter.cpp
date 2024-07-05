@@ -8,4 +8,9 @@ extern "C" {
     {
         (*value)--;
     }
+
+    int accessRef(int* value)
+    {
+        return *value;
+    }
 }
