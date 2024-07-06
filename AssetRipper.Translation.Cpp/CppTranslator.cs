@@ -454,8 +454,10 @@ public static unsafe class CppTranslator
 								case LLVMOpcode.LLVMAddrSpaceCast:
 									break;
 								case LLVMOpcode.LLVMICmp:
+									instructionContext.AddIntegerComparisonInstruction();
+									break;
 								case LLVMOpcode.LLVMFCmp:
-									instructionContext.AddComparisonInstruction();
+									instructionContext.AddFloatComparisonInstruction();
 									break;
 								case LLVMOpcode.LLVMPHI:
 									//Mostly handled by branches

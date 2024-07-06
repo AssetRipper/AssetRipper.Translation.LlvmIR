@@ -57,7 +57,7 @@ internal sealed class InstructionContext
 		Function.InstructionLocals[Instruction] = resultLocal;
 	}
 
-	public void AddComparisonInstruction()
+	public void AddIntegerComparisonInstruction()
 	{
 		Debug.Assert(Operands.Length == 2);
 		Function.LoadOperand(Operands[0]);
@@ -102,6 +102,58 @@ internal sealed class InstructionContext
 				break;
 			default:
 				throw new InvalidOperationException($"Unknown comparison predicate: {Instruction.ICmpPredicate}");
+		};
+		CilInstructions.Add(CilOpCodes.Stloc, resultLocal);
+		Function.InstructionLocals[Instruction] = resultLocal;
+	}
+
+	public void AddFloatComparisonInstruction()
+	{
+		Debug.Assert(Operands.Length == 2);
+		Function.LoadOperand(Operands[0]);
+		Function.LoadOperand(Operands[1]);
+		CilLocalVariable resultLocal = CilInstructions.AddLocalVariable(Function.Module.Definition.CorLibTypeFactory.Boolean);
+		switch (Instruction.FCmpPredicate)
+		{
+			case LLVMRealPredicate.LLVMRealOEQ:
+			case LLVMRealPredicate.LLVMRealUEQ:
+				CilInstructions.Add(CilOpCodes.Ceq);
+				break;
+			case LLVMRealPredicate.LLVMRealONE:
+			case LLVMRealPredicate.LLVMRealUNE:
+				CilInstructions.Add(CilOpCodes.Ceq);
+				CilInstructions.AddBooleanNot();
+				break;
+			case LLVMRealPredicate.LLVMRealUGT:
+				CilInstructions.Add(CilOpCodes.Cgt_Un);
+				break;
+			case LLVMRealPredicate.LLVMRealUGE:
+				CilInstructions.Add(CilOpCodes.Clt_Un);
+				CilInstructions.AddBooleanNot();
+				break;
+			case LLVMRealPredicate.LLVMRealULT:
+				CilInstructions.Add(CilOpCodes.Clt_Un);
+				break;
+			case LLVMRealPredicate.LLVMRealULE:
+				CilInstructions.Add(CilOpCodes.Cgt_Un);
+				CilInstructions.AddBooleanNot();
+				break;
+			case LLVMRealPredicate.LLVMRealOGT:
+				CilInstructions.Add(CilOpCodes.Cgt);
+				break;
+			case LLVMRealPredicate.LLVMRealOGE:
+				CilInstructions.Add(CilOpCodes.Clt);
+				CilInstructions.AddBooleanNot();
+				break;
+			case LLVMRealPredicate.LLVMRealOLT:
+				CilInstructions.Add(CilOpCodes.Clt);
+				break;
+			case LLVMRealPredicate.LLVMRealOLE:
+				CilInstructions.Add(CilOpCodes.Cgt);
+				CilInstructions.AddBooleanNot();
+				break;
+			default:
+				throw new NotImplementedException($"Unknown comparison predicate: {Instruction.ICmpPredicate}");
 		};
 		CilInstructions.Add(CilOpCodes.Stloc, resultLocal);
 		Function.InstructionLocals[Instruction] = resultLocal;
