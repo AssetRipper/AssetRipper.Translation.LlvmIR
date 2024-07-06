@@ -39,6 +39,18 @@ public static unsafe class CppTranslator
 				moduleDefinition.TopLevelTypes.Add(typeDefinition);
 
 				ModuleContext moduleContext = new(module, moduleDefinition);
+
+				foreach (LLVMValueRef global in module.GetGlobals())
+				{
+					Debug.Assert(global.OperandCount == 1);
+					LLVMValueRef operand = global.GetOperand(0);
+					LLVMTypeRef type = operand.TypeOf;
+					LLVMTypeRef globalType = LLVM.GlobalGetValueType(global);
+					//I don't think this is feasible right now.
+					//I think it needs improvements to libLLVMSharp.
+					//https://github.com/llvm/llvm-project/blob/ccf357ff643c6af86bb459eba5a00f40f1dcaf22/llvm/include/llvm/IR/Constants.h#L584
+				}
+
 				Dictionary<string, List<MethodDefinition>> demangledNames = new();
 				foreach (LLVMValueRef function in module.GetFunctions())
 				{
