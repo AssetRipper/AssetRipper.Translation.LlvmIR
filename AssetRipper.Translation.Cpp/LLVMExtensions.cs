@@ -107,4 +107,21 @@ internal static class LLVMExtensions
 		}
 		return operands;
 	}
+
+	private static unsafe LLVMValueRef GetUser(this LLVMUseRef use) => LLVM.GetUser(use);
+
+	private static unsafe LLVMUseRef GetNextUse(this LLVMUseRef use) => LLVM.GetNextUse(use);
+
+	// This could be used for dead code elimination.
+	// For example, when Clang optimization is disabled (the default),
+	// arguments always get put into locals even if they're not used.
+	public static IEnumerable<LLVMValueRef> GetUsers(this LLVMValueRef value)
+	{
+		LLVMUseRef use = value.FirstUse;
+		while (use.Handle != 0)
+		{
+			yield return use.GetUser();
+			use = use.GetNextUse();
+		}
+	}
 }
