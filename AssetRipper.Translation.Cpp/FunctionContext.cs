@@ -43,7 +43,8 @@ internal sealed class FunctionContext
 			case LLVMValueKind.LLVMConstantIntValueKind:
 				{
 					long value = operand.ConstIntSExt;
-					if (value is <= int.MaxValue and >= int.MinValue)
+					LLVMTypeRef operandType = operand.TypeOf;
+					if (value is <= int.MaxValue and >= int.MinValue && operandType is { IntWidth: <= sizeof(int) * 8 })
 					{
 						Instructions.Add(CilOpCodes.Ldc_I4, (int)value);
 					}
@@ -51,7 +52,7 @@ internal sealed class FunctionContext
 					{
 						Instructions.Add(CilOpCodes.Ldc_I8, value);
 					}
-					typeSignature = Module.GetTypeSignature(operand.TypeOf);
+					typeSignature = Module.GetTypeSignature(operandType);
 				}
 				break;
 			case LLVMValueKind.LLVMInstructionValueKind:
