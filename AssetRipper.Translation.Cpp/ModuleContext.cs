@@ -1,5 +1,6 @@
 ﻿using AsmResolver.DotNet;
 using AsmResolver.DotNet.Signatures;
+using AsmResolver.PE.DotNet.Metadata.Tables;
 using LLVMSharp.Interop;
 
 namespace AssetRipper.Translation.Cpp;
@@ -15,6 +16,7 @@ internal sealed class ModuleContext
 	public LLVMModuleRef Module { get; }
 	public ModuleDefinition Definition { get; }
 	public Dictionary<LLVMValueRef, FunctionContext> Methods { get; } = new();
+	public Dictionary<string, TypeDefinition> Structs { get; } = new();
 
 	public TypeSignature GetTypeSignature(LLVMTypeRef type)
 	{
@@ -55,7 +57,30 @@ internal sealed class ModuleContext
 				//I don't think this can happen, but void* is fine.
 				return Definition.CorLibTypeFactory.Void.MakePointerType();
 			case LLVMTypeKind.LLVMStructTypeKind:
-				goto default;
+				{
+					string name = type.StructName;
+					if (!Structs.TryGetValue(name, out TypeDefinition? typeDefinition))
+					{
+						typeDefinition = new(
+							null,
+							name,
+							TypeAttributes.Public | TypeAttributes.SequentialLayout | TypeAttributes.BeforeFieldInit,
+							Definition.DefaultImporter.ImportType(typeof(ValueType)));
+						Definition.TopLevelTypes.Add(typeDefinition);
+						Structs.Add(name, typeDefinition);
+
+						LLVMTypeRef[] array = type.GetSubtypes();
+						for (int i = 0; i < array.Length; i++)
+						{
+							LLVMTypeRef subType = array[i];
+							TypeSignature fieldType = GetTypeSignature(subType);
+							string fieldName = $"field_{i}";
+							FieldDefinition field = new(fieldName, FieldAttributes.Public, fieldType);
+							typeDefinition.Fields.Add(field);
+						}
+					}
+					return typeDefinition.ToTypeSignature();
+				}
 			case LLVMTypeKind.LLVMArrayTypeKind:
 				goto default;
 			case LLVMTypeKind.LLVMPointerTypeKind:

@@ -26,9 +26,14 @@ internal sealed class InstructionContext
 		return Function.GetOperandTypeSignature(Operands[index]);
 	}
 
-	public void LoadLocalOrConstantOperand(int index, out TypeSignature typeSignature)
+	public void LoadOperand(int index, out TypeSignature typeSignature)
 	{
 		Function.LoadOperand(Operands[index], out typeSignature);
+	}
+
+	public void LoadOperand(int index)
+	{
+		Function.LoadOperand(Operands[index]);
 	}
 
 	public void AddBinaryMathInstruction(CilOpCode opCode)

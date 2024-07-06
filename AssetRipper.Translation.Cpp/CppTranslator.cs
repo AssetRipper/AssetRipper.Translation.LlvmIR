@@ -321,12 +321,12 @@ public static unsafe class CppTranslator
 									break;
 								case LLVMOpcode.LLVMGetElementPtr:
 									{
-										Debug.Assert(instructionContext.Operands.Length == 2);
+										Debug.Assert(instructionContext.Operands.Length >= 2);
 										LLVMTypeRef sourceElementType = LLVM.GetGEPSourceElementType(instruction);
 										TypeSignature sourceElementTypeSignature = moduleContext.GetTypeSignature(sourceElementType);
 										TypeSignature resultTypeSignature = sourceElementTypeSignature.MakePointerType();
 
-										//This is the pointer. It's generally void* due to stripping, but
+										//This is the pointer. It's generally void* due to stripping.
 										functionContext.LoadOperand(instructionContext.Operands[0], out _);//Pointer
 
 										//This isn't strictly necessary, but it might make ILSpy output better someday.
@@ -367,7 +367,37 @@ public static unsafe class CppTranslator
 										}
 										functionContext.Instructions.Add(CilOpCodes.Add);
 
-										CilLocalVariable resultLocal = instructions.AddLocalVariable(resultTypeSignature);
+										TypeSignature currentType = sourceElementTypeSignature;
+										for (int i = 2; i < instructionContext.Operands.Length; i++)
+										{
+											LLVMValueRef operand = instructionContext.Operands[i];
+											if (currentType is TypeDefOrRefSignature structTypeSignature)
+											{
+												TypeDefinition structType = (TypeDefinition)structTypeSignature.ToTypeDefOrRef();
+												if (operand.Kind == LLVMValueKind.LLVMConstantIntValueKind)
+												{
+													long index = operand.ConstIntSExt;
+													string fieldName = $"field_{index}";
+													FieldDefinition field = structType.Fields.First(t => t.Name == fieldName);
+													functionContext.Instructions.Add(CilOpCodes.Ldflda, field);
+													currentType = field.Signature!.FieldType;
+												}
+												else
+												{
+													throw new NotSupportedException();
+												}
+											}
+											else if (currentType is CorLibTypeSignature)
+											{
+												throw new NotSupportedException();
+											}
+											else
+											{
+												throw new NotSupportedException();
+											}
+										}
+
+										CilLocalVariable resultLocal = instructions.AddLocalVariable(currentType.MakePointerType());
 										functionContext.Instructions.Add(CilOpCodes.Stloc, resultLocal);
 										functionContext.InstructionLocals[instruction] = resultLocal;
 									}
@@ -383,7 +413,7 @@ public static unsafe class CppTranslator
 										CorLibTypeSignature destinationType = (CorLibTypeSignature)instructionContext.Function.Module.GetTypeSignature(instructionContext.Instruction.TypeOf);
 										CilLocalVariable resultLocal = functionContext.Instructions.AddLocalVariable(destinationType);
 
-										instructionContext.LoadLocalOrConstantOperand(0, out TypeSignature sourceType);
+										instructionContext.LoadOperand(0, out TypeSignature sourceType);
 										Debug.Assert(sourceType is CorLibTypeSignature);
 
 										if (destinationType.ElementType is ElementType.I8)
@@ -444,8 +474,7 @@ public static unsafe class CppTranslator
 										MethodDefinition calledMethod = moduleContext.Methods[functionOperand].Definition;
 										for (int i = 0; i < instructionContext.Operands.Length - 1; i++)
 										{
-											CilLocalVariable parameterLocal = functionContext.InstructionLocals[instructionContext.Operands[i]];
-											instructions.Add(CilOpCodes.Ldloc, parameterLocal);
+											instructionContext.LoadOperand(i);
 										}
 										instructions.Add(CilOpCodes.Call, calledMethod);
 										TypeSignature functionReturnType = calledMethod.Signature!.ReturnType;
