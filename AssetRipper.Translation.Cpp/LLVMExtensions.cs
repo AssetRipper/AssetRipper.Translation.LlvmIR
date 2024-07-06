@@ -103,7 +103,7 @@ internal static class LLVMExtensions
 		LLVMValueRef[] operands = new LLVMValueRef[numOperands];
 		for (int i = 0; i < numOperands; i++)
 		{
-			operands[i] = LLVM.GetOperand(value, (uint)i);
+			operands[i] = value.GetOperand((uint)i);
 		}
 		return operands;
 	}

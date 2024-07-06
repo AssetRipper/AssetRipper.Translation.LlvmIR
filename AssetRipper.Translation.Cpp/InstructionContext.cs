@@ -58,7 +58,46 @@ internal sealed class InstructionContext
 		Function.LoadOperand(Operands[0]);
 		Function.LoadOperand(Operands[1]);
 		CilLocalVariable resultLocal = CilInstructions.AddLocalVariable(Function.Module.Definition.CorLibTypeFactory.Boolean);
-		CilInstructions.Add(CilOpCodes.Ceq);
+		switch (Instruction.ICmpPredicate)
+		{
+			case LLVMIntPredicate.LLVMIntEQ:
+				CilInstructions.Add(CilOpCodes.Ceq);
+				break;
+			case LLVMIntPredicate.LLVMIntNE:
+				CilInstructions.Add(CilOpCodes.Ceq);
+				CilInstructions.AddBooleanNot();
+				break;
+			case LLVMIntPredicate.LLVMIntUGT:
+				CilInstructions.Add(CilOpCodes.Cgt_Un);
+				break;
+			case LLVMIntPredicate.LLVMIntUGE:
+				CilInstructions.Add(CilOpCodes.Clt_Un);
+				CilInstructions.AddBooleanNot();
+				break;
+			case LLVMIntPredicate.LLVMIntULT:
+				CilInstructions.Add(CilOpCodes.Clt_Un);
+				break;
+			case LLVMIntPredicate.LLVMIntULE:
+				CilInstructions.Add(CilOpCodes.Cgt_Un);
+				CilInstructions.AddBooleanNot();
+				break;
+			case LLVMIntPredicate.LLVMIntSGT:
+				CilInstructions.Add(CilOpCodes.Cgt);
+				break;
+			case LLVMIntPredicate.LLVMIntSGE:
+				CilInstructions.Add(CilOpCodes.Clt);
+				CilInstructions.AddBooleanNot();
+				break;
+			case LLVMIntPredicate.LLVMIntSLT:
+				CilInstructions.Add(CilOpCodes.Clt);
+				break;
+			case LLVMIntPredicate.LLVMIntSLE:
+				CilInstructions.Add(CilOpCodes.Cgt);
+				CilInstructions.AddBooleanNot();
+				break;
+			default:
+				throw new InvalidOperationException($"Unknown comparison predicate: {Instruction.ICmpPredicate}");
+		};
 		CilInstructions.Add(CilOpCodes.Stloc, resultLocal);
 		Function.InstructionLocals[Instruction] = resultLocal;
 	}
@@ -75,8 +114,9 @@ internal sealed class InstructionContext
 
 			CilInstructions.Add(CilOpCodes.Ldloc, Function.InstructionLocals[Operands[0]]);
 
-			LLVMBasicBlockRef trueBlock = Operands[1].AsBasicBlock();
-			LLVMBasicBlockRef falseBlock = Operands[2].AsBasicBlock();
+			// I have no idea why, but the second and third operands seem to be swapped.
+			LLVMBasicBlockRef trueBlock = Operands[2].AsBasicBlock();
+			LLVMBasicBlockRef falseBlock = Operands[1].AsBasicBlock();
 
 			if (TargetBlockStartsWithPhi(trueBlock, out LLVMValueRef truePhiInstruction))
 			{

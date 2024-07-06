@@ -74,6 +74,12 @@ internal static class AsmResolverExtensions
 		}
 	}
 
+	public static void AddBooleanNot(this CilInstructionCollection instructions)
+	{
+		instructions.Add(CilOpCodes.Ldc_I4_0);
+		instructions.Add(CilOpCodes.Ceq);
+	}
+
 	public static bool IsLoadConstantInteger(this CilInstruction instruction, out long value)
 	{
 		if (instruction.IsLdcI4())
