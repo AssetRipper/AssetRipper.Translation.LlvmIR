@@ -105,6 +105,13 @@ public static unsafe class CppTranslator
 
 					CilInstructionCollection instructions = method.CilMethodBody.Instructions;
 
+					if (function.BasicBlocksCount == 0)
+					{
+						instructions.Add(CilOpCodes.Ldnull);
+						instructions.Add(CilOpCodes.Throw);
+						continue;
+					}
+
 					foreach (LLVMBasicBlockRef basicBlock in function.GetBasicBlocks())
 					{
 						functionContext.Labels[basicBlock] = new();
