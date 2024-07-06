@@ -336,7 +336,15 @@ public static unsafe class CppTranslator
 
 										//This is the index, which might be a constant.
 										functionContext.LoadOperand(instructionContext.Operands[1], out _);
-										if (sourceElementTypeSignature.TryGetSize(out int size))
+										CilInstruction previousInstruction = functionContext.Instructions[^1];
+
+										if (previousInstruction.IsLoadConstantInteger(out long value) && value == 0)
+										{
+											//Remove the Ldc_I4_0
+											//There's no need to add it to the pointer.
+											functionContext.Instructions.Pop();
+										}
+										else if (sourceElementTypeSignature.TryGetSize(out int size))
 										{
 											if (size == 1)
 											{
@@ -344,8 +352,7 @@ public static unsafe class CppTranslator
 											}
 											else
 											{
-												CilInstruction previousInstruction = functionContext.Instructions[^1];
-												if (previousInstruction.IsLoadConstantInteger(out long value))
+												if (previousInstruction.IsLoadConstantInteger(out value))
 												{
 													previousInstruction.OpCode = CilOpCodes.Ldc_I4;
 													previousInstruction.Operand = (int)(value * size);
@@ -358,14 +365,15 @@ public static unsafe class CppTranslator
 													functionContext.Instructions.Add(CilOpCodes.Mul);
 												}
 											}
+											functionContext.Instructions.Add(CilOpCodes.Add);
 										}
 										else
 										{
 											functionContext.Instructions.Add(CilOpCodes.Conv_I);
 											functionContext.Instructions.Add(CilOpCodes.Sizeof, sourceElementTypeSignature.ToTypeDefOrRef());
 											functionContext.Instructions.Add(CilOpCodes.Mul);
+											functionContext.Instructions.Add(CilOpCodes.Add);
 										}
-										functionContext.Instructions.Add(CilOpCodes.Add);
 
 										TypeSignature currentType = sourceElementTypeSignature;
 										for (int i = 2; i < instructionContext.Operands.Length; i++)
