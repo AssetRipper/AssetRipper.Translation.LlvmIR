@@ -18,7 +18,7 @@ public static unsafe class CppTranslator
 		Patches.Apply();
 	}
 
-	public static void Translate(string inputPath, string outputPath)
+	public static void Translate(string inputPath, string outputPath, bool removeDeadCode = false)
 	{
 		ModuleDefinition moduleDefinition = new("ConvertedCpp");
 		LLVMMemoryBufferRef buffer = LoadIR(inputPath);
@@ -28,6 +28,21 @@ public static unsafe class CppTranslator
 			try
 			{
 				LLVMModuleRef module = context.ParseIR(buffer);
+
+				if (removeDeadCode)
+				{
+					//Need to expose these in libLLVMSharp
+
+					//Old passes:
+					//https://github.com/llvm/llvm-project/blob/f02eae7487992ecddc335530b55126b15e388b62/llvm/include/llvm-c/Transforms/Scalar.h
+
+					//New passes:
+					//https://github.com/llvm/llvm-project/blob/6e4bb60adef6abd34516f9121930eaa84e41e04a/llvm/include/llvm/LinkAllPasses.h
+
+					using LLVMPassManagerRef passManager = LLVM.CreatePassManager();
+					LLVMPassBuilderOptionsRef builderOptions = LLVM.CreatePassBuilderOptions();
+					passManager.Run(module);
+				}
 
 				{
 					var globals = module.GetGlobals().ToList();
