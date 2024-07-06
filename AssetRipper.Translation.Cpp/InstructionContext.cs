@@ -21,36 +21,46 @@ internal sealed class InstructionContext
 	public FunctionContext Function { get; }
 	public LLVMValueRef[] Operands { get; }
 
+	public TypeSignature GetOperandTypeSignature(int index)
+	{
+		return Function.GetOperandTypeSignature(Operands[index]);
+	}
+
+	public void LoadLocalOrConstantOperand(int index, out TypeSignature typeSignature)
+	{
+		Function.LoadOperand(Operands[index], out typeSignature);
+	}
+
 	public void AddBinaryMathInstruction(CilOpCode opCode)
 	{
 		Debug.Assert(Operands.Length == 2);
-		Function.LoadLocalOrConstant(Operands[0], out TypeSignature resultTypeSignature);
-		Function.LoadLocalOrConstant(Operands[1], out _);
+		Function.LoadOperand(Operands[0], out TypeSignature resultTypeSignature);
+		Function.LoadOperand(Operands[1]);
 		CilLocalVariable resultLocal = CilInstructions.AddLocalVariable(resultTypeSignature);
 		CilInstructions.Add(opCode);
 		CilInstructions.Add(CilOpCodes.Stloc, resultLocal);
-		Function.Locals[Instruction] = resultLocal;
+		Function.InstructionLocals[Instruction] = resultLocal;
 	}
 
 	public void AddUnaryMathInstruction(CilOpCode opCode)
 	{
 		Debug.Assert(Operands.Length == 1);
-		Function.LoadLocalOrConstant(Operands[0], out TypeSignature resultTypeSignature);
+		Function.LoadOperand(Operands[0], out TypeSignature resultTypeSignature);
 		CilLocalVariable resultLocal = CilInstructions.AddLocalVariable(resultTypeSignature);
 		CilInstructions.Add(opCode);
 		CilInstructions.Add(CilOpCodes.Stloc, resultLocal);
-		Function.Locals[Instruction] = resultLocal;
+		Function.InstructionLocals[Instruction] = resultLocal;
 	}
 
 	public void AddComparisonInstruction()
 	{
 		Debug.Assert(Operands.Length == 2);
-		Function.LoadLocalOrConstant(Operands[0], out _);
-		Function.LoadLocalOrConstant(Operands[1], out _);
+		Function.LoadOperand(Operands[0]);
+		Function.LoadOperand(Operands[1]);
 		CilLocalVariable resultLocal = CilInstructions.AddLocalVariable(Function.Module.Definition.CorLibTypeFactory.Boolean);
 		CilInstructions.Add(CilOpCodes.Ceq);
 		CilInstructions.Add(CilOpCodes.Stloc, resultLocal);
-		Function.Locals[Instruction] = resultLocal;
+		Function.InstructionLocals[Instruction] = resultLocal;
 	}
 
 	public void AddBranchInstruction()
@@ -63,7 +73,7 @@ internal sealed class InstructionContext
 			Debug.Assert(Operands[2].IsBasicBlock);
 
 
-			CilInstructions.Add(CilOpCodes.Ldloc, Function.Locals[Operands[0]]);
+			CilInstructions.Add(CilOpCodes.Ldloc, Function.InstructionLocals[Operands[0]]);
 
 			LLVMBasicBlockRef trueBlock = Operands[1].AsBasicBlock();
 			LLVMBasicBlockRef falseBlock = Operands[2].AsBasicBlock();
@@ -114,7 +124,7 @@ internal sealed class InstructionContext
 				LLVMBasicBlockRef sourceBlock = phiInstruction.GetIncomingBlock((uint)i);
 				if (sourceBlock == originBlock)
 				{
-					Function.LoadLocalOrConstant(phiOperands[i], out _);
+					Function.LoadOperand(phiOperands[i]);
 					return;
 				}
 			}

@@ -13,4 +13,19 @@ extern "C" {
     {
         return *value;
     }
+
+    void* accessSuperRef(void** pointerToPointer)
+    {
+        return *pointerToPointer;
+    }
+
+    void* accessSuperSuperRef(void*** arg)
+    {
+        return *(*arg);
+    }
+
+    void* returnSuperRef(void** pointerToPointer)
+    {
+        return pointerToPointer;
+    }
 }

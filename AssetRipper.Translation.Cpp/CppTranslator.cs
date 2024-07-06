@@ -28,6 +28,13 @@ public static unsafe class CppTranslator
 			try
 			{
 				LLVMModuleRef module = context.ParseIR(buffer);
+
+				{
+					var globals = module.GetGlobals().ToList();
+					var aliases = module.GetGlobalAliases().ToList();
+					var ifuncs = module.GetGlobalIFuncs().ToList();
+					var metadataList = module.GetNamedMetadata().ToList();
+				}
 				TypeDefinition typeDefinition = new(null, "GlobalMembers", TypeAttributes.Public | TypeAttributes.Abstract | TypeAttributes.Sealed);
 				moduleDefinition.TopLevelTypes.Add(typeDefinition);
 
@@ -75,12 +82,11 @@ public static unsafe class CppTranslator
 
 					typeDefinition.Methods.Add(method);
 
-					Dictionary<LLVMValueRef, Parameter> parameters = new();
 					foreach (LLVMValueRef parameter in function.GetParams())
 					{
 						LLVMTypeRef type = parameter.TypeOf;
 						TypeSignature parameterType = moduleContext.GetTypeSignature(type);
-						parameters[parameter] = method.AddParameter(parameterType);
+						functionContext.Parameters[parameter] = method.AddParameter(parameterType);
 					}
 
 					method.CilMethodBody = new(method);
@@ -91,6 +97,10 @@ public static unsafe class CppTranslator
 					{
 						functionContext.Labels[basicBlock] = new();
 					}
+
+					bool hasReturn = false;
+					bool hasSingleReturn = true;
+					TypeSignature? actualReturnType = null;
 
 					foreach ((LLVMBasicBlockRef basicBlock, CilInstructionLabel blockLabel) in functionContext.Labels)
 					{
@@ -107,7 +117,19 @@ public static unsafe class CppTranslator
 									{
 										if (instructionContext.Operands[0].Kind == LLVMValueKind.LLVMInstructionValueKind)
 										{
-											instructions.Add(CilOpCodes.Ldloc, functionContext.Locals[instructionContext.Operands[0]]);
+											CilLocalVariable returnLocal = functionContext.InstructionLocals[instructionContext.Operands[0]];
+											instructions.Add(CilOpCodes.Ldloc, returnLocal);
+
+											if (!hasReturn)
+											{
+												hasReturn = true;
+												actualReturnType = returnLocal.VariableType;
+											}
+											else if (hasSingleReturn && !SignatureComparer.Default.Equals(actualReturnType, returnLocal.VariableType))
+											{
+												hasSingleReturn = false;
+												actualReturnType = null;
+											}
 										}
 										else
 										{
@@ -117,6 +139,19 @@ public static unsafe class CppTranslator
 									else if (instructionContext.Operands.Length != 0)
 									{
 										throw new NotSupportedException();
+									}
+									else
+									{
+										if (!hasReturn)
+										{
+											hasReturn = true;
+
+										}
+										else if (hasSingleReturn && actualReturnType is not null)
+										{
+											hasSingleReturn = false;
+											actualReturnType = null;
+										}
 									}
 
 									instructions.Add(CilOpCodes.Ret);
@@ -183,55 +218,171 @@ public static unsafe class CppTranslator
 									break;
 								case LLVMOpcode.LLVMAlloca:
 									{
-										Debug.Assert(instructionContext.Operands.Length == 1 && instructionContext.Operands[0].Kind is LLVMValueKind.LLVMConstantIntValueKind);
-										long size = instructionContext.Operands[0].ConstIntSExt;
-										Debug.Assert(size == 1);
+										Debug.Assert(instructionContext.Operands.Length == 1);
+										if (instructionContext.Operands[0].Kind is not LLVMValueKind.LLVMConstantIntValueKind)
+										{
+											throw new NotSupportedException("Variable size alloca not supported");
+										}
+
 										LLVMTypeRef allocatedType = LLVM.GetAllocatedType(instruction);
 										TypeSignature allocatedTypeSignature = moduleContext.GetTypeSignature(allocatedType);
-										instructionContext.Function.Locals[instruction] = instructions.AddLocalVariable(allocatedTypeSignature);
+										CilLocalVariable pointerLocal = instructions.AddLocalVariable(allocatedTypeSignature.MakePointerType());
+
+										CilLocalVariable contentLocal;
+										long size = instructionContext.Operands[0].ConstIntSExt;
+										if (size != 1)
+										{
+											throw new NotSupportedException("Fixed size array not supported");
+										}
+										else
+										{
+											contentLocal = instructions.AddLocalVariable(allocatedTypeSignature);
+											functionContext.DataLocals[pointerLocal] = contentLocal;
+
+											//Zero out the memory
+											instructions.Add(CilOpCodes.Ldloca, contentLocal);
+											instructions.Add(CilOpCodes.Initobj, allocatedTypeSignature.ToTypeDefOrRef());
+										}
+
+										instructions.Add(CilOpCodes.Ldloca, contentLocal);//Might need slight modifications for fixed size arrays.
+										instructions.Add(CilOpCodes.Stloc, pointerLocal);
+										instructionContext.Function.InstructionLocals[instruction] = pointerLocal;
 									}
 									break;
 								case LLVMOpcode.LLVMLoad:
 									{
 										Debug.Assert(instructionContext.Operands.Length == 1);
-										CilLocalVariable addressLocal = functionContext.Locals[instructionContext.Operands[0]];
-										CilLocalVariable resultLocal = instructions.AddLocalVariable(addressLocal.VariableType);
-										instructions.Add(CilOpCodes.Ldloc, addressLocal);
+										CilLocalVariable addressLocal = functionContext.InstructionLocals[instructionContext.Operands[0]];
+
+										//https://llvm.org/docs/OpaquePointers.html#migration-instructions
+										LLVMTypeRef loadType = instruction.TypeOf;
+										TypeSignature loadTypeSignature = moduleContext.GetTypeSignature(loadType);
+										CilLocalVariable resultLocal = instructions.AddLocalVariable(loadTypeSignature);
+
+										if (functionContext.DataLocals.TryGetValue(addressLocal, out CilLocalVariable? dataLocal)
+											&& SignatureComparer.Default.Equals(dataLocal.VariableType, loadTypeSignature))
+										{
+											instructions.Add(CilOpCodes.Ldloc, dataLocal);
+										}
+										else
+										{
+											instructions.Add(CilOpCodes.Ldloc, addressLocal);
+											instructions.AddLoadIndirect(loadTypeSignature);
+										}
 										instructions.Add(CilOpCodes.Stloc, resultLocal);
-										functionContext.Locals[instruction] = resultLocal;
+
+										functionContext.InstructionLocals[instruction] = resultLocal;
 									}
 									break;
 								case LLVMOpcode.LLVMStore:
 									{
 										Debug.Assert(instructionContext.Operands.Length == 2);
-										switch (instructionContext.Operands[0].Kind)
+
+										CilLocalVariable addressLocal = functionContext.InstructionLocals[instructionContext.Operands[1]];
+										TypeSignature addressType = addressLocal.VariableType;
+
+										//https://llvm.org/docs/OpaquePointers.html#migration-instructions
+										LLVMTypeRef storeType = instructionContext.Operands[0].TypeOf;
+										TypeSignature storeTypeSignature = moduleContext.GetTypeSignature(storeType);
+
+										if (functionContext.DataLocals.TryGetValue(addressLocal, out CilLocalVariable? dataLocal)
+											&& SignatureComparer.Default.Equals(dataLocal.VariableType, storeTypeSignature))
 										{
-											case LLVMValueKind.LLVMInstructionValueKind:
-												{
-													CilLocalVariable valueLocal = functionContext.Locals[instructionContext.Operands[0]];
-													instructions.Add(CilOpCodes.Ldloc, valueLocal);
-												}
-												break;
-											case LLVMValueKind.LLVMArgumentValueKind:
-												{
-													Parameter parameter = parameters[instructionContext.Operands[0]];
-													instructions.Add(CilOpCodes.Ldarg, parameter);
-												}
-												break;
-											default:
-												throw new NotSupportedException();
+											functionContext.LoadOperand(instructionContext.Operands[0]);
+											instructions.Add(CilOpCodes.Stloc, dataLocal);
 										}
-										CilLocalVariable addressLocal = functionContext.Locals[instructionContext.Operands[1]];
-										instructions.Add(CilOpCodes.Stloc, addressLocal);
+										else
+										{
+											instructions.Add(CilOpCodes.Ldloc, addressLocal);
+											functionContext.LoadOperand(instructionContext.Operands[0]);
+											instructions.AddStoreIndirect(storeTypeSignature);
+										}
+										
 									}
 									break;
 								case LLVMOpcode.LLVMGetElementPtr:
+									{
+										Debug.Assert(instructionContext.Operands.Length == 2);
+										LLVMTypeRef sourceElementType = LLVM.GetGEPSourceElementType(instruction);
+										TypeSignature sourceElementTypeSignature = moduleContext.GetTypeSignature(sourceElementType);
+										TypeSignature resultTypeSignature = sourceElementTypeSignature.MakePointerType();
+
+										//This is the pointer. It's generally void* due to stripping, but
+										functionContext.LoadOperand(instructionContext.Operands[0], out _);//Pointer
+
+										//This isn't strictly necessary, but it might make ILSpy output better someday.
+										CilLocalVariable pointerLocal = instructions.AddLocalVariable(resultTypeSignature);
+										functionContext.Instructions.Add(CilOpCodes.Stloc, pointerLocal);
+										functionContext.Instructions.Add(CilOpCodes.Ldloc, pointerLocal);
+
+										//This is the index, which might be a constant.
+										functionContext.LoadOperand(instructionContext.Operands[1], out _);
+										if (sourceElementTypeSignature.TryGetSize(out int size))
+										{
+											if (size == 1)
+											{
+												functionContext.Instructions.Add(CilOpCodes.Conv_I);
+											}
+											else
+											{
+												CilInstruction previousInstruction = functionContext.Instructions[^1];
+												if (previousInstruction.IsLoadConstantInteger(out long value))
+												{
+													previousInstruction.OpCode = CilOpCodes.Ldc_I4;
+													previousInstruction.Operand = (int)(value * size);
+													functionContext.Instructions.Add(CilOpCodes.Conv_I);
+												}
+												else
+												{
+													functionContext.Instructions.Add(CilOpCodes.Conv_I);
+													functionContext.Instructions.Add(CilOpCodes.Ldc_I4, size);
+													functionContext.Instructions.Add(CilOpCodes.Mul);
+												}
+											}
+										}
+										else
+										{
+											functionContext.Instructions.Add(CilOpCodes.Conv_I);
+											functionContext.Instructions.Add(CilOpCodes.Sizeof, sourceElementTypeSignature.ToTypeDefOrRef());
+											functionContext.Instructions.Add(CilOpCodes.Mul);
+										}
+										functionContext.Instructions.Add(CilOpCodes.Add);
+
+										CilLocalVariable resultLocal = instructions.AddLocalVariable(resultTypeSignature);
+										functionContext.Instructions.Add(CilOpCodes.Stloc, resultLocal);
+										functionContext.InstructionLocals[instruction] = resultLocal;
+									}
 									break;
 								case LLVMOpcode.LLVMTrunc:
 									break;
 								case LLVMOpcode.LLVMZExt:
 									break;
 								case LLVMOpcode.LLVMSExt:
+									{
+										Debug.Assert(instructionContext.Operands.Length == 1);
+
+										CorLibTypeSignature destinationType = (CorLibTypeSignature)instructionContext.Function.Module.GetTypeSignature(instructionContext.Instruction.TypeOf);
+										CilLocalVariable resultLocal = functionContext.Instructions.AddLocalVariable(destinationType);
+
+										instructionContext.LoadLocalOrConstantOperand(0, out TypeSignature sourceType);
+										Debug.Assert(sourceType is CorLibTypeSignature);
+
+										if (destinationType.ElementType is ElementType.I8)
+										{
+											instructionContext.CilInstructions.Add(CilOpCodes.Conv_I8);
+										}
+										else if (destinationType.ElementType is ElementType.I4)
+										{
+											instructionContext.CilInstructions.Add(CilOpCodes.Conv_I4);
+										}
+										else
+										{
+											throw new NotSupportedException();
+										}
+
+										instructionContext.CilInstructions.Add(CilOpCodes.Stloc, resultLocal);
+										functionContext.InstructionLocals[instruction] = resultLocal;
+									}
 									break;
 								case LLVMOpcode.LLVMFPToUI:
 									break;
@@ -264,7 +415,7 @@ public static unsafe class CppTranslator
 										TypeSignature phiTypeSignature = functionContext.GetOperandTypeSignature(instructionContext.Operands[0]);
 										CilLocalVariable resultLocal = instructions.AddLocalVariable(phiTypeSignature);
 										instructions.Add(CilOpCodes.Stloc, resultLocal);
-										functionContext.Locals[instruction] = resultLocal;
+										functionContext.InstructionLocals[instruction] = resultLocal;
 									}
 									break;
 								case LLVMOpcode.LLVMCall:
@@ -274,7 +425,7 @@ public static unsafe class CppTranslator
 										MethodDefinition calledMethod = moduleContext.Methods[functionOperand].Definition;
 										for (int i = 0; i < instructionContext.Operands.Length - 1; i++)
 										{
-											CilLocalVariable parameterLocal = functionContext.Locals[instructionContext.Operands[i]];
+											CilLocalVariable parameterLocal = functionContext.InstructionLocals[instructionContext.Operands[i]];
 											instructions.Add(CilOpCodes.Ldloc, parameterLocal);
 										}
 										instructions.Add(CilOpCodes.Call, calledMethod);
@@ -283,7 +434,7 @@ public static unsafe class CppTranslator
 										{
 											CilLocalVariable resultLocal = instructions.AddLocalVariable(functionReturnType);
 											instructions.Add(CilOpCodes.Stloc, resultLocal);
-											functionContext.Locals[instruction] = resultLocal;
+											functionContext.InstructionLocals[instruction] = resultLocal;
 										}
 									}
 									break;
@@ -329,6 +480,11 @@ public static unsafe class CppTranslator
 									break;
 							}
 						}
+					}
+
+					if (actualReturnType is not null && !SignatureComparer.Default.Equals(actualReturnType, method.Signature!.ReturnType))
+					{
+						method.Signature.ReturnType = actualReturnType;
 					}
 
 					instructions.OptimizeMacros();

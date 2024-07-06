@@ -20,11 +20,23 @@ internal sealed class FunctionContext
 	public MethodDefinition Definition { get; }
 	public ModuleContext Module { get; }
 	public CilInstructionCollection Instructions => Definition.CilMethodBody!.Instructions;
-	public Dictionary<LLVMValueRef, CilLocalVariable> Locals { get; } = new();
+	public Dictionary<LLVMValueRef, CilLocalVariable> InstructionLocals { get; } = new();
+	/// <summary>
+	/// Some local variables are simply pointers to other local variables, which hold the actual value.
+	/// </summary>
+	/// <remarks>
+	/// Keys are the pointer locals, and the values are the data locals.
+	/// </remarks>
+	public Dictionary<CilLocalVariable, CilLocalVariable> DataLocals { get; } = new();
 	public Dictionary<LLVMBasicBlockRef, CilInstructionLabel> Labels { get; } = new();
 	public Dictionary<LLVMValueRef, Parameter> Parameters { get; } = new();
 
-	public void LoadLocalOrConstant(LLVMValueRef operand, out TypeSignature typeSignature)
+	public void LoadOperand(LLVMValueRef operand)
+	{
+		LoadOperand(operand, out _);
+	}
+
+	public void LoadOperand(LLVMValueRef operand, out TypeSignature typeSignature)
 	{
 		switch (operand.Kind)
 		{
@@ -44,9 +56,16 @@ internal sealed class FunctionContext
 				break;
 			case LLVMValueKind.LLVMInstructionValueKind:
 				{
-					CilLocalVariable local = Locals[operand];
+					CilLocalVariable local = InstructionLocals[operand];
 					Instructions.Add(CilOpCodes.Ldloc, local);
 					typeSignature = local.VariableType;
+				}
+				break;
+			case LLVMValueKind.LLVMArgumentValueKind:
+				{
+					Parameter parameter = Parameters[operand];
+					Instructions.Add(CilOpCodes.Ldarg, parameter);
+					typeSignature = parameter.ParameterType;
 				}
 				break;
 			default:
@@ -59,7 +78,8 @@ internal sealed class FunctionContext
 		return operand.Kind switch
 		{
 			LLVMValueKind.LLVMConstantIntValueKind => Module.GetTypeSignature(operand.TypeOf),
-			LLVMValueKind.LLVMInstructionValueKind => Locals[operand].VariableType,
+			LLVMValueKind.LLVMInstructionValueKind => InstructionLocals[operand].VariableType,
+			LLVMValueKind.LLVMArgumentValueKind => Parameters[operand].ParameterType,
 			_ => throw new NotSupportedException(),
 		};
 	}
