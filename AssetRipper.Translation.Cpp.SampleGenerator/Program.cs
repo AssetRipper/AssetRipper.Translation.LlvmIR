@@ -6,19 +6,30 @@ namespace AssetRipper.Translation.Cpp.SampleGenerator;
 
 internal static class Program
 {
+	private sealed record class HashFile(string ClangVersionInfo, Dictionary<string, uint> Hashes);
+
 	static void Main()
 	{
+		string clangVersionInfo = GetClangVersionInfo();
 		Dictionary<string, uint> hashes;
 		const string PathToHashes = "hashes.json";
 		if (File.Exists(PathToHashes))
 		{
 			string json = File.ReadAllText(PathToHashes);
-			hashes = JsonSerializer.Deserialize<Dictionary<string, uint>>(json) ?? [];
-			foreach (string path in hashes.Keys.ToArray())
+			HashFile? hashFile = JsonSerializer.Deserialize<HashFile>(json);
+			if (hashFile is null or { Hashes: null } || hashFile.ClangVersionInfo != clangVersionInfo)
 			{
-				if (!File.Exists(path))
+				hashes = [];
+			}
+			else
+			{
+				hashes = hashFile.Hashes;
+				foreach (string path in hashes.Keys.ToArray())
 				{
-					hashes.Remove(path);
+					if (!File.Exists(path))
+					{
+						hashes.Remove(path);
+					}
 				}
 			}
 		}
@@ -30,7 +41,7 @@ internal static class Program
 		const string PathToSamples = "../../../../Samples";
 		foreach (string file in Directory.EnumerateFiles(PathToSamples, "*.cpp", SearchOption.TopDirectoryOnly))
 		{
-			uint hash = HashFile(file);
+			uint hash = ComputeHash(file);
 			string ir_path = Path.ChangeExtension(file, ".ll");
 			if (!hashes.TryGetValue(file, out uint old_hash) || old_hash != hash || !File.Exists(ir_path))
 			{
@@ -42,12 +53,12 @@ internal static class Program
 			}
 		}
 
-		File.WriteAllText(PathToHashes, JsonSerializer.Serialize(hashes));
+		File.WriteAllText(PathToHashes, JsonSerializer.Serialize(new HashFile(clangVersionInfo, hashes)));
 
 		Console.WriteLine("Done!");
 	}
 
-	private static uint HashFile(string path)
+	private static uint ComputeHash(string path)
 	{
 		return Crc32.HashToUInt32(File.ReadAllBytes(path));
 	}
@@ -85,6 +96,43 @@ internal static class Program
 			{
 				Console.WriteLine(error);
 			}
+		}
+
+		if (!File.Exists(outputFile))
+		{
+			throw new FileNotFoundException($"Failed to generate IR for {inputFile}");
+		}
+		else
+		{
+			string[] lines = File.ReadAllLines(outputFile);
+			if (lines.Length > 4
+				&& lines[0].StartsWith("; ModuleID = ", StringComparison.Ordinal)
+				&& lines[1].StartsWith("source_filename = ", StringComparison.Ordinal)
+				&& lines[2].StartsWith("target datalayout = ", StringComparison.Ordinal)
+				&& lines[3].StartsWith("target triple = ", StringComparison.Ordinal))
+			{
+				// Remove the target lines
+				string sourceFilenameLine = $"source_filename = \"{Path.GetFileName(inputFile)}\"";
+				string contents = string.Join('\n', lines.Skip(4).Prepend(sourceFilenameLine)) + '\n';
+				File.WriteAllText(outputFile, contents);
+			}
+		}
+	}
+
+	private static string GetClangVersionInfo()
+	{
+		ProcessStartInfo processInfo = new("clang", "--version")
+		{
+			RedirectStandardOutput = true,
+			UseShellExecute = false,
+			CreateNoWindow = true,
+		};
+		using (Process process = new())
+		{
+			process.StartInfo = processInfo;
+			process.Start();
+			process.WaitForExit();
+			return process.StandardOutput.ReadToEnd();
 		}
 	}
 }

@@ -1,7 +1,4 @@
-; ModuleID = '../../../../Samples\template_addition_function.cpp'
-source_filename = "../../../../Samples\\template_addition_function.cpp"
-target datalayout = "e-m:w-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128"
-target triple = "x86_64-pc-windows-msvc19.41.33923"
+source_filename = "template_addition_function.cpp"
 
 $"??$add@H@@YAHHH@Z" = comdat any
 

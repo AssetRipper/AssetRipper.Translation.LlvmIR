@@ -1,7 +1,4 @@
-; ModuleID = '../../../../Samples\abs_int_functions.cpp'
-source_filename = "../../../../Samples\\abs_int_functions.cpp"
-target datalayout = "e-m:w-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128"
-target triple = "x86_64-pc-windows-msvc19.41.33923"
+source_filename = "abs_int_functions.cpp"
 
 ; Function Attrs: mustprogress noinline nounwind optnone uwtable
 define dso_local i32 @abs_if_blocks(i32 noundef %0) #0 {

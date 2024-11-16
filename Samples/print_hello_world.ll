@@ -1,7 +1,4 @@
-; ModuleID = '../../../../Samples\print_hello_world.cpp'
-source_filename = "../../../../Samples\\print_hello_world.cpp"
-target datalayout = "e-m:w-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128"
-target triple = "x86_64-pc-windows-msvc19.41.33923"
+source_filename = "print_hello_world.cpp"
 
 %"class.std::basic_ostream" = type { ptr, [4 x i8], i32, %"class.std::basic_ios" }
 %"class.std::basic_ios" = type { %"class.std::ios_base", ptr, ptr, i8 }
@@ -208,7 +205,7 @@ $"??$max@_K@std@@YAAEB_KAEB_K0@Z" = comdat any
 
 $"??$min@_K@std@@YAAEB_KAEB_K0@Z" = comdat any
 
-$"?max@?$numeric_limits@_J@std@@SA_JXZ" = comdat any
+$"??$_Max_limit@_J@std@@YA_JXZ" = comdat any
 
 $"?_Get_first@?$_Compressed_pair@V?$allocator@D@std@@V?$_String_val@U?$_Simple_types@D@std@@@2@$00@std@@QEBAAEBV?$allocator@D@2@XZ" = comdat any
 
@@ -2400,7 +2397,7 @@ define linkonce_odr dso_local noundef i64 @"?max_size@?$basic_string@DU?$char_tr
   %13 = load i64, ptr %4, align 8
   %14 = sub i64 %13, 1
   store i64 %14, ptr %6, align 8
-  %15 = call noundef i64 @"?max@?$numeric_limits@_J@std@@SA_JXZ"() #3
+  %15 = call noundef i64 @"??$_Max_limit@_J@std@@YA_JXZ"() #3
   store i64 %15, ptr %7, align 8
   %16 = call noundef nonnull align 8 dereferenceable(8) ptr @"??$min@_K@std@@YAAEB_KAEB_K0@Z"(ptr noundef nonnull align 8 dereferenceable(8) %7, ptr noundef nonnull align 8 dereferenceable(8) %6) #3
   %17 = load i64, ptr %16, align 8
@@ -2642,7 +2639,9 @@ define linkonce_odr dso_local noundef nonnull align 8 dereferenceable(8) ptr @"?
 }
 
 ; Function Attrs: mustprogress noinline nounwind optnone uwtable
-define linkonce_odr dso_local noundef i64 @"?max@?$numeric_limits@_J@std@@SA_JXZ"() #1 comdat align 2 {
+define linkonce_odr dso_local noundef i64 @"??$_Max_limit@_J@std@@YA_JXZ"() #1 comdat {
+  %1 = alloca i64, align 8
+  store i64 -1, ptr %1, align 8
   ret i64 9223372036854775807
 }
 
