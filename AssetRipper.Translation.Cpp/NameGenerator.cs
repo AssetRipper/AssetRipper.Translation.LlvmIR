@@ -11,9 +11,9 @@ internal static class NameGenerator
 	private const string Base32Characters = "abcdefghijklmnopqrstuvwxyz234579";
 
 	/// <summary>
-	/// Modified: replaced + and / with 0
+	/// Modified: replaced + and / with Σ (sigma) and Ω (omega).
 	/// </summary>
-	private const string Base64Characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz012345678900";
+	private const string Base64Characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789ΣΩ";
 
 	public static string GenerateName(string demangledName, string name)
 	{
