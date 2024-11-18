@@ -175,9 +175,18 @@ public static unsafe class CppTranslator
 										TypeSignature loadTypeSignature = loadInstructionContext.ResultTypeSignature ?? throw new NullReferenceException();
 
 										if (loadInstructionContext.SourceInstruction is AllocaInstructionContext { DataLocal: not null } allocaSource
-											&& SignatureComparer.Default.Equals(allocaSource.DataLocal.VariableType, loadTypeSignature))
+											//&& SignatureComparer.Default.Equals(allocaSource.DataLocal.VariableType, loadTypeSignature)// Disabled because of incorrect types
+											)
 										{
-											instructions.Add(CilOpCodes.Ldloc, allocaSource.DataLocal);
+											if (SignatureComparer.Default.Equals(allocaSource.DataLocal.VariableType, loadTypeSignature))
+											{
+												instructions.Add(CilOpCodes.Ldloc, allocaSource.DataLocal);
+											}
+											else
+											{
+												instructions.Add(CilOpCodes.Ldloca, allocaSource.DataLocal);
+												instructions.AddLoadIndirect(loadTypeSignature);
+											}
 										}
 										else
 										{
@@ -197,10 +206,20 @@ public static unsafe class CppTranslator
 										TypeSignature storeTypeSignature = moduleContext.GetTypeSignature(storeType);
 
 										if (storeInstructionContext.DestinationInstruction is AllocaInstructionContext { DataLocal: not null } allocaDestination
-											&& SignatureComparer.Default.Equals(allocaDestination.DataLocal.VariableType, storeTypeSignature))
+											//&& SignatureComparer.Default.Equals(allocaDestination.DataLocal.VariableType, storeTypeSignature)// Disabled because of incorrect parameter types
+											)
 										{
-											functionContext.LoadOperand(storeInstructionContext.SourceOperand);
-											instructions.Add(CilOpCodes.Stloc, allocaDestination.DataLocal);
+											if (SignatureComparer.Default.Equals(allocaDestination.DataLocal.VariableType, storeTypeSignature))
+											{
+												functionContext.LoadOperand(storeInstructionContext.SourceOperand);
+												instructions.Add(CilOpCodes.Stloc, allocaDestination.DataLocal);
+											}
+											else
+											{
+												instructions.Add(CilOpCodes.Ldloca, allocaDestination.DataLocal);
+												functionContext.LoadOperand(storeInstructionContext.SourceOperand);
+												instructions.AddStoreIndirect(storeTypeSignature);
+											}
 										}
 										else
 										{
