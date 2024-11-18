@@ -69,7 +69,7 @@ internal sealed class ModuleContext
 		foreach ((LLVMValueRef function, FunctionContext functionContext) in Methods)
 		{
 			functionContext.DemangledName = LibLLVMSharp.ValueGetDemangledName(function);
-			functionContext.CleanName = ExtractCleanName(functionContext.MangledName);
+			functionContext.CleanName = ExtractCleanName(functionContext.MangledName).Replace('.', '_');
 
 			if (!demangledNames.TryGetValue(functionContext.CleanName, out List<FunctionContext>? list))
 			{
