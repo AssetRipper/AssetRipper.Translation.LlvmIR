@@ -18,6 +18,7 @@ internal sealed class ModuleContext
 		Definition = definition;
 		GlobalMembersType = CreateGlobalMembersType(definition);
 		ConstantsType = CreateConstantsType(definition);
+		IntrinsicsType = IntrinsicFunctionImplementer.InjectIntrinsics(Definition);
 
 		CompilerGeneratedAttributeConstructor = (IMethodDefOrRef)definition.DefaultImporter.ImportMethod(typeof(CompilerGeneratedAttribute).GetConstructors()[0]);
 
@@ -30,6 +31,7 @@ internal sealed class ModuleContext
 	public ModuleDefinition Definition { get; }
 	public TypeDefinition GlobalMembersType { get; }
 	public TypeDefinition ConstantsType { get; }
+	public TypeDefinition IntrinsicsType { get; }
 	public TypeDefinition PrivateImplementationDetails { get; }
 	private IMethodDefOrRef CompilerGeneratedAttributeConstructor { get; }
 	public Dictionary<LLVMValueRef, FunctionContext> Methods { get; } = new();

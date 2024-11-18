@@ -127,8 +127,11 @@ public static unsafe class CppTranslator
 
 					if (functionContext.BasicBlocks.Count == 0)
 					{
-						instructions.Add(CilOpCodes.Ldnull);
-						instructions.Add(CilOpCodes.Throw);
+						if (!IntrinsicFunctionImplementer.TryFillIntrinsicFunction(functionContext))
+						{
+							instructions.Add(CilOpCodes.Ldnull);
+							instructions.Add(CilOpCodes.Throw);
+						}
 						continue;
 					}
 
