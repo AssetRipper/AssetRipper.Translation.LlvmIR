@@ -1,9 +1,12 @@
-﻿using AsmResolver.DotNet;
+﻿using AsmResolver;
+using AsmResolver.DotNet;
 using AsmResolver.DotNet.Signatures;
 using AsmResolver.PE.DotNet.Metadata.Tables;
 using AssetRipper.CIL;
 using LLVMSharp.Interop;
 using System.Diagnostics;
+using System.Runtime.CompilerServices;
+using System.Security.Cryptography;
 
 namespace AssetRipper.Translation.Cpp;
 
@@ -13,12 +16,25 @@ internal sealed class ModuleContext
 	{
 		Module = module;
 		Definition = definition;
+		GlobalMembersType = CreateGlobalMembersType(definition);
+		ConstantsType = CreateConstantsType(definition);
+
+		CompilerGeneratedAttributeConstructor = (IMethodDefOrRef)definition.DefaultImporter.ImportMethod(typeof(CompilerGeneratedAttribute).GetConstructors()[0]);
+
+		PrivateImplementationDetails = new TypeDefinition(null, "<PrivateImplementationDetails>", TypeAttributes.NotPublic | TypeAttributes.AutoLayout | TypeAttributes.AnsiClass | TypeAttributes.Sealed);
+		AddCompilerGeneratedAttribute(PrivateImplementationDetails);
+		Definition.TopLevelTypes.Add(PrivateImplementationDetails);
 	}
 
 	public LLVMModuleRef Module { get; }
 	public ModuleDefinition Definition { get; }
+	public TypeDefinition GlobalMembersType { get; }
+	public TypeDefinition ConstantsType { get; }
+	public TypeDefinition PrivateImplementationDetails { get; }
+	private IMethodDefOrRef CompilerGeneratedAttributeConstructor { get; }
 	public Dictionary<LLVMValueRef, FunctionContext> Methods { get; } = new();
 	public Dictionary<string, TypeDefinition> Structs { get; } = new();
+	public Dictionary<LLVMValueRef, FieldDefinition> GlobalConstants { get; } = new();
 	private readonly Dictionary<(TypeSignature, int), TypeDefinition> inlineArrayCache = new();
 
 	public TypeDefinition GetOrCreateInlineArray(TypeSignature type, int size)
@@ -39,10 +55,9 @@ internal sealed class ModuleContext
 
 	public void CreateFunctions()
 	{
-		TypeDefinition globalMembersType = CreateGlobalMembersType(Definition);
 		foreach (LLVMValueRef function in Module.GetFunctions())
 		{
-			MethodDefinition method = CreateNewMethod(globalMembersType);
+			MethodDefinition method = CreateNewMethod(GlobalMembersType);
 			FunctionContext functionContext = FunctionContext.Create(function, method, this);
 			Methods.Add(function, functionContext);
 		}
@@ -205,7 +220,17 @@ internal sealed class ModuleContext
 
 	private static TypeDefinition CreateGlobalMembersType(ModuleDefinition moduleDefinition)
 	{
-		TypeDefinition typeDefinition = new(null, "GlobalMembers", TypeAttributes.Public | TypeAttributes.Abstract | TypeAttributes.Sealed);
+		return CreateStaticType(moduleDefinition, "GlobalMembers");
+	}
+
+	private static TypeDefinition CreateConstantsType(ModuleDefinition moduleDefinition)
+	{
+		return CreateStaticType(moduleDefinition, "Constants");
+	}
+
+	private static TypeDefinition CreateStaticType(ModuleDefinition moduleDefinition, string name)
+	{
+		TypeDefinition typeDefinition = new(null, name, TypeAttributes.Public | TypeAttributes.Abstract | TypeAttributes.Sealed);
 		moduleDefinition.TopLevelTypes.Add(typeDefinition);
 		return typeDefinition;
 	}
@@ -222,5 +247,69 @@ internal sealed class ModuleContext
 		{
 			return name;
 		}
+	}
+
+	private void AddCompilerGeneratedAttribute(IHasCustomAttribute hasCustomAttribute)
+	{
+		CustomAttributeSignature attributeSignature = new();
+		CustomAttribute attribute = new((ICustomAttributeType)CompilerGeneratedAttributeConstructor, attributeSignature);
+		hasCustomAttribute.CustomAttributes.Add(attribute);
+	}
+
+	/// <summary>
+	/// Adds a byte array field to the PrivateImplementationDetails class.
+	/// </summary>
+	/// <param name="fieldName">The name of the field.</param>
+	/// <param name="data">The data contained within the field.</param>
+	/// <returns>The field's <see cref="FieldDefinition"/>.</returns>
+	public FieldDefinition AddStoredDataField(byte[] data)
+	{
+		TypeDefinition nestedType = GetOrCreateStaticArrayInitType(data.Length);
+
+		string fieldName = HashDataToBase64(data);
+		TypeSignature fieldType = nestedType.ToTypeSignature();
+		FieldDefinition privateImplementationField = new FieldDefinition(fieldName, FieldAttributes.Assembly | FieldAttributes.Static, fieldType);
+		privateImplementationField.IsInitOnly = true;
+		privateImplementationField.FieldRva = new DataSegment(data);
+		privateImplementationField.HasFieldRva = true;
+		AddCompilerGeneratedAttribute(privateImplementationField);
+
+		PrivateImplementationDetails.Fields.Add(privateImplementationField);
+
+		return privateImplementationField;
+
+		//This might not be the correct way to choose a field name, but I think the specification allows it.
+		//In any case, ILSpy handles it the way we want, which is all that matters.
+		static string HashDataToBase64(byte[] data)
+		{
+			byte[] hash = SHA256.HashData(data);
+			return Convert.ToBase64String(hash, Base64FormattingOptions.None);
+		}
+	}
+
+	private TypeDefinition GetOrCreateStaticArrayInitType(int length)
+	{
+		string name = $"__StaticArrayInitTypeSize={length}";
+
+		foreach (TypeDefinition nestedType in PrivateImplementationDetails.NestedTypes)
+		{
+			if (nestedType.Name == name)
+			{
+				return nestedType;
+			}
+		}
+
+		TypeDefinition result = new TypeDefinition(null, name,
+			TypeAttributes.NestedPrivate |
+			TypeAttributes.ExplicitLayout |
+			TypeAttributes.AnsiClass |
+			TypeAttributes.Sealed);
+		PrivateImplementationDetails.NestedTypes.Add(result);
+
+		result.BaseType = Definition.DefaultImporter.ImportType(typeof(ValueType));
+		result.ClassLayout = new ClassLayout(1, (uint)length);
+		AddCompilerGeneratedAttribute(result);
+
+		return result;
 	}
 }

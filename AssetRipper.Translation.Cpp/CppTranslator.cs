@@ -18,7 +18,7 @@ public static unsafe class CppTranslator
 
 	public static void Translate(string inputPath, string outputPath, bool removeDeadCode = false)
 	{
-		ModuleDefinition moduleDefinition = new("ConvertedCpp");
+		ModuleDefinition moduleDefinition = new("ConvertedCpp", KnownCorLibs.SystemRuntime_v8_0_0_0);
 		LLVMMemoryBufferRef buffer = LoadIR(inputPath);
 		try
 		{
@@ -49,18 +49,22 @@ public static unsafe class CppTranslator
 					var metadataList = module.GetNamedMetadata().ToList();
 				}
 
+				ModuleContext moduleContext = new(module, moduleDefinition);
+
 				foreach (LLVMValueRef global in module.GetGlobals())
 				{
 					Debug.Assert(global.OperandCount == 1);
 					LLVMValueRef operand = global.GetOperand(0);
-					LLVMTypeRef type = operand.TypeOf;
-					LLVMTypeRef globalType = LLVM.GlobalGetValueType(global);
-					//I don't think this is feasible right now.
-					//I think it needs improvements to libLLVMSharp.
+					//LLVMTypeRef type = operand.TypeOf;
+					//LLVMTypeRef globalType = LLVM.GlobalGetValueType(global);
 					//https://github.com/llvm/llvm-project/blob/ccf357ff643c6af86bb459eba5a00f40f1dcaf22/llvm/include/llvm/IR/Constants.h#L584
-				}
 
-				ModuleContext moduleContext = new(module, moduleDefinition);
+					ReadOnlySpan<byte> data = LibLLVMSharp.ConstantDataArrayGetData(operand);
+
+					FieldDefinition field = moduleContext.AddStoredDataField(data.ToArray());
+
+					moduleContext.GlobalConstants.Add(global, field);
+				}
 
 				moduleContext.CreateFunctions();
 

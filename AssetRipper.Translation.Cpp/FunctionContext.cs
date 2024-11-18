@@ -110,6 +110,13 @@ internal sealed class FunctionContext
 					typeSignature = parameter.ParameterType;
 				}
 				break;
+			case LLVMValueKind.LLVMGlobalVariableValueKind:
+				{
+					FieldDefinition field = Module.GlobalConstants[operand];
+					CilInstructions.Add(CilOpCodes.Ldsflda, field);
+					typeSignature = Module.Definition.CorLibTypeFactory.Byte.MakePointerType();
+				}
+				break;
 			default:
 				throw new NotSupportedException();
 		}

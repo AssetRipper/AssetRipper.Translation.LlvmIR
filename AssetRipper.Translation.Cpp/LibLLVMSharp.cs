@@ -13,6 +13,9 @@ internal static unsafe class LibLLVMSharp
 	[DllImport("libLLVMSharp", CallingConvention = CallingConvention.Cdecl, EntryPoint = "llvmsharp_Function_getFunctionType", ExactSpelling = true)]
 	private static extern LLVMOpaqueType* FunctionGetFunctionType(LLVMOpaqueValue* Fn);
 
+	[DllImport("libLLVMSharp", CallingConvention = CallingConvention.Cdecl, EntryPoint = "llvmsharp_ConstantDataArray_getData", ExactSpelling = true)]
+	private static extern byte* ConstantDataArrayGetData(LLVMOpaqueValue* ConstantDataArray, int* out_size);
+
 	[DllImport("libLLVMSharp", CallingConvention = CallingConvention.Cdecl, EntryPoint = "llvmsharp_Value_getDemangledName", ExactSpelling = true)]
 	private static extern int ValueGetDemangledName(LLVMOpaqueValue* value, byte* buffer, int buffer_size);
 #pragma warning restore SYSLIB1054 // Use 'LibraryImportAttribute' instead of 'DllImportAttribute' to generate P/Invoke marshalling code at compile time
@@ -33,6 +36,13 @@ internal static unsafe class LibLLVMSharp
 	public static LLVMTypeRef FunctionGetFunctionType(LLVMValueRef fn)
 	{
 		return FunctionGetFunctionType((LLVMOpaqueValue*)fn);
+	}
+
+	public static ReadOnlySpan<byte> ConstantDataArrayGetData(LLVMValueRef constantDataArray)
+	{
+		int size;
+		byte* data = ConstantDataArrayGetData((LLVMOpaqueValue*)constantDataArray, &size);
+		return new ReadOnlySpan<byte>(data, size);
 	}
 
 	public static string? ValueGetDemangledName(LLVMValueRef value)
