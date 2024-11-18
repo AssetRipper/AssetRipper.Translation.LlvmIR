@@ -354,8 +354,6 @@ public static unsafe class CppTranslator
 								default:
 									switch (instruction.InstructionOpcode)
 									{
-										case LLVMOpcode.LLVMSwitch:
-											goto default;
 										case LLVMOpcode.LLVMIndirectBr:
 											goto default;
 										case LLVMOpcode.LLVMInvoke:
