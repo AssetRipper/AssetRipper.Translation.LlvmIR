@@ -129,4 +129,12 @@ internal static class LLVMExtensions
 	{
 		return value.Kind == LLVMValueKind.LLVMInstructionValueKind;
 	}
+
+	public static unsafe double GetFloatingPointValue(this LLVMValueRef value)
+	{
+		int losesInfo = default;
+		return value.Kind is LLVMValueKind.LLVMConstantFPValueKind
+			? LLVM.ConstRealGetDouble(value, &losesInfo)
+			: default;
+	}
 }

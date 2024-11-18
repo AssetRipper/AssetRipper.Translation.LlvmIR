@@ -3,6 +3,7 @@ using AsmResolver.DotNet.Code.Cil;
 using AsmResolver.DotNet.Collections;
 using AsmResolver.DotNet.Signatures;
 using AsmResolver.PE.DotNet.Cil;
+using AsmResolver.PE.DotNet.Metadata.Tables;
 using LLVMSharp.Interop;
 using System.Diagnostics;
 
@@ -117,6 +118,23 @@ internal sealed class FunctionContext
 					typeSignature = Module.Definition.CorLibTypeFactory.Byte.MakePointerType();
 				}
 				break;
+			case LLVMValueKind.LLVMConstantFPValueKind:
+				{
+					double value = operand.GetFloatingPointValue();
+					typeSignature = Module.GetTypeSignature(operand.TypeOf);
+					switch (typeSignature)
+					{
+						case CorLibTypeSignature { ElementType: ElementType.R4 }:
+							CilInstructions.Add(CilOpCodes.Ldc_R4, (float)value);
+							break;
+						case CorLibTypeSignature { ElementType: ElementType.R8 }:
+							CilInstructions.Add(CilOpCodes.Ldc_R8, value);
+							break;
+						default:
+							throw new NotSupportedException();
+					}
+				}
+				break;
 			default:
 				throw new NotSupportedException();
 		}
@@ -126,9 +144,10 @@ internal sealed class FunctionContext
 	{
 		return operand.Kind switch
 		{
-			LLVMValueKind.LLVMConstantIntValueKind => Module.GetTypeSignature(operand.TypeOf),
+			LLVMValueKind.LLVMConstantIntValueKind or LLVMValueKind.LLVMConstantFPValueKind => Module.GetTypeSignature(operand.TypeOf),
 			LLVMValueKind.LLVMInstructionValueKind => InstructionLookup[operand].ResultTypeSignature!,// Todo: handle null
 			LLVMValueKind.LLVMArgumentValueKind => Parameters[operand].ParameterType,
+			LLVMValueKind.LLVMGlobalVariableValueKind => Module.Definition.CorLibTypeFactory.Byte.MakePointerType(),
 			_ => throw new NotSupportedException(),
 		};
 	}
