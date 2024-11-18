@@ -15,12 +15,12 @@ internal static class NameGenerator
 	/// </summary>
 	private const string Base64Characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789ΣΩ";
 
-	public static string GenerateName(string demangledName, string name)
+	public static string GenerateName(string cleanName, string name)
 	{
 		uint hash = Crc32.HashToUInt32(Encoding.UTF8.GetBytes(name));
 		Span<char> buffer = stackalloc char[7];
 		WriteBase32(hash, buffer);
-		return $"{demangledName}_{buffer}";
+		return $"{cleanName}_{buffer}";
 	}
 
 	private static void WriteBase32(uint value, Span<char> buffer)

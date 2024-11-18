@@ -1,9 +1,7 @@
 ﻿using AsmResolver.DotNet;
 using AsmResolver.DotNet.Code.Cil;
-using AsmResolver.DotNet.Collections;
 using AsmResolver.DotNet.Signatures;
 using AsmResolver.PE.DotNet.Cil;
-using AsmResolver.PE.DotNet.Metadata.Tables;
 using AssetRipper.CIL;
 using LLVMSharp.Interop;
 using System.Diagnostics;
@@ -50,10 +48,6 @@ public static unsafe class CppTranslator
 					var ifuncs = module.GetGlobalIFuncs().ToList();
 					var metadataList = module.GetNamedMetadata().ToList();
 				}
-				TypeDefinition typeDefinition = new(null, "GlobalMembers", TypeAttributes.Public | TypeAttributes.Abstract | TypeAttributes.Sealed);
-				moduleDefinition.TopLevelTypes.Add(typeDefinition);
-
-				ModuleContext moduleContext = new(module, moduleDefinition);
 
 				foreach (LLVMValueRef global in module.GetGlobals())
 				{
@@ -66,304 +60,238 @@ public static unsafe class CppTranslator
 					//https://github.com/llvm/llvm-project/blob/ccf357ff643c6af86bb459eba5a00f40f1dcaf22/llvm/include/llvm/IR/Constants.h#L584
 				}
 
-				Dictionary<string, List<MethodDefinition>> demangledNames = new();
-				foreach (LLVMValueRef function in module.GetFunctions())
-				{
-					//string? functionName = LibLLVMSharp.ValueGetDemangledName(function);
-					LLVMTypeRef functionType = LibLLVMSharp.FunctionGetFunctionType(function);
-					LLVMTypeRef returnType = LibLLVMSharp.FunctionGetReturnType(function);
-					TypeSignature returnTypeSignature = moduleContext.GetTypeSignature(returnType);
-					MethodSignature signature = MethodSignature.CreateStatic(returnTypeSignature);
+				ModuleContext moduleContext = new(module, moduleDefinition);
 
-					string mangledName = function.Name;
-					string demangledName = Demangle(mangledName);
-					MethodDefinition method = new(mangledName, MethodAttributes.Public | MethodAttributes.Static | MethodAttributes.HideBySig, signature);
-					moduleContext.Methods.Add(function, new FunctionContext(function, method, moduleContext));
-					if (!demangledNames.TryGetValue(demangledName, out List<MethodDefinition>? list))
-					{
-						list = new();
-						demangledNames.Add(demangledName, list);
-					}
-					list.Add(method);
-				}
+				moduleContext.CreateFunctions();
 
-				foreach ((string demangledName, List<MethodDefinition> list) in demangledNames)
+				moduleContext.AssignFunctionNames();
+
+				moduleContext.InitializeMethodSignatures();
+
+				foreach ((LLVMValueRef function, FunctionContext functionContext) in moduleContext.Methods)
 				{
-					if (list.Count == 1)
+					MethodDefinition method = functionContext.Definition;
+					Debug.Assert(method.CilMethodBody is not null);
+
+					CilInstructionCollection instructions = method.CilMethodBody.Instructions;
+
+					functionContext.CreateLabelsForBasicBlocks();
+
+					functionContext.Analyze();
+
+					foreach (InstructionContext instruction in functionContext.Instructions)
 					{
-						list[0].Name = demangledName;
-					}
-					else
-					{
-						foreach (MethodDefinition method in list)
+						switch (instruction)
 						{
-							method.Name = NameGenerator.GenerateName(demangledName, method.Name!);
+							case AllocaInstructionContext allocaInstruction:
+								{
+									if (allocaInstruction.FixedSize != 1)
+									{
+										throw new NotSupportedException("Fixed size array not supported");
+									}
+									else
+									{
+										allocaInstruction.DataLocal = instructions.AddLocalVariable(allocaInstruction.AllocatedTypeSignature);
+									}
+
+									if (allocaInstruction.Accessors.Count > 0)
+									{
+										CilLocalVariable pointerLocal = instructions.AddLocalVariable(allocaInstruction.PointerTypeSignature);
+										allocaInstruction.PointerLocal = pointerLocal;
+										instruction.Function.InstructionLocals[instruction.Instruction] = pointerLocal;
+									}
+								}
+								break;
+							default:
+								if (instruction.HasResult)
+								{
+									CilLocalVariable resultLocal = instructions.AddLocalVariable(instruction.ResultTypeSignature);
+									instruction.Function.InstructionLocals[instruction.Instruction] = resultLocal;
+								}
+								break;
 						}
 					}
+
+					functionContext.FixMethodReturnType();
 				}
 
 				foreach ((LLVMValueRef function, FunctionContext functionContext) in moduleContext.Methods)
 				{
 					MethodDefinition method = functionContext.Definition;
-					string functionString = function.ToString();
 
-					typeDefinition.Methods.Add(method);
+					CilInstructionCollection instructions = method.CilMethodBody!.Instructions;
 
-					foreach (LLVMValueRef parameter in function.GetParams())
-					{
-						LLVMTypeRef type = parameter.TypeOf;
-						TypeSignature parameterType = moduleContext.GetTypeSignature(type);
-						functionContext.Parameters[parameter] = method.AddParameter(parameterType);
-					}
-
-					method.CilMethodBody = new(method);
-
-					CilInstructionCollection instructions = method.CilMethodBody.Instructions;
-
-					if (function.BasicBlocksCount == 0)
+					if (functionContext.BasicBlocks.Count == 0)
 					{
 						instructions.Add(CilOpCodes.Ldnull);
 						instructions.Add(CilOpCodes.Throw);
 						continue;
 					}
 
-					foreach (LLVMBasicBlockRef basicBlock in function.GetBasicBlocks())
-					{
-						functionContext.Labels[basicBlock] = new();
-					}
+					functionContext.CreateLabelsForBasicBlocks();
 
-					bool hasReturn = false;
-					bool hasSingleReturn = true;
-					TypeSignature? actualReturnType = null;
+					functionContext.Analyze();
 
-					foreach ((LLVMBasicBlockRef basicBlock, CilInstructionLabel blockLabel) in functionContext.Labels)
+					foreach (BasicBlockContext basicBlock in functionContext.BasicBlocks)
 					{
+						CilInstructionLabel blockLabel = functionContext.Labels[basicBlock.Block];
 						blockLabel.Instruction = instructions.Add(CilOpCodes.Nop);
 
-						foreach (LLVMValueRef instruction in basicBlock.GetInstructions())
+						foreach (InstructionContext instructionContext in basicBlock.Instructions)
 						{
-							InstructionContext instructionContext = new(instruction, functionContext);
-							string instructionString = instruction.ToString();
-							switch (instruction.InstructionOpcode)
+							LLVMValueRef instruction = instructionContext.Instruction;
+							switch (instructionContext)
 							{
-								case LLVMOpcode.LLVMRet:
-									if (instructionContext.Operands.Length == 1)
+								case AllocaInstructionContext allocaInstructionContext:
 									{
-										if (instructionContext.Operands[0].Kind == LLVMValueKind.LLVMInstructionValueKind)
-										{
-											CilLocalVariable returnLocal = functionContext.InstructionLocals[instructionContext.Operands[0]];
-											instructions.Add(CilOpCodes.Ldloc, returnLocal);
+										TypeSignature allocatedTypeSignature = allocaInstructionContext.AllocatedTypeSignature;
 
-											if (!hasReturn)
-											{
-												hasReturn = true;
-												actualReturnType = returnLocal.VariableType;
-											}
-											else if (hasSingleReturn && !SignatureComparer.Default.Equals(actualReturnType, returnLocal.VariableType))
-											{
-												hasSingleReturn = false;
-												actualReturnType = null;
-											}
+										if (allocaInstructionContext.DataLocal is null)
+										{
+											throw new NotSupportedException("Stack allocated data not currently supported");
 										}
 										else
 										{
-											throw new NotImplementedException();
-										}
-									}
-									else if (instructionContext.Operands.Length != 0)
-									{
-										throw new NotSupportedException();
-									}
-									else
-									{
-										if (!hasReturn)
-										{
-											hasReturn = true;
-
-										}
-										else if (hasSingleReturn && actualReturnType is not null)
-										{
-											hasSingleReturn = false;
-											actualReturnType = null;
-										}
-									}
-
-									instructions.Add(CilOpCodes.Ret);
-									break;
-								case LLVMOpcode.LLVMBr:
-									instructionContext.AddBranchInstruction();
-									break;
-								case LLVMOpcode.LLVMSwitch:
-									break;
-								case LLVMOpcode.LLVMIndirectBr:
-									break;
-								case LLVMOpcode.LLVMInvoke:
-									break;
-								case LLVMOpcode.LLVMUnreachable:
-									break;
-								case LLVMOpcode.LLVMCallBr:
-									break;
-								case LLVMOpcode.LLVMFNeg:
-									instructionContext.AddUnaryMathInstruction(CilOpCodes.Neg);
-									break;
-								case LLVMOpcode.LLVMAdd:
-								case LLVMOpcode.LLVMFAdd:
-									instructionContext.AddBinaryMathInstruction(CilOpCodes.Add);
-									break;
-								case LLVMOpcode.LLVMSub:
-								case LLVMOpcode.LLVMFSub:
-									instructionContext.AddBinaryMathInstruction(CilOpCodes.Sub);
-									break;
-								case LLVMOpcode.LLVMMul:
-								case LLVMOpcode.LLVMFMul:
-									instructionContext.AddBinaryMathInstruction(CilOpCodes.Mul);
-									break;
-								case LLVMOpcode.LLVMUDiv:
-									instructionContext.AddBinaryMathInstruction(CilOpCodes.Div_Un);
-									break;
-								case LLVMOpcode.LLVMSDiv:
-								case LLVMOpcode.LLVMFDiv:
-									instructionContext.AddBinaryMathInstruction(CilOpCodes.Div);
-									break;
-								case LLVMOpcode.LLVMURem:
-									instructionContext.AddBinaryMathInstruction(CilOpCodes.Rem_Un);
-									break;
-								case LLVMOpcode.LLVMSRem:
-								case LLVMOpcode.LLVMFRem:
-									instructionContext.AddBinaryMathInstruction(CilOpCodes.Rem);
-									break;
-								case LLVMOpcode.LLVMShl:
-									instructionContext.AddBinaryMathInstruction(CilOpCodes.Shl);
-									break;
-								case LLVMOpcode.LLVMLShr:
-									instructionContext.AddBinaryMathInstruction(CilOpCodes.Shr_Un);//Logical
-									break;
-								case LLVMOpcode.LLVMAShr:
-									instructionContext.AddBinaryMathInstruction(CilOpCodes.Shr);//Arithmetic
-									break;
-								case LLVMOpcode.LLVMAnd:
-									instructionContext.AddBinaryMathInstruction(CilOpCodes.And);
-									break;
-								case LLVMOpcode.LLVMOr:
-									instructionContext.AddBinaryMathInstruction(CilOpCodes.Or);
-									break;
-								case LLVMOpcode.LLVMXor:
-									instructionContext.AddBinaryMathInstruction(CilOpCodes.Xor);
-									break;
-								case LLVMOpcode.LLVMAlloca:
-									{
-										Debug.Assert(instructionContext.Operands.Length == 1);
-										if (instructionContext.Operands[0].Kind is not LLVMValueKind.LLVMConstantIntValueKind)
-										{
-											throw new NotSupportedException("Variable size alloca not supported");
-										}
-
-										LLVMTypeRef allocatedType = LLVM.GetAllocatedType(instruction);
-										TypeSignature allocatedTypeSignature = moduleContext.GetTypeSignature(allocatedType);
-										CilLocalVariable pointerLocal = instructions.AddLocalVariable(allocatedTypeSignature.MakePointerType());
-
-										CilLocalVariable contentLocal;
-										long size = instructionContext.Operands[0].ConstIntSExt;
-										if (size != 1)
-										{
-											throw new NotSupportedException("Fixed size array not supported");
-										}
-										else
-										{
-											contentLocal = instructions.AddLocalVariable(allocatedTypeSignature);
-											functionContext.DataLocals[pointerLocal] = contentLocal;
-
+											// We could zero out the memory here, but it's not necessary because alloca doesn't guarantee zero initialization.
 											//Zero out the memory
-											instructions.Add(CilOpCodes.Ldloca, contentLocal);
-											instructions.Add(CilOpCodes.Initobj, allocatedTypeSignature.ToTypeDefOrRef());
-										}
+											//instructions.Add(CilOpCodes.Ldloca, allocaInstructionContext.DataLocal);
+											//instructions.Add(CilOpCodes.Initobj, allocatedTypeSignature.ToTypeDefOrRef());
 
-										instructions.Add(CilOpCodes.Ldloca, contentLocal);//Might need slight modifications for fixed size arrays.
-										instructions.Add(CilOpCodes.Stloc, pointerLocal);
-										instructionContext.Function.InstructionLocals[instruction] = pointerLocal;
+											if (allocaInstructionContext.PointerLocal is not null)
+											{
+												//Might need slight modifications for fixed size arrays.
+												instructions.Add(CilOpCodes.Ldloca, allocaInstructionContext.DataLocal);
+												instructions.Add(CilOpCodes.Stloc, allocaInstructionContext.PointerLocal);
+											}
+										}
 									}
 									break;
-								case LLVMOpcode.LLVMLoad:
+								case LoadInstructionContext loadInstructionContext:
 									{
-										Debug.Assert(instructionContext.Operands.Length == 1);
-										CilLocalVariable addressLocal = functionContext.InstructionLocals[instructionContext.Operands[0]];
+										TypeSignature loadTypeSignature = loadInstructionContext.ResultTypeSignature ?? throw new NullReferenceException();
 
-										//https://llvm.org/docs/OpaquePointers.html#migration-instructions
-										LLVMTypeRef loadType = instruction.TypeOf;
-										TypeSignature loadTypeSignature = moduleContext.GetTypeSignature(loadType);
-										CilLocalVariable resultLocal = instructions.AddLocalVariable(loadTypeSignature);
-
-										if (functionContext.DataLocals.TryGetValue(addressLocal, out CilLocalVariable? dataLocal)
-											&& SignatureComparer.Default.Equals(dataLocal.VariableType, loadTypeSignature))
+										if (loadInstructionContext.SourceInstruction is AllocaInstructionContext { DataLocal: not null } allocaSource
+											&& SignatureComparer.Default.Equals(allocaSource.DataLocal.VariableType, loadTypeSignature))
 										{
-											instructions.Add(CilOpCodes.Ldloc, dataLocal);
+											instructions.Add(CilOpCodes.Ldloc, allocaSource.DataLocal);
 										}
 										else
 										{
+											CilLocalVariable addressLocal = functionContext.InstructionLocals[loadInstructionContext.SourceOperand];
+
 											instructions.Add(CilOpCodes.Ldloc, addressLocal);
 											instructions.AddLoadIndirect(loadTypeSignature);
 										}
-										instructions.Add(CilOpCodes.Stloc, resultLocal);
 
-										functionContext.InstructionLocals[instruction] = resultLocal;
+										instructions.Add(CilOpCodes.Stloc, functionContext.InstructionLocals[instructionContext.Instruction]);
 									}
 									break;
-								case LLVMOpcode.LLVMStore:
+								case StoreInstructionContext storeInstructionContext:
 									{
-										Debug.Assert(instructionContext.Operands.Length == 2);
-
-										CilLocalVariable addressLocal = functionContext.InstructionLocals[instructionContext.Operands[1]];
-										TypeSignature addressType = addressLocal.VariableType;
-
 										//https://llvm.org/docs/OpaquePointers.html#migration-instructions
 										LLVMTypeRef storeType = instructionContext.Operands[0].TypeOf;
 										TypeSignature storeTypeSignature = moduleContext.GetTypeSignature(storeType);
 
-										if (functionContext.DataLocals.TryGetValue(addressLocal, out CilLocalVariable? dataLocal)
-											&& SignatureComparer.Default.Equals(dataLocal.VariableType, storeTypeSignature))
+										if (storeInstructionContext.DestinationInstruction is AllocaInstructionContext { DataLocal: not null } allocaDestination
+											&& SignatureComparer.Default.Equals(allocaDestination.DataLocal.VariableType, storeTypeSignature))
 										{
-											functionContext.LoadOperand(instructionContext.Operands[0]);
-											instructions.Add(CilOpCodes.Stloc, dataLocal);
+											functionContext.LoadOperand(storeInstructionContext.SourceOperand);
+											instructions.Add(CilOpCodes.Stloc, allocaDestination.DataLocal);
 										}
 										else
 										{
+											CilLocalVariable addressLocal = functionContext.InstructionLocals[instructionContext.Operands[1]];
+
 											instructions.Add(CilOpCodes.Ldloc, addressLocal);
-											functionContext.LoadOperand(instructionContext.Operands[0]);
+											functionContext.LoadOperand(storeInstructionContext.SourceOperand);
 											instructions.AddStoreIndirect(storeTypeSignature);
 										}
-										
 									}
 									break;
-								case LLVMOpcode.LLVMGetElementPtr:
+								case CallInstructionContext callInstructionContext:
 									{
-										Debug.Assert(instructionContext.Operands.Length >= 2);
-										LLVMTypeRef sourceElementType = LLVM.GetGEPSourceElementType(instruction);
-										TypeSignature sourceElementTypeSignature = moduleContext.GetTypeSignature(sourceElementType);
-										TypeSignature resultTypeSignature = sourceElementTypeSignature.MakePointerType();
-
+										for (int i = 0; i < instructionContext.Operands.Length - 1; i++)
+										{
+											instructionContext.LoadOperand(i);
+										}
+										instructions.Add(CilOpCodes.Call, callInstructionContext.FunctionCalled.Definition);
+										if (callInstructionContext.HasResult)
+										{
+											// Todo: pop if the return value isn't used
+											instructions.Add(CilOpCodes.Stloc, functionContext.InstructionLocals[instruction]);
+										}
+									}
+									break;
+								case UnaryMathInstructionContext unaryMathInstructionContext:
+									{
+										functionContext.LoadOperand(unaryMathInstructionContext.Operand);
+										instructions.Add(unaryMathInstructionContext.CilOpCode);
+										instructions.Add(CilOpCodes.Stloc, functionContext.InstructionLocals[instructionContext.Instruction]);
+									}
+									break;
+								case BinaryMathInstructionContext binaryMathInstructionContext:
+									{
+										functionContext.LoadOperand(binaryMathInstructionContext.Operand1);
+										functionContext.LoadOperand(binaryMathInstructionContext.Operand2);
+										instructions.Add(binaryMathInstructionContext.CilOpCode);
+										instructions.Add(CilOpCodes.Stloc, functionContext.InstructionLocals[instructionContext.Instruction]);
+									}
+									break;
+								case NumericComparisonInstructionContext numericComparisonInstructionContext:
+									{
+										functionContext.LoadOperand(numericComparisonInstructionContext.Operand1);
+										functionContext.LoadOperand(numericComparisonInstructionContext.Operand2);
+										numericComparisonInstructionContext.AddComparisonInstruction(instructions);
+										instructions.Add(CilOpCodes.Stloc, functionContext.InstructionLocals[instructionContext.Instruction]);
+									}
+									break;
+								case NumericConversionInstructionContext integerExtendInstructionContext:
+									{
+										functionContext.LoadOperand(integerExtendInstructionContext.Operand);
+										instructions.Add(integerExtendInstructionContext.CilOpCode);
+										instructions.Add(CilOpCodes.Stloc, functionContext.InstructionLocals[instructionContext.Instruction]);
+									}
+									break;
+								case BranchInstructionContext branchInstructionContext:
+									branchInstructionContext.AddBranchInstruction();
+									break;
+								case ReturnInstructionContext returnInstructionContext:
+									{
+										if (returnInstructionContext.HasReturnValue)
+										{
+											functionContext.LoadOperand(returnInstructionContext.ResultOperand);
+										}
+										instructions.Add(CilOpCodes.Ret);
+									}
+									break;
+								case PhiInstructionContext:
+									// Handled by branches
+									break;
+								case GetElementPointerInstructionContext gepInstructionContext:
+									{
 										//This is the pointer. It's generally void* due to stripping.
-										functionContext.LoadOperand(instructionContext.Operands[0], out _);//Pointer
+										functionContext.LoadOperand(instructionContext.Operands[0]);//Pointer
 
 										//This isn't strictly necessary, but it might make ILSpy output better someday.
-										CilLocalVariable pointerLocal = instructions.AddLocalVariable(resultTypeSignature);
-										functionContext.Instructions.Add(CilOpCodes.Stloc, pointerLocal);
-										functionContext.Instructions.Add(CilOpCodes.Ldloc, pointerLocal);
+										CilLocalVariable pointerLocal = instructions.AddLocalVariable(gepInstructionContext.SourceElementTypeSignature.MakePointerType());
+										functionContext.CilInstructions.Add(CilOpCodes.Stloc, pointerLocal);
+										functionContext.CilInstructions.Add(CilOpCodes.Ldloc, pointerLocal);
 
 										//This is the index, which might be a constant.
 										functionContext.LoadOperand(instructionContext.Operands[1], out _);
-										CilInstruction previousInstruction = functionContext.Instructions[^1];
+										CilInstruction previousInstruction = functionContext.CilInstructions[^1];
 
 										if (previousInstruction.IsLoadConstantInteger(out long value) && value == 0)
 										{
 											//Remove the Ldc_I4_0
 											//There's no need to add it to the pointer.
-											functionContext.Instructions.Pop();
+											functionContext.CilInstructions.Pop();
 										}
-										else if (sourceElementTypeSignature.TryGetSize(out int size))
+										else if (gepInstructionContext.SourceElementTypeSignature.TryGetSize(out int size))
 										{
 											if (size == 1)
 											{
-												functionContext.Instructions.Add(CilOpCodes.Conv_I);
+												functionContext.CilInstructions.Add(CilOpCodes.Conv_I);
 											}
 											else
 											{
@@ -371,26 +299,26 @@ public static unsafe class CppTranslator
 												{
 													previousInstruction.OpCode = CilOpCodes.Ldc_I4;
 													previousInstruction.Operand = (int)(value * size);
-													functionContext.Instructions.Add(CilOpCodes.Conv_I);
+													functionContext.CilInstructions.Add(CilOpCodes.Conv_I);
 												}
 												else
 												{
-													functionContext.Instructions.Add(CilOpCodes.Conv_I);
-													functionContext.Instructions.Add(CilOpCodes.Ldc_I4, size);
-													functionContext.Instructions.Add(CilOpCodes.Mul);
+													functionContext.CilInstructions.Add(CilOpCodes.Conv_I);
+													functionContext.CilInstructions.Add(CilOpCodes.Ldc_I4, size);
+													functionContext.CilInstructions.Add(CilOpCodes.Mul);
 												}
 											}
-											functionContext.Instructions.Add(CilOpCodes.Add);
+											functionContext.CilInstructions.Add(CilOpCodes.Add);
 										}
 										else
 										{
-											functionContext.Instructions.Add(CilOpCodes.Conv_I);
-											functionContext.Instructions.Add(CilOpCodes.Sizeof, sourceElementTypeSignature.ToTypeDefOrRef());
-											functionContext.Instructions.Add(CilOpCodes.Mul);
-											functionContext.Instructions.Add(CilOpCodes.Add);
+											functionContext.CilInstructions.Add(CilOpCodes.Conv_I);
+											functionContext.CilInstructions.Add(CilOpCodes.Sizeof, gepInstructionContext.SourceElementTypeSignature.ToTypeDefOrRef());
+											functionContext.CilInstructions.Add(CilOpCodes.Mul);
+											functionContext.CilInstructions.Add(CilOpCodes.Add);
 										}
 
-										TypeSignature currentType = sourceElementTypeSignature;
+										TypeSignature currentType = gepInstructionContext.SourceElementTypeSignature;
 										for (int i = 2; i < instructionContext.Operands.Length; i++)
 										{
 											LLVMValueRef operand = instructionContext.Operands[i];
@@ -402,7 +330,7 @@ public static unsafe class CppTranslator
 													long index = operand.ConstIntSExt;
 													string fieldName = $"field_{index}";
 													FieldDefinition field = structType.Fields.First(t => t.Name == fieldName);
-													functionContext.Instructions.Add(CilOpCodes.Ldflda, field);
+													functionContext.CilInstructions.Add(CilOpCodes.Ldflda, field);
 													currentType = field.Signature!.FieldType;
 												}
 												else
@@ -420,144 +348,86 @@ public static unsafe class CppTranslator
 											}
 										}
 
-										CilLocalVariable resultLocal = instructions.AddLocalVariable(currentType.MakePointerType());
-										functionContext.Instructions.Add(CilOpCodes.Stloc, resultLocal);
-										functionContext.InstructionLocals[instruction] = resultLocal;
+										functionContext.CilInstructions.Add(CilOpCodes.Stloc, functionContext.InstructionLocals[gepInstructionContext.Instruction]);
 									}
 									break;
-								case LLVMOpcode.LLVMTrunc:
-									break;
-								case LLVMOpcode.LLVMZExt:
-									break;
-								case LLVMOpcode.LLVMSExt:
+								default:
+									switch (instruction.InstructionOpcode)
 									{
-										Debug.Assert(instructionContext.Operands.Length == 1);
-
-										CorLibTypeSignature destinationType = (CorLibTypeSignature)instructionContext.Function.Module.GetTypeSignature(instructionContext.Instruction.TypeOf);
-										CilLocalVariable resultLocal = functionContext.Instructions.AddLocalVariable(destinationType);
-
-										instructionContext.LoadOperand(0, out TypeSignature sourceType);
-										Debug.Assert(sourceType is CorLibTypeSignature);
-
-										if (destinationType.ElementType is ElementType.I8)
-										{
-											instructionContext.CilInstructions.Add(CilOpCodes.Conv_I8);
-										}
-										else if (destinationType.ElementType is ElementType.I4)
-										{
-											instructionContext.CilInstructions.Add(CilOpCodes.Conv_I4);
-										}
-										else
-										{
+										case LLVMOpcode.LLVMSwitch:
+											goto default;
+										case LLVMOpcode.LLVMIndirectBr:
+											goto default;
+										case LLVMOpcode.LLVMInvoke:
+											goto default;
+										case LLVMOpcode.LLVMUnreachable:
+											instructions.Add(CilOpCodes.Ldnull);
+											instructions.Add(CilOpCodes.Throw);
+											break;
+										case LLVMOpcode.LLVMCallBr:
+											goto default;
+										case LLVMOpcode.LLVMFPToUI:
+											goto default;
+										case LLVMOpcode.LLVMFPToSI:
+											goto default;
+										case LLVMOpcode.LLVMUIToFP:
+											goto default;
+										case LLVMOpcode.LLVMSIToFP:
+											goto default;
+										case LLVMOpcode.LLVMPtrToInt:
+											goto default;
+										case LLVMOpcode.LLVMIntToPtr:
+											goto default;
+										case LLVMOpcode.LLVMBitCast:
+											goto default;
+										case LLVMOpcode.LLVMAddrSpaceCast:
+											goto default;
+										case LLVMOpcode.LLVMSelect:
+											goto default;
+										case LLVMOpcode.LLVMUserOp1:
+											goto default;
+										case LLVMOpcode.LLVMUserOp2:
+											goto default;
+										case LLVMOpcode.LLVMVAArg:
+											goto default;
+										case LLVMOpcode.LLVMExtractElement:
+											goto default;
+										case LLVMOpcode.LLVMInsertElement:
+											goto default;
+										case LLVMOpcode.LLVMShuffleVector:
+											goto default;
+										case LLVMOpcode.LLVMExtractValue:
+											goto default;
+										case LLVMOpcode.LLVMInsertValue:
+											goto default;
+										case LLVMOpcode.LLVMFreeze:
+											goto default;
+										case LLVMOpcode.LLVMFence:
+											goto default;
+										case LLVMOpcode.LLVMAtomicCmpXchg:
+											goto default;
+										case LLVMOpcode.LLVMAtomicRMW:
+											goto default;
+										case LLVMOpcode.LLVMResume:
+											goto default;
+										case LLVMOpcode.LLVMLandingPad:
+											goto default;
+										case LLVMOpcode.LLVMCleanupRet:
+											goto default;
+										case LLVMOpcode.LLVMCatchRet:
+											goto default;
+										case LLVMOpcode.LLVMCatchPad:
+											goto default;
+										case LLVMOpcode.LLVMCleanupPad:
+											goto default;
+										case LLVMOpcode.LLVMCatchSwitch:
+											goto default;
+										default:
 											throw new NotSupportedException();
-										}
-
-										instructionContext.CilInstructions.Add(CilOpCodes.Stloc, resultLocal);
-										functionContext.InstructionLocals[instruction] = resultLocal;
 									}
-									break;
-								case LLVMOpcode.LLVMFPToUI:
-									break;
-								case LLVMOpcode.LLVMFPToSI:
-									break;
-								case LLVMOpcode.LLVMUIToFP:
-									break;
-								case LLVMOpcode.LLVMSIToFP:
-									break;
-								case LLVMOpcode.LLVMFPTrunc:
-									break;
-								case LLVMOpcode.LLVMFPExt:
-									break;
-								case LLVMOpcode.LLVMPtrToInt:
-									break;
-								case LLVMOpcode.LLVMIntToPtr:
-									break;
-								case LLVMOpcode.LLVMBitCast:
-									break;
-								case LLVMOpcode.LLVMAddrSpaceCast:
-									break;
-								case LLVMOpcode.LLVMICmp:
-									instructionContext.AddIntegerComparisonInstruction();
-									break;
-								case LLVMOpcode.LLVMFCmp:
-									instructionContext.AddFloatComparisonInstruction();
-									break;
-								case LLVMOpcode.LLVMPHI:
-									//Mostly handled by branches
-									{
-										Debug.Assert(instructionContext.Operands.Length > 0);
-										TypeSignature phiTypeSignature = functionContext.GetOperandTypeSignature(instructionContext.Operands[0]);
-										CilLocalVariable resultLocal = instructions.AddLocalVariable(phiTypeSignature);
-										instructions.Add(CilOpCodes.Stloc, resultLocal);
-										functionContext.InstructionLocals[instruction] = resultLocal;
-									}
-									break;
-								case LLVMOpcode.LLVMCall:
-									{
-										Debug.Assert(instructionContext.Operands.Length >= 1 && instructionContext.Operands[^1].Kind == LLVMValueKind.LLVMFunctionValueKind);
-										LLVMValueRef functionOperand = instructionContext.Operands[^1];
-										MethodDefinition calledMethod = moduleContext.Methods[functionOperand].Definition;
-										for (int i = 0; i < instructionContext.Operands.Length - 1; i++)
-										{
-											instructionContext.LoadOperand(i);
-										}
-										instructions.Add(CilOpCodes.Call, calledMethod);
-										TypeSignature functionReturnType = calledMethod.Signature!.ReturnType;
-										if (functionReturnType is not CorLibTypeSignature { ElementType: ElementType.Void })
-										{
-											CilLocalVariable resultLocal = instructions.AddLocalVariable(functionReturnType);
-											instructions.Add(CilOpCodes.Stloc, resultLocal);
-											functionContext.InstructionLocals[instruction] = resultLocal;
-										}
-									}
-									break;
-								case LLVMOpcode.LLVMSelect:
-									break;
-								case LLVMOpcode.LLVMUserOp1:
-									break;
-								case LLVMOpcode.LLVMUserOp2:
-									break;
-								case LLVMOpcode.LLVMVAArg:
-									break;
-								case LLVMOpcode.LLVMExtractElement:
-									break;
-								case LLVMOpcode.LLVMInsertElement:
-									break;
-								case LLVMOpcode.LLVMShuffleVector:
-									break;
-								case LLVMOpcode.LLVMExtractValue:
-									break;
-								case LLVMOpcode.LLVMInsertValue:
-									break;
-								case LLVMOpcode.LLVMFreeze:
-									break;
-								case LLVMOpcode.LLVMFence:
-									break;
-								case LLVMOpcode.LLVMAtomicCmpXchg:
-									break;
-								case LLVMOpcode.LLVMAtomicRMW:
-									break;
-								case LLVMOpcode.LLVMResume:
-									break;
-								case LLVMOpcode.LLVMLandingPad:
-									break;
-								case LLVMOpcode.LLVMCleanupRet:
-									break;
-								case LLVMOpcode.LLVMCatchRet:
-									break;
-								case LLVMOpcode.LLVMCatchPad:
-									break;
-								case LLVMOpcode.LLVMCleanupPad:
-									break;
-								case LLVMOpcode.LLVMCatchSwitch:
 									break;
 							}
 						}
-					}
-
-					if (actualReturnType is not null && !SignatureComparer.Default.Equals(actualReturnType, method.Signature!.ReturnType))
-					{
-						method.Signature.ReturnType = actualReturnType;
 					}
 
 					instructions.OptimizeMacros();
@@ -574,20 +444,6 @@ public static unsafe class CppTranslator
 		}
 
 		moduleDefinition.Write(outputPath);
-	}
-
-	private static string Demangle(string name)
-	{
-		if (name.StartsWith('?'))
-		{
-			int start = name.StartsWith("??$") ? 3 : 1;
-			int end = name.IndexOf('@', start);
-			return name[start..end];
-		}
-		else
-		{
-			return name;
-		}
 	}
 
 	private static LLVMMemoryBufferRef LoadIR(string path)

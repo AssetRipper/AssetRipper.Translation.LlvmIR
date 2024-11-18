@@ -124,4 +124,9 @@ internal static class LLVMExtensions
 			use = use.GetNextUse();
 		}
 	}
+
+	public static bool IsInstruction(this LLVMValueRef value)
+	{
+		return value.Kind == LLVMValueKind.LLVMInstructionValueKind;
+	}
 }

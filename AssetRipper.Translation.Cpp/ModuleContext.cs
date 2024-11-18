@@ -1,7 +1,9 @@
 ﻿using AsmResolver.DotNet;
 using AsmResolver.DotNet.Signatures;
 using AsmResolver.PE.DotNet.Metadata.Tables;
+using AssetRipper.CIL;
 using LLVMSharp.Interop;
+using System.Diagnostics;
 
 namespace AssetRipper.Translation.Cpp;
 
@@ -17,6 +19,89 @@ internal sealed class ModuleContext
 	public ModuleDefinition Definition { get; }
 	public Dictionary<LLVMValueRef, FunctionContext> Methods { get; } = new();
 	public Dictionary<string, TypeDefinition> Structs { get; } = new();
+	private readonly Dictionary<(TypeSignature, int), TypeDefinition> inlineArrayCache = new();
+
+	public TypeDefinition GetOrCreateInlineArray(TypeSignature type, int size)
+	{
+		(TypeSignature, int) pair = (type, size);
+		if (!inlineArrayCache.TryGetValue(pair, out TypeDefinition? arrayType))
+		{
+			string name = $"InlineArray_{inlineArrayCache.Count}";//Could be better, but it's unique, so it's good enough for now.
+			arrayType = new TypeDefinition(null, name, default(TypeAttributes));
+			Definition.TopLevelTypes.Add(arrayType);
+
+			//Add InlineArrayAttribute to arrayType
+			//Add private instance field with the cooresponding type.
+		}
+
+		return arrayType;
+	}
+
+	public void CreateFunctions()
+	{
+		TypeDefinition globalMembersType = CreateGlobalMembersType(Definition);
+		foreach (LLVMValueRef function in Module.GetFunctions())
+		{
+			MethodDefinition method = CreateNewMethod(globalMembersType);
+			FunctionContext functionContext = FunctionContext.Create(function, method, this);
+			Methods.Add(function, functionContext);
+		}
+	}
+
+	public void AssignFunctionNames()
+	{
+		Dictionary<string, List<FunctionContext>> demangledNames = new();
+		foreach ((LLVMValueRef function, FunctionContext functionContext) in Methods)
+		{
+			functionContext.DemangledName = LibLLVMSharp.ValueGetDemangledName(function);
+			functionContext.CleanName = ExtractCleanName(functionContext.MangledName);
+
+			if (!demangledNames.TryGetValue(functionContext.CleanName, out List<FunctionContext>? list))
+			{
+				list = new();
+				demangledNames.Add(functionContext.CleanName, list);
+			}
+			list.Add(functionContext);
+		}
+
+		foreach ((string cleanName, List<FunctionContext> list) in demangledNames)
+		{
+			if (list.Count == 1)
+			{
+				list[0].Name = cleanName;
+			}
+			else
+			{
+				foreach (FunctionContext functionContext in list)
+				{
+					functionContext.Name = NameGenerator.GenerateName(cleanName, functionContext.MangledName);
+				}
+			}
+		}
+	}
+
+	public void InitializeMethodSignatures()
+	{
+		foreach ((LLVMValueRef function, FunctionContext functionContext) in Methods)
+		{
+			MethodDefinition method = functionContext.Definition;
+			Debug.Assert(method.Signature is not null);
+
+			method.Name = functionContext.Name;
+
+			LLVMTypeRef returnType = LibLLVMSharp.FunctionGetReturnType(function);
+			TypeSignature returnTypeSignature = GetTypeSignature(returnType);
+
+			method.Signature.ReturnType = returnTypeSignature;
+
+			foreach (LLVMValueRef parameter in function.GetParams())
+			{
+				LLVMTypeRef type = parameter.TypeOf;
+				TypeSignature parameterType = GetTypeSignature(type);
+				functionContext.Parameters[parameter] = method.AddParameter(parameterType);
+			}
+		}
+	}
 
 	public TypeSignature GetTypeSignature(LLVMTypeRef type)
 	{
@@ -106,6 +191,36 @@ internal sealed class ModuleContext
 				goto default;
 			default:
 				throw new NotSupportedException();
+		}
+	}
+
+	private static MethodDefinition CreateNewMethod(TypeDefinition globalMembersType)
+	{
+		MethodSignature signature = MethodSignature.CreateStatic(null!);
+		MethodDefinition method = new(null, MethodAttributes.Public | MethodAttributes.Static | MethodAttributes.HideBySig, signature);
+		method.CilMethodBody = new(method);
+		globalMembersType.Methods.Add(method);
+		return method;
+	}
+
+	private static TypeDefinition CreateGlobalMembersType(ModuleDefinition moduleDefinition)
+	{
+		TypeDefinition typeDefinition = new(null, "GlobalMembers", TypeAttributes.Public | TypeAttributes.Abstract | TypeAttributes.Sealed);
+		moduleDefinition.TopLevelTypes.Add(typeDefinition);
+		return typeDefinition;
+	}
+
+	private static string ExtractCleanName(string name)
+	{
+		if (name.StartsWith('?'))
+		{
+			int start = name.StartsWith("??$") ? 3 : 1;
+			int end = name.IndexOf('@', start);
+			return name[start..end];
+		}
+		else
+		{
+			return name;
 		}
 	}
 }
