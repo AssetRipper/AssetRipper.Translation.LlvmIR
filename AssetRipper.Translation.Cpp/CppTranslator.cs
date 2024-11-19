@@ -398,8 +398,6 @@ public static unsafe class CppTranslator
 											goto default;
 										case LLVMOpcode.LLVMSIToFP:
 											goto default;
-										case LLVMOpcode.LLVMPtrToInt:
-											goto default;
 										case LLVMOpcode.LLVMIntToPtr:
 											goto default;
 										case LLVMOpcode.LLVMBitCast:

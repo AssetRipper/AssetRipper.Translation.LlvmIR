@@ -55,6 +55,17 @@ internal sealed class NumericConversionInstructionContext : InstructionContext
 			_ => throw new NotSupportedException(),
 		},
 
+		// Pointer to integer
+		LLVMOpcode.LLVMPtrToInt => ResultTypeSignature!.ElementType switch
+		{
+			ElementType.Boolean => throw new NotSupportedException(),
+			ElementType.I1 => CilOpCodes.Conv_U1,
+			ElementType.I2 => CilOpCodes.Conv_U2,
+			ElementType.I4 => CilOpCodes.Conv_U4,
+			ElementType.I8 => CilOpCodes.Conv_U8,
+			_ => throw new NotSupportedException(),
+		},
+
 		_ => throw new NotSupportedException(),
 	};
 }
