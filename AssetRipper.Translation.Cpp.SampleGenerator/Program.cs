@@ -1,4 +1,5 @@
-﻿using System.Diagnostics;
+﻿using AssetRipper.Translation.Cpp.Clang;
+using System.Diagnostics;
 using System.IO.Hashing;
 using System.Text.Json;
 
@@ -6,18 +7,17 @@ namespace AssetRipper.Translation.Cpp.SampleGenerator;
 
 internal static class Program
 {
-	private sealed record class HashFile(string ClangVersionInfo, Dictionary<string, uint> Hashes);
+	private sealed record class HashFile(string ClangVersion, Dictionary<string, uint> Hashes);
 
 	static void Main()
 	{
-		string clangVersionInfo = GetClangVersionInfo();
 		Dictionary<string, uint> hashes;
 		const string PathToHashes = "hashes.json";
 		if (File.Exists(PathToHashes))
 		{
 			string json = File.ReadAllText(PathToHashes);
 			HashFile? hashFile = JsonSerializer.Deserialize<HashFile>(json);
-			if (hashFile is null or { Hashes: null } || hashFile.ClangVersionInfo != clangVersionInfo)
+			if (hashFile is null or { Hashes: null } || hashFile.ClangVersion != ClangProcess.VersionString)
 			{
 				hashes = [];
 			}
@@ -53,7 +53,7 @@ internal static class Program
 			}
 		}
 
-		File.WriteAllText(PathToHashes, JsonSerializer.Serialize(new HashFile(clangVersionInfo, hashes)));
+		File.WriteAllText(PathToHashes, JsonSerializer.Serialize(new HashFile(ClangProcess.VersionString, hashes)));
 
 		Console.WriteLine("Done!");
 	}
@@ -116,23 +116,6 @@ internal static class Program
 				string contents = string.Join('\n', lines.Skip(4).Prepend(sourceFilenameLine)) + '\n';
 				File.WriteAllText(outputFile, contents);
 			}
-		}
-	}
-
-	private static string GetClangVersionInfo()
-	{
-		ProcessStartInfo processInfo = new("clang", "--version")
-		{
-			RedirectStandardOutput = true,
-			UseShellExecute = false,
-			CreateNoWindow = true,
-		};
-		using (Process process = new())
-		{
-			process.StartInfo = processInfo;
-			process.Start();
-			process.WaitForExit();
-			return process.StandardOutput.ReadToEnd();
 		}
 	}
 }

@@ -18,6 +18,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AssetRipper.Translation.Cpp
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AssetRipper.Translation.Cpp.Tests", "AssetRipper.Translation.Cpp.Tests\AssetRipper.Translation.Cpp.Tests.csproj", "{8A6AC957-FA54-4913-969C-59E7C5523066}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AssetRipper.Translation.Cpp.Clang", "AssetRipper.Translation.Cpp.Clang\AssetRipper.Translation.Cpp.Clang.csproj", "{0C724FF5-1B55-41F4-86B8-1403AB95669F}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -40,6 +42,10 @@ Global
 		{8A6AC957-FA54-4913-969C-59E7C5523066}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{8A6AC957-FA54-4913-969C-59E7C5523066}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{8A6AC957-FA54-4913-969C-59E7C5523066}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0C724FF5-1B55-41F4-86B8-1403AB95669F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0C724FF5-1B55-41F4-86B8-1403AB95669F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0C724FF5-1B55-41F4-86B8-1403AB95669F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0C724FF5-1B55-41F4-86B8-1403AB95669F}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
