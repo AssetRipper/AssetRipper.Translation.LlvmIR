@@ -7,6 +7,7 @@ internal abstract class BranchInstructionContext : InstructionContext
 {
 	internal BranchInstructionContext(LLVMValueRef instruction, BasicBlockContext block, FunctionContext function) : base(instruction, block, function)
 	{
+		ResultTypeSignature = function.Module.Definition.CorLibTypeFactory.Void;
 	}
 
 	public abstract void AddBranchInstruction();

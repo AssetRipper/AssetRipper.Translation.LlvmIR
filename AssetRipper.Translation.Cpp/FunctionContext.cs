@@ -193,20 +193,6 @@ internal sealed class FunctionContext
 						MaybeAddAccessors(callInstructionContext, callInstructionContext.ArgumentOperands);
 					}
 					break;
-				case UnaryMathInstructionContext unaryMathInstructionContext:
-					{
-						unaryMathInstructionContext.ResultTypeSignature = GetOperandTypeSignature(unaryMathInstructionContext.Operand);
-						MaybeAddAccessor(unaryMathInstructionContext, unaryMathInstructionContext.Operand);
-					}
-					break;
-				case BinaryMathInstructionContext binaryMathInstructionContext:
-					{
-						// Traditionally, the left operand and the result type are the same, whereas the right operand can be different.
-						// For example, bit shifting often allows different types for the left and right operands.
-						binaryMathInstructionContext.ResultTypeSignature = GetOperandTypeSignature(binaryMathInstructionContext.Operand1);
-						MaybeAddAccessors(binaryMathInstructionContext, binaryMathInstructionContext.Operands);
-					}
-					break;
 				case PhiInstructionContext phiInstructionContext:
 					{
 						phiInstructionContext.ResultTypeSignature = Module.GetTypeSignature(phiInstructionContext.Instruction.TypeOf);

@@ -9,6 +9,7 @@ internal sealed class BinaryMathInstructionContext : InstructionContext
 	internal BinaryMathInstructionContext(LLVMValueRef instruction, BasicBlockContext block, FunctionContext function) : base(instruction, block, function)
 	{
 		Debug.Assert(Operands.Length == 2);
+		ResultTypeSignature = function.Module.GetTypeSignature(instruction.TypeOf);
 	}
 	public LLVMValueRef Operand1 => Operands[0];
 	public LLVMValueRef Operand2 => Operands[1];
