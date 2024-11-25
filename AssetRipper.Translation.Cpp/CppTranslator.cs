@@ -296,7 +296,7 @@ public static unsafe class CppTranslator
 								case GetElementPointerInstructionContext gepInstructionContext:
 									{
 										//This is the pointer. It's generally void* due to stripping.
-										functionContext.LoadOperand(instructionContext.Operands[0]);//Pointer
+										functionContext.LoadOperand(gepInstructionContext.SourceOperand);//Pointer
 
 										//This isn't strictly necessary, but it might make ILSpy output better someday.
 										CilLocalVariable pointerLocal = instructions.AddLocalVariable(gepInstructionContext.SourceElementTypeSignature.MakePointerType());

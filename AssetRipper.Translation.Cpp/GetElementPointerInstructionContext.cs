@@ -10,7 +10,6 @@ internal sealed class GetElementPointerInstructionContext : InstructionContext
 	internal GetElementPointerInstructionContext(LLVMValueRef instruction, BasicBlockContext block, FunctionContext function) : base(instruction, block, function)
 	{
 		Debug.Assert(Operands.Length >= 2);
-		Debug.Assert(Operands[0].IsInstruction());
 	}
 	/// <summary>
 	/// This is the pointer. It's generally void* due to stripping.
