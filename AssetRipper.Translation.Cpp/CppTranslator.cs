@@ -51,13 +51,22 @@ public static unsafe class CppTranslator
 
 				ModuleContext moduleContext = new(module, moduleDefinition);
 
-				foreach (LLVMValueRef global in module.GetGlobals())
+				foreach (LLVMValueRef global in module.GetGlobals().Where(g => g.Kind == LLVMValueKind.LLVMGlobalVariableValueKind))
 				{
-					Debug.Assert(global.OperandCount == 1);
+					if (global.OperandCount != 1)
+					{
+						continue;
+					}
+
 					LLVMValueRef operand = global.GetOperand(0);
 					//LLVMTypeRef type = operand.TypeOf;
 					//LLVMTypeRef globalType = LLVM.GlobalGetValueType(global);
 					//https://github.com/llvm/llvm-project/blob/ccf357ff643c6af86bb459eba5a00f40f1dcaf22/llvm/include/llvm/IR/Constants.h#L584
+
+					if (operand.Kind != LLVMValueKind.LLVMConstantDataArrayValueKind)
+					{
+						continue;
+					}
 
 					ReadOnlySpan<byte> data = LibLLVMSharp.ConstantDataArrayGetData(operand);
 
