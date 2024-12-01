@@ -106,8 +106,7 @@ internal sealed class ModuleContext
 
 			method.Name = functionContext.Name;
 
-			LLVMTypeRef returnType = LibLLVMSharp.FunctionGetReturnType(function);
-			TypeSignature returnTypeSignature = GetTypeSignature(returnType);
+			TypeSignature returnTypeSignature = GetTypeSignature(functionContext.ReturnType);
 
 			method.Signature.ReturnType = returnTypeSignature;
 
@@ -115,12 +114,12 @@ internal sealed class ModuleContext
 			{
 				LLVMTypeRef type = parameter.TypeOf;
 				TypeSignature parameterType = GetTypeSignature(type);
-				functionContext.Parameters[parameter] = method.AddParameter(parameterType);
+				functionContext.ParameterDictionary[parameter] = method.AddParameter(parameterType);
 			}
 		}
 	}
 
-	public TypeSignature GetTypeSignature(LLVMTypeRef type)
+	public TypeSignature? GetTypeSignature(LLVMTypeRef type)
 	{
 		switch (type.Kind)
 		{
@@ -186,8 +185,8 @@ internal sealed class ModuleContext
 			case LLVMTypeKind.LLVMArrayTypeKind:
 				goto default;
 			case LLVMTypeKind.LLVMPointerTypeKind:
-				//All pointers are void* in IR
-				return Definition.CorLibTypeFactory.Void.MakePointerType();
+				//All pointers are opaque in IR
+				return null;
 			case LLVMTypeKind.LLVMVectorTypeKind:
 				goto default;
 			case LLVMTypeKind.LLVMMetadataTypeKind:

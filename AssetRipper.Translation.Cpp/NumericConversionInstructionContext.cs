@@ -11,7 +11,7 @@ internal sealed class NumericConversionInstructionContext : InstructionContext
 	internal NumericConversionInstructionContext(LLVMValueRef instruction, BasicBlockContext block, FunctionContext function) : base(instruction, block, function)
 	{
 		Debug.Assert(Operands.Length == 1);
-		ResultTypeSignature = (CorLibTypeSignature)function.Module.GetTypeSignature(Instruction.TypeOf);
+		ResultTypeSignature = (CorLibTypeSignature?)function.Module.GetTypeSignature(Instruction.TypeOf);
 	}
 	public LLVMValueRef Operand => Operands[0];
 	public CilOpCode CilOpCode => Opcode switch

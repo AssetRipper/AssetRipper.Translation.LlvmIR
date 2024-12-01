@@ -81,16 +81,26 @@ public static unsafe class CppTranslator
 
 				moduleContext.InitializeMethodSignatures();
 
+				foreach (FunctionContext functionContext in moduleContext.Methods.Values)
+				{
+					functionContext.CreateLabelsForBasicBlocks();
+
+					functionContext.Analyze();
+				}
+
+				TypeInference.Infer(moduleContext);
+
+				foreach (FunctionContext functionContext in moduleContext.Methods.Values)
+				{
+					functionContext.Definition.Parameters.PullUpdatesFromMethodSignature();
+				}
+
 				foreach ((LLVMValueRef function, FunctionContext functionContext) in moduleContext.Methods)
 				{
 					MethodDefinition method = functionContext.Definition;
 					Debug.Assert(method.CilMethodBody is not null);
 
 					CilInstructionCollection instructions = method.CilMethodBody.Instructions;
-
-					functionContext.CreateLabelsForBasicBlocks();
-
-					functionContext.Analyze();
 
 					foreach (InstructionContext instruction in functionContext.Instructions)
 					{
@@ -124,8 +134,6 @@ public static unsafe class CppTranslator
 								break;
 						}
 					}
-
-					functionContext.FixMethodReturnType();
 				}
 
 				foreach ((LLVMValueRef function, FunctionContext functionContext) in moduleContext.Methods)
@@ -143,10 +151,6 @@ public static unsafe class CppTranslator
 						}
 						continue;
 					}
-
-					functionContext.CreateLabelsForBasicBlocks();
-
-					functionContext.Analyze();
 
 					foreach (BasicBlockContext basicBlock in functionContext.BasicBlocks)
 					{
@@ -213,15 +217,11 @@ public static unsafe class CppTranslator
 									break;
 								case StoreInstructionContext storeInstructionContext:
 									{
-										//https://llvm.org/docs/OpaquePointers.html#migration-instructions
-										LLVMTypeRef storeType = instructionContext.Operands[0].TypeOf;
-										TypeSignature storeTypeSignature = moduleContext.GetTypeSignature(storeType);
-
 										if (storeInstructionContext.DestinationInstruction is AllocaInstructionContext { DataLocal: not null } allocaDestination
 											//&& SignatureComparer.Default.Equals(allocaDestination.DataLocal.VariableType, storeTypeSignature)// Disabled because of incorrect parameter types
 											)
 										{
-											if (SignatureComparer.Default.Equals(allocaDestination.DataLocal.VariableType, storeTypeSignature))
+											if (SignatureComparer.Default.Equals(allocaDestination.DataLocal.VariableType, storeInstructionContext.StoreTypeSignature))
 											{
 												functionContext.LoadOperand(storeInstructionContext.SourceOperand);
 												instructions.Add(CilOpCodes.Stloc, allocaDestination.DataLocal);
@@ -230,7 +230,7 @@ public static unsafe class CppTranslator
 											{
 												instructions.Add(CilOpCodes.Ldloca, allocaDestination.DataLocal);
 												functionContext.LoadOperand(storeInstructionContext.SourceOperand);
-												instructions.AddStoreIndirect(storeTypeSignature);
+												instructions.AddStoreIndirect(storeInstructionContext.StoreTypeSignature);
 											}
 										}
 										else
@@ -239,7 +239,7 @@ public static unsafe class CppTranslator
 
 											instructions.Add(CilOpCodes.Ldloc, addressLocal);
 											functionContext.LoadOperand(storeInstructionContext.SourceOperand);
-											instructions.AddStoreIndirect(storeTypeSignature);
+											instructions.AddStoreIndirect(storeInstructionContext.StoreTypeSignature);
 										}
 									}
 									break;

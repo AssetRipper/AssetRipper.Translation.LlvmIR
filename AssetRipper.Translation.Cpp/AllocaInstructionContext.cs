@@ -26,6 +26,8 @@ internal sealed class AllocaInstructionContext : InstructionContext
 	public CilLocalVariable? PointerLocal { get; set; } // Might be removable
 	public void InitializePointerTypeSignature()
 	{
-		ResultTypeSignature = AllocatedTypeSignature.MakePointerType();
+		ResultTypeSignature = AllocatedTypeSignature?.MakePointerType();
 	}
+
+	public override TypeSignature? SecondaryTypeSignature { get => AllocatedTypeSignature; set => AllocatedTypeSignature = value; }
 }

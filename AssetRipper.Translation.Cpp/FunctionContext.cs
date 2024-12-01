@@ -15,6 +15,7 @@ internal sealed class FunctionContext
 	public FunctionContext(LLVMValueRef function, MethodDefinition definition, ModuleContext module)
 	{
 		Function = function;
+		Parameters = function.GetParams();
 		Definition = definition;
 		Module = module;
 	}
@@ -55,6 +56,8 @@ internal sealed class FunctionContext
 	public string Name { get; set; } = "";
 	public LLVMValueRef Function { get; }
 	public LLVMTypeRef FunctionType => LibLLVMSharp.FunctionGetFunctionType(Function);
+	public LLVMTypeRef ReturnType => LibLLVMSharp.FunctionGetReturnType(Function);
+	public LLVMValueRef[] Parameters { get; }
 	public MethodDefinition Definition { get; }
 	public ModuleContext Module { get; }
 	public List<BasicBlockContext> BasicBlocks { get; } = new();
@@ -69,7 +72,7 @@ internal sealed class FunctionContext
 	/// </remarks>
 	public Dictionary<CilLocalVariable, CilLocalVariable> DataLocals { get; } = new();
 	public Dictionary<LLVMBasicBlockRef, CilInstructionLabel> Labels { get; } = new();
-	public Dictionary<LLVMValueRef, Parameter> Parameters { get; } = new();
+	public Dictionary<LLVMValueRef, Parameter> ParameterDictionary { get; } = new();
 	public Dictionary<LLVMValueRef, InstructionContext> InstructionLookup { get; } = new();
 	public Dictionary<LLVMBasicBlockRef, BasicBlockContext> BasicBlockLookup { get; } = new();
 
@@ -106,7 +109,7 @@ internal sealed class FunctionContext
 				break;
 			case LLVMValueKind.LLVMArgumentValueKind:
 				{
-					Parameter parameter = Parameters[operand];
+					Parameter parameter = ParameterDictionary[operand];
 					CilInstructions.Add(CilOpCodes.Ldarg, parameter);
 					typeSignature = parameter.ParameterType;
 				}
@@ -140,13 +143,13 @@ internal sealed class FunctionContext
 		}
 	}
 
-	public TypeSignature GetOperandTypeSignature(LLVMValueRef operand)
+	public TypeSignature? GetOperandTypeSignature(LLVMValueRef operand)
 	{
 		return operand.Kind switch
 		{
 			LLVMValueKind.LLVMConstantIntValueKind or LLVMValueKind.LLVMConstantFPValueKind => Module.GetTypeSignature(operand.TypeOf),
-			LLVMValueKind.LLVMInstructionValueKind => InstructionLookup[operand].ResultTypeSignature!,// Todo: handle null
-			LLVMValueKind.LLVMArgumentValueKind => Parameters[operand].ParameterType,
+			LLVMValueKind.LLVMInstructionValueKind => InstructionLookup[operand].ResultTypeSignature,
+			LLVMValueKind.LLVMArgumentValueKind => null, //Parameters[operand].ParameterType,
 			LLVMValueKind.LLVMGlobalVariableValueKind => Module.Definition.CorLibTypeFactory.Byte.MakePointerType(),
 			_ => throw new NotSupportedException(),
 		};
@@ -189,13 +192,11 @@ internal sealed class FunctionContext
 				case CallInstructionContext callInstructionContext:
 					{
 						callInstructionContext.FunctionCalled = Module.Methods[callInstructionContext.FunctionOperand];
-						callInstructionContext.ResultTypeSignature = callInstructionContext.FunctionCalled.Definition.Signature!.ReturnType;
 						MaybeAddAccessors(callInstructionContext, callInstructionContext.ArgumentOperands);
 					}
 					break;
 				case PhiInstructionContext phiInstructionContext:
 					{
-						phiInstructionContext.ResultTypeSignature = Module.GetTypeSignature(phiInstructionContext.Instruction.TypeOf);
 						phiInstructionContext.InitializeIncomingBlocks();
 						MaybeAddAccessors(phiInstructionContext, phiInstructionContext.Operands);
 					}
@@ -203,17 +204,11 @@ internal sealed class FunctionContext
 				case GetElementPointerInstructionContext gepInstructionContext:
 					{
 						gepInstructionContext.SourceElementTypeSignature = Module.GetTypeSignature(gepInstructionContext.SourceElementType);
-						gepInstructionContext.ResultTypeSignature = gepInstructionContext.CalculateFinalType().MakePointerType();
-						MaybeAddAccessors(gepInstructionContext, gepInstructionContext.Operands);
-					}
-					break;
-				case ReturnInstructionContext returnInstructionContext:
-					{
-						if (returnInstructionContext.HasReturnValue)
+						if (gepInstructionContext.SourceElementTypeSignature is not null)
 						{
-							returnInstructionContext.ResultTypeSignature = GetOperandTypeSignature(returnInstructionContext.ResultOperand);
-							MaybeAddAccessor(returnInstructionContext, returnInstructionContext.ResultOperand);
+							gepInstructionContext.ResultTypeSignature = gepInstructionContext.CalculateFinalType().MakePointerType();
 						}
+						MaybeAddAccessors(gepInstructionContext, gepInstructionContext.Operands);
 					}
 					break;
 				default:
@@ -221,16 +216,6 @@ internal sealed class FunctionContext
 						MaybeAddAccessors(instruction, instruction.Operands);
 					}
 					break;
-			}
-		}
-
-		bool anyChange = true;
-		while (anyChange)
-		{
-			anyChange = false;
-			foreach (InstructionContext instruction in Instructions)
-			{
-
 			}
 		}
 
@@ -255,31 +240,6 @@ internal sealed class FunctionContext
 		foreach (LLVMBasicBlockRef basicBlock in Function.GetBasicBlocks())
 		{
 			Labels[basicBlock] = new();
-		}
-	}
-
-	public void FixMethodReturnType()
-	{
-		TypeSignature? returnType = null;
-		foreach (ReturnInstructionContext returnInstruction in Instructions.OfType<ReturnInstructionContext>())
-		{
-			if (returnInstruction.HasReturnValue)
-			{
-				if (returnType is null)
-				{
-					returnType = returnInstruction.ResultTypeSignature;
-				}
-				else if (!SignatureComparer.Default.Equals(returnType, returnInstruction.ResultTypeSignature))
-				{
-					returnType = null;
-					break;
-				}
-			}
-		}
-
-		if (returnType is not null)
-		{
-			Definition.Signature!.ReturnType = returnType;
 		}
 	}
 
