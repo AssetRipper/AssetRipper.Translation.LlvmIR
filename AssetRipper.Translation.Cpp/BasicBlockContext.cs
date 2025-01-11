@@ -1,4 +1,6 @@
-﻿using LLVMSharp.Interop;
+﻿using AssetRipper.Translation.Cpp.Extensions;
+using AssetRipper.Translation.Cpp.Instructions;
+using LLVMSharp.Interop;
 
 namespace AssetRipper.Translation.Cpp;
 

@@ -6,7 +6,7 @@ using LLVMSharp.Interop;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 
-namespace AssetRipper.Translation.Cpp;
+namespace AssetRipper.Translation.Cpp.Instructions;
 
 internal sealed class SwitchBranchInstructionContext : BranchInstructionContext
 {

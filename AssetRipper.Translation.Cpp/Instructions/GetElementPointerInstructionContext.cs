@@ -3,7 +3,7 @@ using AsmResolver.DotNet.Signatures;
 using LLVMSharp.Interop;
 using System.Diagnostics;
 
-namespace AssetRipper.Translation.Cpp;
+namespace AssetRipper.Translation.Cpp.Instructions;
 
 internal sealed class GetElementPointerInstructionContext : InstructionContext
 {

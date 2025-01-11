@@ -1,6 +1,6 @@
 ﻿using LLVMSharp.Interop;
 
-namespace AssetRipper.Translation.Cpp;
+namespace AssetRipper.Translation.Cpp.Extensions;
 internal static class LLVMExtensions
 {
 	public static IEnumerable<LLVMValueRef> GetFunctions(this LLVMModuleRef module)

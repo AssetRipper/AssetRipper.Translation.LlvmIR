@@ -1,6 +1,6 @@
 ﻿using Google.OrTools.Sat;
 
-namespace AssetRipper.Translation.Cpp;
+namespace AssetRipper.Translation.Cpp.Extensions;
 
 internal static class BoundedLinearExpressionExtensions
 {

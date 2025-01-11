@@ -1,8 +1,9 @@
 ﻿using AsmResolver.DotNet.Code.Cil;
 using AsmResolver.PE.DotNet.Cil;
+using AssetRipper.Translation.Cpp.Extensions;
 using LLVMSharp.Interop;
 
-namespace AssetRipper.Translation.Cpp;
+namespace AssetRipper.Translation.Cpp.Instructions;
 
 internal sealed class IntegerComparisonInstructionContext : NumericComparisonInstructionContext
 {

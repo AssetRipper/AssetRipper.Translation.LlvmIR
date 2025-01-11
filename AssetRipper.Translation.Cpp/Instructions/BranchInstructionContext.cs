@@ -1,7 +1,7 @@
 ﻿using AsmResolver.PE.DotNet.Cil;
 using LLVMSharp.Interop;
 
-namespace AssetRipper.Translation.Cpp;
+namespace AssetRipper.Translation.Cpp.Instructions;
 
 internal abstract class BranchInstructionContext : InstructionContext
 {

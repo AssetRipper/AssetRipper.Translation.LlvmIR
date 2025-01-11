@@ -1,8 +1,9 @@
 ﻿using AsmResolver.PE.DotNet.Cil;
+using AssetRipper.Translation.Cpp.Extensions;
 using LLVMSharp.Interop;
 using System.Diagnostics;
 
-namespace AssetRipper.Translation.Cpp;
+namespace AssetRipper.Translation.Cpp.Instructions;
 
 internal sealed class ConditionalBranchInstructionContext : BranchInstructionContext
 {

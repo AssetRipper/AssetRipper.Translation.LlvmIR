@@ -1,6 +1,8 @@
 ﻿using AsmResolver.DotNet;
 using AsmResolver.DotNet.Signatures;
 using AsmResolver.PE.DotNet.Metadata.Tables;
+using AssetRipper.Translation.Cpp.Extensions;
+using AssetRipper.Translation.Cpp.Instructions;
 using Google.OrTools.Sat;
 using LLVMSharp.Interop;
 using System.Diagnostics;
