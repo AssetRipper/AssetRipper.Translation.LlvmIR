@@ -99,109 +99,18 @@ internal static class AsmResolverExtensions
 		}
 	}
 
-	public static void AddLoadIndirect(this CilInstructionCollection instructions, TypeSignature type)
+	public static bool IsInt32(this TypeSignature type)
 	{
-		switch (type)
-		{
-			case CorLibTypeSignature corLibTypeSignature:
-				switch (corLibTypeSignature.ElementType)
-				{
-					case ElementType.I1:
-						instructions.Add(CilOpCodes.Ldind_I1);
-						break;
-					case ElementType.I2:
-						instructions.Add(CilOpCodes.Ldind_I2);
-						break;
-					case ElementType.I4:
-						instructions.Add(CilOpCodes.Ldind_I4);
-						break;
-					case ElementType.I8:
-					case ElementType.U8:
-						instructions.Add(CilOpCodes.Ldind_I8);
-						break;
-					case ElementType.U1:
-						instructions.Add(CilOpCodes.Ldind_U1);
-						break;
-					case ElementType.U2:
-						instructions.Add(CilOpCodes.Ldind_U2);
-						break;
-					case ElementType.U4:
-						instructions.Add(CilOpCodes.Ldind_U4);
-						break;
-					case ElementType.R4:
-						instructions.Add(CilOpCodes.Ldind_R4);
-						break;
-					case ElementType.R8:
-						instructions.Add(CilOpCodes.Ldind_R8);
-						break;
-					case ElementType.I:
-					case ElementType.U:
-						instructions.Add(CilOpCodes.Ldind_I);
-						break;
-					default:
-						instructions.Add(CilOpCodes.Ldobj, type.ToTypeDefOrRef());
-						break;
-				}
-				break;
-			case PointerTypeSignature:
-				instructions.Add(CilOpCodes.Ldind_I);
-				break;
-			default:
-				instructions.Add(CilOpCodes.Ldobj, type.ToTypeDefOrRef());
-				break;
-		}
+		return type is CorLibTypeSignature { ElementType: ElementType.I4 };
 	}
 
-	public static void AddStoreIndirect(this CilInstructionCollection instructions, TypeSignature type)
+	public static bool IsVoid(this TypeSignature type)
 	{
-		switch (type)
-		{
-			case CorLibTypeSignature corLibTypeSignature:
-				switch (corLibTypeSignature.ElementType)
-				{
-					case ElementType.I1:
-						instructions.Add(CilOpCodes.Stind_I1);
-						break;
-					case ElementType.I2:
-						instructions.Add(CilOpCodes.Stind_I2);
-						break;
-					case ElementType.I4:
-						instructions.Add(CilOpCodes.Stind_I4);
-						break;
-					case ElementType.I8:
-					case ElementType.U8:
-						instructions.Add(CilOpCodes.Stind_I8);
-						break;
-					case ElementType.U1:
-						instructions.Add(CilOpCodes.Stind_I1);
-						break;
-					case ElementType.U2:
-						instructions.Add(CilOpCodes.Stind_I2);
-						break;
-					case ElementType.U4:
-						instructions.Add(CilOpCodes.Stind_I4);
-						break;
-					case ElementType.R4:
-						instructions.Add(CilOpCodes.Stind_R4);
-						break;
-					case ElementType.R8:
-						instructions.Add(CilOpCodes.Stind_R8);
-						break;
-					case ElementType.I:
-					case ElementType.U:
-						instructions.Add(CilOpCodes.Stind_I);
-						break;
-					default:
-						instructions.Add(CilOpCodes.Stobj, type.ToTypeDefOrRef());
-						break;
-				}
-				break;
-			case PointerTypeSignature:
-				instructions.Add(CilOpCodes.Stind_I);
-				break;
-			default:
-				instructions.Add(CilOpCodes.Stobj, type.ToTypeDefOrRef());
-				break;
-		}
+		return type is CorLibTypeSignature { ElementType: ElementType.Void };
+	}
+
+	public static bool IsVoidPointer(this TypeSignature type)
+	{
+		return type is PointerTypeSignature { BaseType: CorLibTypeSignature { ElementType: ElementType.Void } };
 	}
 }

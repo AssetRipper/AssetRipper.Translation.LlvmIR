@@ -10,7 +10,7 @@
 
 	<ItemGroup>
 		<PackageReference Include="AsmResolver.DotNet" Version="6.0.0-beta.1" />
-		<PackageReference Include="AssetRipper.CIL" Version="1.1.0" />
+		<PackageReference Include="AssetRipper.CIL" Version="1.1.4" />
 		<PackageReference Include="Google.OrTools" Version="9.11.4210" />
 		<PackageReference Include="HarmonyX" Version="2.13.0" />
 		<PackageReference Include="LLVMSharp" Version="18.1.0-rc1.8895972383" />
