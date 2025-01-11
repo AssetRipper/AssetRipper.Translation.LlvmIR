@@ -168,17 +168,26 @@ internal static class TypeInference
 
 							for (int i = 0; i < instruction.Operands.Length - 1; i++)
 							{
-								model.Add(operandVariables[(instruction, i)] == parameterVariables[(callInstructionContext.FunctionCalled, i)]);
+								IntVar operand = operandVariables[(instruction, i)];
+								IntVar parameter = parameterVariables[(callInstructionContext.FunctionCalled, i)];
+
+								// If equal, everything is fine.
+								BoolVar equal = (operand == parameter).ToBoolean(model);
+
+								// If not equal, it's okay if the operand is a pointer and the parameter is a void pointer.
+								BoolVar operandIsPointer = model.BooleanOr(cache.IsPointer(model, operand));
+								BoolVar parameterIsVoidPointer = (parameter == cache.VoidPointer).ToBoolean(model);
+								BoolVar compatiblePointerConversion = model.BooleanAnd(operandIsPointer, parameterIsVoidPointer);
+
+								model.AddBoolOr([equal, compatiblePointerConversion]);
 							}
 						}
 						break;
 					case GetElementPointerInstructionContext:
 						{
-							int int32 = cache[moduleContext.Definition.CorLibTypeFactory.Int32];
-
 							for (int i = 1; i < instruction.Operands.Length; ++i)
 							{
-								model.Add(operandVariables[(instruction, i)] == int32);
+								model.Add(operandVariables[(instruction, i)] == cache.Int32);
 							}
 						}
 						break;
@@ -226,6 +235,30 @@ internal static class TypeInference
 	private sealed record class TypeSignatureCache(List<TypeSignature> Types, Dictionary<TypeSignature, int> Indices)
 	{
 		private const int MaxPointerIndirection = 4;
+
+		public int Int32
+		{
+			get => GetIndex(ref field, AsmResolverExtensions.IsInt32);
+		} = -1;
+
+		public int Void
+		{
+			get => GetIndex(ref field, AsmResolverExtensions.IsVoid);
+		} = -1;
+
+		public int VoidPointer
+		{
+			get => GetIndex(ref field, AsmResolverExtensions.IsVoidPointer);
+		} = -1;
+
+		private int GetIndex(ref int field, Func<TypeSignature, bool> filter)
+		{
+			if (field == -1)
+			{
+				field = Indices.FirstOrDefault(pair => filter(pair.Key)).Value;
+			}
+			return field;
+		}
 
 		public TypeSignatureCache() : this(new(), new(SignatureComparer.Default))
 		{
@@ -317,7 +350,7 @@ internal static class TypeInference
 			}
 		}
 
-		public void AddPointerReferenceConstraint(CpModel model, IntVar data, IntVar pointer)
+		public TableConstraint AddPointerReferenceConstraint(CpModel model, IntVar data, IntVar pointer)
 		{
 			// Todo: Cache the tuples
 			List<(int, int)> pairs = new();
@@ -333,31 +366,39 @@ internal static class TypeInference
 			{
 				(tuples[i, 0], tuples[i, 1]) = pairs[i];
 			}
-			model.AddAllowedAssignments([pointer, data]).AddTuples(tuples);
+			return model.AddAllowedAssignments([pointer, data]).AddTuples(tuples);
 		}
 
-		public void AddTypeConstraint(CpModel model, IntVar variable, LLVMTypeRef type)
+		public Constraint AddTypeConstraint(CpModel model, IntVar variable, LLVMTypeRef type)
 		{
 			if (type.Kind == LLVMTypeKind.LLVMPointerTypeKind)
 			{
-				AddPointerConstraint(model, variable);
+				return AddPointerConstraint(model, variable);
 			}
 			else
 			{
-				AddStructConstraint(model, variable);
+				return AddStructConstraint(model, variable);
 			}
 		}
 
-		public void AddPointerConstraint(CpModel model, IntVar variable)
+		public Constraint AddPointerConstraint(CpModel model, IntVar variable)
 		{
-			IEnumerable<ILiteral> literals = GetPointerIndices().Select(index => (variable == index).ToLiteral(model));
-			model.AddBoolOr(literals);
+			return model.AddBoolOr(IsPointer(model, variable));
 		}
 
-		public void AddStructConstraint(CpModel model, IntVar variable)
+		public Constraint AddStructConstraint(CpModel model, IntVar variable)
 		{
-			IEnumerable<ILiteral> literals = GetStructIndices().Select(index => (variable == index).ToLiteral(model));
-			model.AddBoolOr(literals);
+			return model.AddBoolOr(IsStruct(model, variable));
+		}
+
+		public IEnumerable<BoolVar> IsPointer(CpModel model, IntVar variable)
+		{
+			return GetPointerIndices().Select(index => (variable == index).ToBoolean(model));
+		}
+
+		public IEnumerable<BoolVar> IsStruct(CpModel model, IntVar variable)
+		{
+			return GetStructIndices().Select(index => (variable == index).ToBoolean(model));
 		}
 
 		private IEnumerable<int> GetPointerIndices()
