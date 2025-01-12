@@ -51,4 +51,14 @@ extern "C" {
         result.w = v1.w + v2.w + v3.w + v4.w + v5.w;
         return result;
     }
+
+    Vector4F vector4f_negate(Vector4F value)
+    {
+        Vector4F result;
+        result.x = -value.x;
+        result.y = -value.y;
+        result.z = -value.z;
+        result.w = -value.w;
+        return result;
+    }
 }

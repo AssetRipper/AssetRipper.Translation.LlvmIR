@@ -263,6 +263,35 @@ define dso_local void @Vector4F_add_5(ptr dead_on_unwind noalias writable sret(%
   ret void
 }
 
+; Function Attrs: mustprogress noinline nounwind optnone uwtable
+define dso_local void @vector4f_negate(ptr dead_on_unwind noalias writable sret(%struct.Vector4F) align 4 %0, ptr noundef %1) #0 {
+  %3 = alloca ptr, align 8
+  %4 = alloca ptr, align 8
+  store ptr %0, ptr %3, align 8
+  store ptr %1, ptr %4, align 8
+  %5 = getelementptr inbounds %struct.Vector4F, ptr %1, i32 0, i32 0
+  %6 = load float, ptr %5, align 4
+  %7 = fneg float %6
+  %8 = getelementptr inbounds %struct.Vector4F, ptr %0, i32 0, i32 0
+  store float %7, ptr %8, align 4
+  %9 = getelementptr inbounds %struct.Vector4F, ptr %1, i32 0, i32 1
+  %10 = load float, ptr %9, align 4
+  %11 = fneg float %10
+  %12 = getelementptr inbounds %struct.Vector4F, ptr %0, i32 0, i32 1
+  store float %11, ptr %12, align 4
+  %13 = getelementptr inbounds %struct.Vector4F, ptr %1, i32 0, i32 2
+  %14 = load float, ptr %13, align 4
+  %15 = fneg float %14
+  %16 = getelementptr inbounds %struct.Vector4F, ptr %0, i32 0, i32 2
+  store float %15, ptr %16, align 4
+  %17 = getelementptr inbounds %struct.Vector4F, ptr %1, i32 0, i32 3
+  %18 = load float, ptr %17, align 4
+  %19 = fneg float %18
+  %20 = getelementptr inbounds %struct.Vector4F, ptr %0, i32 0, i32 3
+  store float %19, ptr %20, align 4
+  ret void
+}
+
 attributes #0 = { mustprogress noinline nounwind optnone uwtable "min-legal-vector-width"="0" "no-trapping-math"="true" "stack-protector-buffer-size"="8" "target-cpu"="x86-64" "target-features"="+cmov,+cx8,+fxsr,+mmx,+sse,+sse2,+x87" "tune-cpu"="generic" }
 attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: readwrite) }
 
