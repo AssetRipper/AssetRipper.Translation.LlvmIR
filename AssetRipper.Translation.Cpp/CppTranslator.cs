@@ -247,9 +247,7 @@ public static unsafe class CppTranslator
 										}
 										else
 										{
-											CilLocalVariable addressLocal = functionContext.InstructionLocals[instructionContext.Operands[1]];
-
-											instructions.Add(CilOpCodes.Ldloc, addressLocal);
+											functionContext.LoadOperand(storeInstructionContext.DestinationOperand);
 											functionContext.LoadOperand(storeInstructionContext.SourceOperand);
 											instructions.AddStoreIndirect(storeInstructionContext.StoreTypeSignature);
 										}

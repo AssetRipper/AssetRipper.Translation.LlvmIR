@@ -202,8 +202,8 @@ internal sealed class FunctionContext
 				case StoreInstructionContext storeInstructionContext:
 					{
 						MaybeAddAccessor(storeInstructionContext, storeInstructionContext.SourceOperand);
-						storeInstructionContext.DestinationInstruction = InstructionLookup[storeInstructionContext.DestinationOperand];
-						storeInstructionContext.DestinationInstruction.Stores.Add(storeInstructionContext);
+						storeInstructionContext.DestinationInstruction = InstructionLookup.TryGetValue(storeInstructionContext.DestinationOperand);
+						storeInstructionContext.DestinationInstruction?.Stores.Add(storeInstructionContext);
 					}
 					break;
 				case CallInstructionContext callInstructionContext:
