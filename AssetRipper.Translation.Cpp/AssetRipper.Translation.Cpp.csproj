@@ -17,4 +17,11 @@
 		<PackageReference Include="System.IO.Hashing" Version="8.0.0" />
 	</ItemGroup>
 
+	<ItemGroup>
+		<ContentWithTargetPath Include="bin\libLLVMSharp.dll">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<TargetPath>libLLVMSharp.dll</TargetPath>
+		</ContentWithTargetPath>
+	</ItemGroup>
+
 </Project>
