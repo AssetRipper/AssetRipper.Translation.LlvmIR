@@ -50,7 +50,7 @@ internal sealed class ModuleContext
 		if (!inlineArrayCache.TryGetValue(pair, out TypeDefinition? arrayType))
 		{
 			string name = $"InlineArray_{inlineArrayCache.Count}";//Could be better, but it's unique, so it's good enough for now.
-			arrayType = new TypeDefinition(null, name, default(TypeAttributes));
+			arrayType = new TypeDefinition("InlineArrays", name, default(TypeAttributes));
 			Definition.TopLevelTypes.Add(arrayType);
 
 			//Add InlineArrayAttribute to arrayType
@@ -104,6 +104,63 @@ internal sealed class ModuleContext
 				{
 					functionContext.Name = NameGenerator.GenerateName(cleanName, functionContext.MangledName);
 				}
+			}
+		}
+
+		static string ExtractCleanName(string name)
+		{
+			if (name.StartsWith('?'))
+			{
+				int start = name.StartsWith("??$") ? 3 : 1;
+				int end = name.IndexOf('@', start);
+				return name[start..end];
+			}
+			else
+			{
+				return name;
+			}
+		}
+	}
+
+	public void AssignStructNames()
+	{
+		Dictionary<string, List<(string UniqueName, TypeDefinition Type)>> cleanNames = new();
+		foreach ((string name, TypeDefinition type) in Structs)
+		{
+			string cleanName = ExtractCleanName(name);
+			if (!cleanNames.TryGetValue(cleanName, out List<(string UniqueName, TypeDefinition Type)>? list))
+			{
+				list = new();
+				cleanNames.Add(cleanName, list);
+			}
+			list.Add((name, type));
+		}
+
+		foreach ((string cleanName, List<(string UniqueName, TypeDefinition Type)> list) in cleanNames)
+		{
+			if (list.Count == 1)
+			{
+				list[0].Type.Name = cleanName;
+			}
+			else
+			{
+				foreach ((string uniqueName, TypeDefinition type) in list)
+				{
+					type.Name = NameGenerator.GenerateName(cleanName, uniqueName);
+				}
+			}
+		}
+
+		static string ExtractCleanName(string name)
+		{
+			const string StructPrefix = "struct.";
+			if (name.StartsWith(StructPrefix, StringComparison.Ordinal))
+			{
+				return name[StructPrefix.Length..];
+			}
+			else
+			{
+				return name;
 			}
 		}
 	}
@@ -192,7 +249,7 @@ internal sealed class ModuleContext
 					if (!Structs.TryGetValue(name, out TypeDefinition? typeDefinition))
 					{
 						typeDefinition = new(
-							null,
+							"Structures",
 							name,
 							TypeAttributes.Public | TypeAttributes.SequentialLayout | TypeAttributes.BeforeFieldInit,
 							Definition.DefaultImporter.ImportType(typeof(ValueType)));
@@ -279,20 +336,6 @@ internal sealed class ModuleContext
 		TypeDefinition typeDefinition = new(null, name, TypeAttributes.Public | TypeAttributes.Abstract | TypeAttributes.Sealed);
 		moduleDefinition.TopLevelTypes.Add(typeDefinition);
 		return typeDefinition;
-	}
-
-	private static string ExtractCleanName(string name)
-	{
-		if (name.StartsWith('?'))
-		{
-			int start = name.StartsWith("??$") ? 3 : 1;
-			int end = name.IndexOf('@', start);
-			return name[start..end];
-		}
-		else
-		{
-			return name;
-		}
 	}
 
 	private void AddCompilerGeneratedAttribute(IHasCustomAttribute hasCustomAttribute)

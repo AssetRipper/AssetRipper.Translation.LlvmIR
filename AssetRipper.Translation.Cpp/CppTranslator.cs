@@ -54,7 +54,6 @@ public static unsafe class CppTranslator
 
 	private static ModuleDefinition Translate(LLVMModuleRef module, bool removeDeadCode = false)
 	{
-		ModuleDefinition moduleDefinition;
 		if (removeDeadCode)
 		{
 			//Need to expose these in libLLVMSharp
@@ -77,7 +76,7 @@ public static unsafe class CppTranslator
 			var metadataList = module.GetNamedMetadata().ToList();
 		}
 
-		moduleDefinition = new("ConvertedCpp", KnownCorLibs.SystemRuntime_v8_0_0_0);
+		ModuleDefinition moduleDefinition = new("ConvertedCpp", KnownCorLibs.SystemRuntime_v8_0_0_0);
 		ModuleContext moduleContext = new(module, moduleDefinition);
 
 		foreach (LLVMValueRef global in module.GetGlobals().Where(g => g.Kind == LLVMValueKind.LLVMGlobalVariableValueKind))
@@ -563,6 +562,8 @@ public static unsafe class CppTranslator
 			// Annotate the original return parameter
 			method.Parameters[0].GetOrCreateDefinition().Name = "result";
 		}
+
+		moduleContext.AssignStructNames();
 
 		return moduleDefinition;
 	}
