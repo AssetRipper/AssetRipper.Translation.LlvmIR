@@ -25,7 +25,5 @@ internal sealed class AllocaInstructionContext : InstructionContext
 	public TypeSignature AllocatedTypeSignature { get; set; }
 	public TypeSignature PointerTypeSignature => ResultTypeSignature;
 	public CilLocalVariable? DataLocal { get; set; }
-	public CilLocalVariable? PointerLocal { get; set; } // Might be removable
-
-	public override TypeSignature? SecondaryTypeSignature { get => AllocatedTypeSignature; set => AllocatedTypeSignature = value; }
+	public CilLocalVariable? PointerLocal { get; set; }
 }

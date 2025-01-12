@@ -54,11 +54,6 @@ internal class InstructionContext
 	public List<InstructionContext> Stores { get; } = new();
 	public List<InstructionContext> Accessors { get; } = new();
 	public TypeSignature ResultTypeSignature { get; set; }
-	public virtual TypeSignature? SecondaryTypeSignature
-	{
-		get => null;
-		set { }
-	}
 
 	[MemberNotNullWhen(true, nameof(ResultTypeSignature))]
 	public bool HasResult => ResultTypeSignature is not null and not CorLibTypeSignature { ElementType: ElementType.Void };

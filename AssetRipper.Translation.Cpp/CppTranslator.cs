@@ -169,40 +169,35 @@ public static unsafe class CppTranslator
 
 										if (allocaInstructionContext.DataLocal is null)
 										{
+											Debug.Assert(allocaInstructionContext.PointerLocal is not null);
 											throw new NotSupportedException("Stack allocated data not currently supported");
 										}
-										else
+										else if (allocaInstructionContext.PointerLocal is not null)
 										{
-											// We could zero out the memory here, but it's not necessary because alloca doesn't guarantee zero initialization.
 											//Zero out the memory
-											//instructions.Add(CilOpCodes.Ldloca, allocaInstructionContext.DataLocal);
-											//instructions.Add(CilOpCodes.Initobj, allocatedTypeSignature.ToTypeDefOrRef());
+											instructions.Add(CilOpCodes.Ldloca, allocaInstructionContext.DataLocal);
+											instructions.Add(CilOpCodes.Initobj, allocatedTypeSignature.ToTypeDefOrRef());
 
-											if (allocaInstructionContext.PointerLocal is not null)
-											{
-												//Might need slight modifications for fixed size arrays.
-												instructions.Add(CilOpCodes.Ldloca, allocaInstructionContext.DataLocal);
-												instructions.Add(CilOpCodes.Stloc, allocaInstructionContext.PointerLocal);
-											}
+											//Might need slight modifications for fixed size arrays.
+											instructions.Add(CilOpCodes.Ldloca, allocaInstructionContext.DataLocal);
+											instructions.Add(CilOpCodes.Stloc, allocaInstructionContext.PointerLocal);
 										}
 									}
 									break;
 								case LoadInstructionContext loadInstructionContext:
 									{
-										TypeSignature loadTypeSignature = loadInstructionContext.ResultTypeSignature ?? throw new NullReferenceException();
-
 										if (loadInstructionContext.SourceInstruction is AllocaInstructionContext { DataLocal: not null } allocaSource
-											//&& SignatureComparer.Default.Equals(allocaSource.DataLocal.VariableType, loadTypeSignature)// Disabled because of incorrect types
-											)
+											&& IsCompatible(allocaSource, loadInstructionContext))
 										{
-											if (SignatureComparer.Default.Equals(allocaSource.DataLocal.VariableType, loadTypeSignature))
+											if (allocaSource.DataLocal.VariableType is PointerTypeSignature
+												|| SignatureComparer.Default.Equals(allocaSource.DataLocal.VariableType, loadInstructionContext.ResultTypeSignature))
 											{
 												instructions.Add(CilOpCodes.Ldloc, allocaSource.DataLocal);
 											}
 											else
 											{
 												instructions.Add(CilOpCodes.Ldloca, allocaSource.DataLocal);
-												instructions.AddLoadIndirect(loadTypeSignature);
+												instructions.AddLoadIndirect(loadInstructionContext.ResultTypeSignature);
 											}
 										}
 										else
@@ -210,19 +205,37 @@ public static unsafe class CppTranslator
 											CilLocalVariable addressLocal = functionContext.InstructionLocals[loadInstructionContext.SourceOperand];
 
 											instructions.Add(CilOpCodes.Ldloc, addressLocal);
-											instructions.AddLoadIndirect(loadTypeSignature);
+											instructions.AddLoadIndirect(loadInstructionContext.ResultTypeSignature);
 										}
 
 										instructions.Add(CilOpCodes.Stloc, functionContext.InstructionLocals[instructionContext.Instruction]);
+
+										static bool IsCompatible(AllocaInstructionContext allocaSource, LoadInstructionContext loadInstructionContext)
+										{
+											Debug.Assert(allocaSource.DataLocal is not null);
+
+											if (allocaSource.DataLocal.VariableType is PointerTypeSignature && loadInstructionContext.ResultTypeSignature is PointerTypeSignature)
+											{
+												return true;
+											}
+
+											LLVMModuleRef module = allocaSource.Function.Module.Module;
+											if (allocaSource.AllocatedType.GetABISize(module) == loadInstructionContext.Instruction.TypeOf.GetABISize(module))
+											{
+												return true;
+											}
+
+											return false;
+										}
 									}
 									break;
 								case StoreInstructionContext storeInstructionContext:
 									{
 										if (storeInstructionContext.DestinationInstruction is AllocaInstructionContext { DataLocal: not null } allocaDestination
-											//&& SignatureComparer.Default.Equals(allocaDestination.DataLocal.VariableType, storeTypeSignature)// Disabled because of incorrect parameter types
-											)
+											&& IsCompatible(allocaDestination, storeInstructionContext))
 										{
-											if (SignatureComparer.Default.Equals(allocaDestination.DataLocal.VariableType, storeInstructionContext.StoreTypeSignature))
+											if (allocaDestination.DataLocal.VariableType is PointerTypeSignature
+												|| SignatureComparer.Default.Equals(allocaDestination.DataLocal.VariableType, storeInstructionContext.StoreTypeSignature))
 											{
 												functionContext.LoadOperand(storeInstructionContext.SourceOperand);
 												instructions.Add(CilOpCodes.Stloc, allocaDestination.DataLocal);
@@ -241,6 +254,24 @@ public static unsafe class CppTranslator
 											instructions.Add(CilOpCodes.Ldloc, addressLocal);
 											functionContext.LoadOperand(storeInstructionContext.SourceOperand);
 											instructions.AddStoreIndirect(storeInstructionContext.StoreTypeSignature);
+										}
+
+										static bool IsCompatible(AllocaInstructionContext allocaDestination, StoreInstructionContext storeInstructionContext)
+										{
+											Debug.Assert(allocaDestination.DataLocal is not null);
+
+											if (allocaDestination.DataLocal.VariableType is PointerTypeSignature && storeInstructionContext.StoreTypeSignature is PointerTypeSignature)
+											{
+												return true;
+											}
+
+											LLVMModuleRef module = allocaDestination.Function.Module.Module;
+											if (allocaDestination.AllocatedType.GetABISize(module) == storeInstructionContext.StoreType.GetABISize(module))
+											{
+												return true;
+											}
+
+											return false;
 										}
 									}
 									break;
