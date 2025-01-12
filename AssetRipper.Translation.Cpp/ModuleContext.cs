@@ -1,6 +1,7 @@
 ﻿using AsmResolver;
 using AsmResolver.DotNet;
 using AsmResolver.DotNet.Signatures;
+using AsmResolver.PE.DotNet.Cil;
 using AsmResolver.PE.DotNet.Metadata.Tables;
 using AssetRipper.CIL;
 using AssetRipper.Translation.Cpp.Extensions;
@@ -286,7 +287,22 @@ internal sealed class ModuleContext
 
 		PrivateImplementationDetails.Fields.Add(privateImplementationField);
 
-		return privateImplementationField;
+		SzArrayTypeSignature byteArrayType = Definition.CorLibTypeFactory.Byte.MakeSzArrayType();
+		FieldDefinition constantsField = new FieldDefinition($"C_{ConstantsType.Fields.Count}", FieldAttributes.Public | FieldAttributes.Static, byteArrayType);
+		constantsField.IsInitOnly = true;
+		ConstantsType.Fields.Add(constantsField);
+		MethodDefinition staticConstructor = ConstantsType.GetOrCreateStaticConstructor();
+		staticConstructor.CilMethodBody!.Instructions.InsertRange(staticConstructor.CilMethodBody.Instructions.Count - 1,
+		[
+			new CilInstruction(CilOpCodes.Ldc_I4, data.Length),
+			new CilInstruction(CilOpCodes.Newarr, Definition.CorLibTypeFactory.Byte.ToTypeDefOrRef()),
+			new CilInstruction(CilOpCodes.Dup),
+			new CilInstruction(CilOpCodes.Ldtoken, privateImplementationField),
+			new CilInstruction(CilOpCodes.Call, Definition.DefaultImporter.ImportMethod(typeof(RuntimeHelpers).GetMethod(nameof(RuntimeHelpers.InitializeArray))!)),
+			new CilInstruction(CilOpCodes.Stsfld, constantsField),
+		]);
+
+		return constantsField;
 
 		//This might not be the correct way to choose a field name, but I think the specification allows it.
 		//In any case, ILSpy handles it the way we want, which is all that matters.

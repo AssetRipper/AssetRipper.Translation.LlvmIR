@@ -4,6 +4,7 @@ using AsmResolver.DotNet.Collections;
 using AsmResolver.DotNet.Signatures;
 using AsmResolver.PE.DotNet.Cil;
 using AsmResolver.PE.DotNet.Metadata.Tables;
+using AssetRipper.CIL;
 using AssetRipper.Translation.Cpp.Extensions;
 using AssetRipper.Translation.Cpp.Instructions;
 using LLVMSharp.Interop;
@@ -130,7 +131,24 @@ internal sealed class FunctionContext
 			case LLVMValueKind.LLVMGlobalVariableValueKind:
 				{
 					FieldDefinition field = Module.GlobalConstants[operand];
-					CilInstructions.Add(CilOpCodes.Ldsflda, field);
+
+					CilLocalVariable pinned = CilInstructions.AddLocalVariable(Module.Definition.CorLibTypeFactory.Byte.MakeSzArrayType());
+					CilLocalVariable pointer = CilInstructions.AddLocalVariable(Module.Definition.CorLibTypeFactory.Byte.MakePointerType());
+
+					// Pin the array
+					CilInstructions.Add(CilOpCodes.Ldsfld, field);
+					CilInstructions.Add(CilOpCodes.Stloc, pinned);
+
+					// Get the address of the first element
+					CilInstructions.Add(CilOpCodes.Ldloc, pinned);
+					CilInstructions.Add(CilOpCodes.Ldc_I4_0);
+					CilInstructions.Add(CilOpCodes.Ldelema, Module.Definition.CorLibTypeFactory.Byte.ToTypeDefOrRef());
+					CilInstructions.Add(CilOpCodes.Conv_U);
+					CilInstructions.Add(CilOpCodes.Stloc, pointer);
+
+					// Load the pointer
+					CilInstructions.Add(CilOpCodes.Ldloc, pointer);
+
 					typeSignature = Module.Definition.CorLibTypeFactory.Byte.MakePointerType();
 				}
 				break;
