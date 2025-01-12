@@ -33,7 +33,11 @@ internal sealed class GetElementPointerInstructionContext : InstructionContext
 			if (currentType is TypeDefOrRefSignature structTypeSignature)
 			{
 				TypeDefinition structType = (TypeDefinition)structTypeSignature.ToTypeDefOrRef();
-				if (operand.Kind == LLVMValueKind.LLVMConstantIntValueKind)
+				if (Function.Module.InlineArrayTypes.TryGetValue(structType, out (TypeSignature, int) pair))
+				{
+					currentType = pair.Item1;
+				}
+				else if (operand.Kind == LLVMValueKind.LLVMConstantIntValueKind)
 				{
 					long index = operand.ConstIntSExt;
 					string fieldName = $"field_{index}";

@@ -39,7 +39,10 @@ internal sealed class ModuleContext
 	public Dictionary<LLVMValueRef, FunctionContext> Methods { get; } = new();
 	public Dictionary<string, TypeDefinition> Structs { get; } = new();
 	public Dictionary<LLVMValueRef, FieldDefinition> GlobalConstants { get; } = new();
-	private readonly Dictionary<(TypeSignature, int), TypeDefinition> inlineArrayCache = new();
+	private readonly Dictionary<(TypeSignature, int), TypeDefinition> inlineArrayCache = new(TypeSignatureIntPairComparer);
+	public Dictionary<TypeDefinition, (TypeSignature, int)> InlineArrayTypes { get; } = new(SignatureComparer.Default);
+
+	private static PairEqualityComparer<TypeSignature, int> TypeSignatureIntPairComparer { get; } = new(SignatureComparer.Default, EqualityComparer<int>.Default);
 
 	public TypeDefinition GetOrCreateInlineArray(TypeSignature type, int size)
 	{
@@ -51,7 +54,13 @@ internal sealed class ModuleContext
 			Definition.TopLevelTypes.Add(arrayType);
 
 			//Add InlineArrayAttribute to arrayType
+
 			//Add private instance field with the cooresponding type.
+			FieldDefinition field = new("__element0", FieldAttributes.Private, type);
+			arrayType.Fields.Add(field);
+
+			inlineArrayCache.Add(pair, arrayType);
+			InlineArrayTypes.Add(arrayType, pair);
 		}
 
 		return arrayType;
@@ -135,23 +144,31 @@ internal sealed class ModuleContext
 		{
 			case LLVMTypeKind.LLVMVoidTypeKind:
 				return Definition.CorLibTypeFactory.Void;
+
 			case LLVMTypeKind.LLVMHalfTypeKind:
 				return Definition.DefaultImporter.ImportTypeSignature(typeof(Half));
+
 			case LLVMTypeKind.LLVMFloatTypeKind:
 				return Definition.CorLibTypeFactory.Single;
+
 			case LLVMTypeKind.LLVMDoubleTypeKind:
 				return Definition.CorLibTypeFactory.Double;
+
 			case LLVMTypeKind.LLVMX86_FP80TypeKind:
 				//x86_fp80 has a very unique structure and uses 10 bytes
 				goto default;
+
 			case LLVMTypeKind.LLVMFP128TypeKind:
 				//IEEE 754 floating point number with 128 bits.
 				goto default;
+
 			case LLVMTypeKind.LLVMPPC_FP128TypeKind:
 				//ppc_fp128 can be approximated by fp128, which conforms to IEEE 754 standards.
 				goto case LLVMTypeKind.LLVMFP128TypeKind;
+
 			case LLVMTypeKind.LLVMLabelTypeKind:
 				goto default;
+
 			case LLVMTypeKind.LLVMIntegerTypeKind:
 				return type.IntWidth switch
 				{
@@ -164,9 +181,11 @@ internal sealed class ModuleContext
 					//128
 					_ => throw new NotSupportedException(),
 				};
+
 			case LLVMTypeKind.LLVMFunctionTypeKind:
 				//I don't think this can happen, but void* is fine.
 				return Definition.CorLibTypeFactory.Void.MakePointerType();
+
 			case LLVMTypeKind.LLVMStructTypeKind:
 				{
 					string name = type.StructName;
@@ -192,29 +211,45 @@ internal sealed class ModuleContext
 					}
 					return typeDefinition.ToTypeSignature();
 				}
+
 			case LLVMTypeKind.LLVMArrayTypeKind:
-				goto default;
+				{
+					TypeSignature elementType = GetTypeSignature(type.ElementType);
+					int count = (int)type.ArrayLength;
+					TypeDefinition arrayType = GetOrCreateInlineArray(elementType, count);
+					return arrayType.ToTypeSignature();
+				}
+
 			case LLVMTypeKind.LLVMPointerTypeKind:
 				//All pointers are opaque in IR
 				return Definition.CorLibTypeFactory.Void.MakePointerType();
+
 			case LLVMTypeKind.LLVMVectorTypeKind:
 				goto default;
+
 			case LLVMTypeKind.LLVMMetadataTypeKind:
 				goto default;
+
 			case LLVMTypeKind.LLVMX86_MMXTypeKind:
 				goto default;
+
 			case LLVMTypeKind.LLVMTokenTypeKind:
-				goto default;
+				return Definition.CorLibTypeFactory.Void;
+
 			case LLVMTypeKind.LLVMScalableVectorTypeKind:
 				goto default;
+
 			case LLVMTypeKind.LLVMBFloatTypeKind:
 				//Half is just an approximation of BFloat16, which is not yet supported in .NET
 				//Maybe we can use this instead: https://www.nuget.org/packages/UltimateOrb.TruncatedFloatingPoints
 				return Definition.DefaultImporter.ImportTypeSignature(typeof(Half));
+
 			case LLVMTypeKind.LLVMX86_AMXTypeKind:
 				goto default;
+
 			case LLVMTypeKind.LLVMTargetExtTypeKind:
 				goto default;
+
 			default:
 				throw new NotSupportedException();
 		}
