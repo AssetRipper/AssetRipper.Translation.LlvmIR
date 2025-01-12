@@ -76,7 +76,7 @@ public static unsafe class CppTranslator
 			var metadataList = module.GetNamedMetadata().ToList();
 		}
 
-		ModuleDefinition moduleDefinition = new("ConvertedCpp", KnownCorLibs.SystemRuntime_v8_0_0_0);
+		ModuleDefinition moduleDefinition = new("ConvertedCpp", KnownCorLibs.SystemRuntime_v9_0_0_0);
 		ModuleContext moduleContext = new(module, moduleDefinition);
 
 		foreach (LLVMValueRef global in module.GetGlobals().Where(g => g.Kind == LLVMValueKind.LLVMGlobalVariableValueKind))
