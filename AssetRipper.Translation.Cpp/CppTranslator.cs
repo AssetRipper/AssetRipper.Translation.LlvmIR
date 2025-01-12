@@ -1,5 +1,6 @@
 ﻿using AsmResolver.DotNet;
 using AsmResolver.DotNet.Code.Cil;
+using AsmResolver.DotNet.Collections;
 using AsmResolver.DotNet.Signatures;
 using AsmResolver.PE.DotNet.Cil;
 using AssetRipper.CIL;
@@ -89,8 +90,6 @@ public static unsafe class CppTranslator
 
 					functionContext.Analyze();
 				}
-
-				TypeInference.Infer(moduleContext);
 
 				foreach (FunctionContext functionContext in moduleContext.Methods.Values)
 				{
@@ -464,6 +463,43 @@ public static unsafe class CppTranslator
 					}
 
 					instructions.OptimizeMacros();
+				}
+
+				// Add struct return type methods
+				foreach (FunctionContext functionContext in moduleContext.Methods.Values)
+				{
+					if (!functionContext.TryGetStructReturnType(out LLVMTypeRef structReturnType))
+					{
+						continue;
+					}
+
+					TypeSignature returnTypeSignature = functionContext.Module.GetTypeSignature(structReturnType);
+
+					MethodDefinition method = functionContext.Definition;
+
+					MethodDefinition newMethod = new(method.Name, method.Attributes, MethodSignature.CreateStatic(returnTypeSignature, method.Parameters.Skip(1).Select(p => p.ParameterType)));
+					method.DeclaringType!.Methods.Add(newMethod);
+					newMethod.CilMethodBody = new(newMethod);
+
+					CilInstructionCollection instructions = newMethod.CilMethodBody.Instructions;
+					CilLocalVariable returnLocal = instructions.AddLocalVariable(returnTypeSignature);
+					instructions.Add(CilOpCodes.Ldloca, returnLocal);
+					instructions.Add(CilOpCodes.Initobj, returnTypeSignature.ToTypeDefOrRef());
+					instructions.Add(CilOpCodes.Ldloca, returnLocal);
+					foreach (Parameter parameter in newMethod.Parameters)
+					{
+						instructions.Add(CilOpCodes.Ldarg, parameter);
+					}
+					instructions.Add(CilOpCodes.Call, method);
+					instructions.Add(CilOpCodes.Ldloc, returnLocal);
+					instructions.Add(CilOpCodes.Ret);
+					instructions.OptimizeMacros();
+
+					// Hide the original method
+					method.IsAssembly = true;
+
+					// Annotate the original return parameter
+					method.Parameters[0].GetOrCreateDefinition().Name = "result";
 				}
 			}
 			finally

@@ -17,6 +17,7 @@ internal class InstructionContext
 		Function = function;
 		Block = block;
 		Operands = instruction.GetOperands();
+		ResultTypeSignature = function.Module.GetTypeSignature(instruction.TypeOf);
 	}
 
 	public static InstructionContext Create(LLVMValueRef instruction, BasicBlockContext block, FunctionContext function)
@@ -52,7 +53,7 @@ internal class InstructionContext
 	public List<InstructionContext> Loads { get; } = new();
 	public List<InstructionContext> Stores { get; } = new();
 	public List<InstructionContext> Accessors { get; } = new();
-	public TypeSignature? ResultTypeSignature { get; set; }
+	public TypeSignature ResultTypeSignature { get; set; }
 	public virtual TypeSignature? SecondaryTypeSignature
 	{
 		get => null;

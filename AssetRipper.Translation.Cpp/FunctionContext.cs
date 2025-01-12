@@ -20,6 +20,14 @@ internal sealed class FunctionContext
 		Parameters = function.GetParams();
 		Definition = definition;
 		Module = module;
+
+		Attributes = AttributeWrapper.FromArray(function.GetAttributesAtIndex(LLVMAttributeIndex.LLVMAttributeFunctionIndex));
+		ReturnAttributes = AttributeWrapper.FromArray(function.GetAttributesAtIndex(LLVMAttributeIndex.LLVMAttributeReturnIndex));
+		ParameterAttributes = new AttributeWrapper[Parameters.Length][];
+		for (int i = 0; i < Parameters.Length; i++)
+		{
+			ParameterAttributes[i] = AttributeWrapper.FromArray(function.GetAttributesAtIndex((LLVMAttributeIndex)(i + 1)));
+		}
 	}
 
 	public static FunctionContext Create(LLVMValueRef function, MethodDefinition definition, ModuleContext module)
@@ -60,6 +68,9 @@ internal sealed class FunctionContext
 	public LLVMTypeRef FunctionType => LibLLVMSharp.FunctionGetFunctionType(Function);
 	public LLVMTypeRef ReturnType => LibLLVMSharp.FunctionGetReturnType(Function);
 	public LLVMValueRef[] Parameters { get; }
+	public AttributeWrapper[] Attributes { get; }
+	public AttributeWrapper[] ReturnAttributes { get; }
+	public AttributeWrapper[][] ParameterAttributes { get; }
 	public MethodDefinition Definition { get; }
 	public ModuleContext Module { get; }
 	public List<BasicBlockContext> BasicBlocks { get; } = new();
@@ -145,13 +156,13 @@ internal sealed class FunctionContext
 		}
 	}
 
-	public TypeSignature? GetOperandTypeSignature(LLVMValueRef operand)
+	public TypeSignature GetOperandTypeSignature(LLVMValueRef operand)
 	{
 		return operand.Kind switch
 		{
 			LLVMValueKind.LLVMConstantIntValueKind or LLVMValueKind.LLVMConstantFPValueKind => Module.GetTypeSignature(operand.TypeOf),
 			LLVMValueKind.LLVMInstructionValueKind => InstructionLookup[operand].ResultTypeSignature,
-			LLVMValueKind.LLVMArgumentValueKind => null, //Parameters[operand].ParameterType,
+			LLVMValueKind.LLVMArgumentValueKind => ParameterDictionary[operand].ParameterType,
 			LLVMValueKind.LLVMGlobalVariableValueKind => Module.Definition.CorLibTypeFactory.Byte.MakePointerType(),
 			_ => throw new NotSupportedException(),
 		};
@@ -164,24 +175,10 @@ internal sealed class FunctionContext
 		{
 			switch (instruction)
 			{
-				case AllocaInstructionContext allocaInstructionContext:
-					{
-						allocaInstructionContext.AllocatedTypeSignature = Module.GetTypeSignature(allocaInstructionContext.AllocatedType);
-						allocaInstructionContext.InitializePointerTypeSignature();
-						MaybeAddAccessor(allocaInstructionContext, allocaInstructionContext.SizeOperand);
-					}
-					break;
 				case LoadInstructionContext loadInstructionContext:
 					{
 						loadInstructionContext.SourceInstruction = InstructionLookup[loadInstructionContext.SourceOperand];
 						loadInstructionContext.SourceInstruction.Loads.Add(loadInstructionContext);
-
-						//https://llvm.org/docs/OpaquePointers.html#migration-instructions
-						LLVMTypeRef loadType = loadInstructionContext.Instruction.TypeOf;
-						//if () //if not opaque ref
-						{
-							loadInstructionContext.ResultTypeSignature = Module.GetTypeSignature(loadType);
-						}
 					}
 					break;
 				case StoreInstructionContext storeInstructionContext:
@@ -201,16 +198,6 @@ internal sealed class FunctionContext
 					{
 						phiInstructionContext.InitializeIncomingBlocks();
 						MaybeAddAccessors(phiInstructionContext, phiInstructionContext.Operands);
-					}
-					break;
-				case GetElementPointerInstructionContext gepInstructionContext:
-					{
-						gepInstructionContext.SourceElementTypeSignature = Module.GetTypeSignature(gepInstructionContext.SourceElementType);
-						if (gepInstructionContext.SourceElementTypeSignature is not null)
-						{
-							gepInstructionContext.ResultTypeSignature = gepInstructionContext.CalculateFinalType().MakePointerType();
-						}
-						MaybeAddAccessors(gepInstructionContext, gepInstructionContext.Operands);
 					}
 					break;
 				default:
@@ -243,6 +230,29 @@ internal sealed class FunctionContext
 		{
 			Labels[basicBlock] = new();
 		}
+	}
+
+	public bool TryGetStructReturnType(out LLVMTypeRef type)
+	{
+		if (ReturnType.Kind != LLVMTypeKind.LLVMVoidTypeKind || Parameters.Length == 0 || Parameters[0].TypeOf.Kind != LLVMTypeKind.LLVMPointerTypeKind)
+		{
+			type = default;
+			return false;
+		}
+
+		AttributeWrapper[] parameter0Attributes = ParameterAttributes[0];
+		for (int i = 0; i < parameter0Attributes.Length; i++)
+		{
+			AttributeWrapper attribute = parameter0Attributes[i];
+			if (attribute.IsTypeAttribute) // Todo: Need to check the kind
+			{
+				type = attribute.TypeValue;
+				return true;
+			}
+		}
+
+		type = default;
+		return false;
 	}
 
 	private string GetDebuggerDisplay()

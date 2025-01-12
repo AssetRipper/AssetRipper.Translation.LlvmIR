@@ -100,7 +100,7 @@ internal sealed class ModuleContext
 
 	public void InitializeMethodSignatures()
 	{
-		foreach ((LLVMValueRef function, FunctionContext functionContext) in Methods)
+		foreach (FunctionContext functionContext in Methods.Values)
 		{
 			MethodDefinition method = functionContext.Definition;
 			Debug.Assert(method.Signature is not null);
@@ -111,16 +111,24 @@ internal sealed class ModuleContext
 
 			method.Signature.ReturnType = returnTypeSignature;
 
-			foreach (LLVMValueRef parameter in function.GetParams())
+			for (int i = 0; i < functionContext.Parameters.Length; i++)
 			{
-				LLVMTypeRef type = parameter.TypeOf;
-				TypeSignature parameterType = GetTypeSignature(type);
+				LLVMValueRef parameter = functionContext.Parameters[i];
+				TypeSignature parameterType;
+				if (i == 0 && functionContext.TryGetStructReturnType(out LLVMTypeRef type))
+				{
+					parameterType = GetTypeSignature(type).MakePointerType();
+				}
+				else
+				{
+					parameterType = GetTypeSignature(parameter.TypeOf);
+				}
 				functionContext.ParameterDictionary[parameter] = method.AddParameter(parameterType);
 			}
 		}
 	}
 
-	public TypeSignature? GetTypeSignature(LLVMTypeRef type)
+	public TypeSignature GetTypeSignature(LLVMTypeRef type)
 	{
 		switch (type.Kind)
 		{
@@ -187,7 +195,7 @@ internal sealed class ModuleContext
 				goto default;
 			case LLVMTypeKind.LLVMPointerTypeKind:
 				//All pointers are opaque in IR
-				return null;
+				return Definition.CorLibTypeFactory.Void.MakePointerType();
 			case LLVMTypeKind.LLVMVectorTypeKind:
 				goto default;
 			case LLVMTypeKind.LLVMMetadataTypeKind:

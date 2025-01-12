@@ -13,10 +13,10 @@ internal sealed class StoreInstructionContext : InstructionContext
 		Debug.Assert(Operands.Length == 2);
 		Debug.Assert(DestinationOperand.IsInstruction());
 		ResultTypeSignature = function.Module.Definition.CorLibTypeFactory.Void;
+		StoreTypeSignature = function.Module.GetTypeSignature(SourceOperand.TypeOf);
 	}
 	public LLVMValueRef SourceOperand => Operands[0];
 	public LLVMValueRef DestinationOperand => Operands[1];
 	public InstructionContext DestinationInstruction { get; set; } = null!; // Set during Analysis
-	public TypeSignature StoreTypeSignature { get; set; } = null!; // Set during Analysis
-	public override TypeSignature? SecondaryTypeSignature { get => StoreTypeSignature; set => StoreTypeSignature = value; }
+	public TypeSignature StoreTypeSignature { get; set; }
 }

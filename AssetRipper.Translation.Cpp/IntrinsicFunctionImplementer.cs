@@ -16,6 +16,8 @@ internal static class IntrinsicFunctionImplementer
 			return false;
 		}
 
+		context.Definition.IsAssembly = true;
+
 		CilInstructionCollection instructions = context.Definition.CilMethodBody!.Instructions;
 
 		foreach (Parameter parameter in context.Definition.Parameters)
@@ -37,7 +39,7 @@ internal static class IntrinsicFunctionImplementer
 
 	public static TypeDefinition InjectIntrinsics(ModuleDefinition targetModule)
 	{
-		ModuleDefinition executingModule = ModuleDefinition.FromFile(typeof(ModuleContext).Assembly.Location);
+		ModuleDefinition executingModule = ModuleDefinition.FromFile(typeof(IntrinsicFunctions).Assembly.Location);
 		MemberCloner cloner = new(targetModule);
 		cloner.Include(executingModule.TopLevelTypes.First(t => t.Name == nameof(IntrinsicFunctions)));
 		TypeDefinition result = cloner.Clone().ClonedTopLevelTypes.Single();

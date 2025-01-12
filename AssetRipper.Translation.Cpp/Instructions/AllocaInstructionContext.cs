@@ -16,18 +16,16 @@ internal sealed class AllocaInstructionContext : InstructionContext
 		{
 			throw new NotSupportedException("Variable size alloca not supported");
 		}
+		AllocatedTypeSignature = function.Module.GetTypeSignature(AllocatedType);
+		ResultTypeSignature = AllocatedTypeSignature.MakePointerType();
 	}
 	public LLVMValueRef SizeOperand => Operands[0];
 	public long FixedSize => SizeOperand.ConstIntSExt;
 	public unsafe LLVMTypeRef AllocatedType => LLVM.GetAllocatedType(Instruction);
-	public TypeSignature AllocatedTypeSignature { get; set; } = null!; // Set during Analysis
-	public TypeSignature PointerTypeSignature => ResultTypeSignature!; // Set during Analysis
+	public TypeSignature AllocatedTypeSignature { get; set; }
+	public TypeSignature PointerTypeSignature => ResultTypeSignature;
 	public CilLocalVariable? DataLocal { get; set; }
 	public CilLocalVariable? PointerLocal { get; set; } // Might be removable
-	public void InitializePointerTypeSignature()
-	{
-		ResultTypeSignature = AllocatedTypeSignature?.MakePointerType();
-	}
 
 	public override TypeSignature? SecondaryTypeSignature { get => AllocatedTypeSignature; set => AllocatedTypeSignature = value; }
 }
