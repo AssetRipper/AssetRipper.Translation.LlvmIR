@@ -277,10 +277,19 @@ public static unsafe class CppTranslator
 										{
 											instructionContext.LoadOperand(i);
 										}
-										instructions.Add(CilOpCodes.Call, callInstructionContext.FunctionCalled.Definition);
+
+										if (callInstructionContext.FunctionCalled is null)
+										{
+											instructionContext.LoadOperand(instructionContext.Operands.Length - 1);
+											instructions.Add(CilOpCodes.Calli, callInstructionContext.MakeStandaloneSignature());
+										}
+										else
+										{
+											instructions.Add(CilOpCodes.Call, callInstructionContext.FunctionCalled.Definition);
+										}
+
 										if (callInstructionContext.HasResult)
 										{
-											// Todo: pop if the return value isn't used
 											instructions.Add(CilOpCodes.Stloc, functionContext.InstructionLocals[instruction]);
 										}
 									}

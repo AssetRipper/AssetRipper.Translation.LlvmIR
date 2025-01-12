@@ -208,7 +208,7 @@ internal sealed class FunctionContext
 					break;
 				case CallInstructionContext callInstructionContext:
 					{
-						callInstructionContext.FunctionCalled = Module.Methods[callInstructionContext.FunctionOperand];
+						callInstructionContext.FunctionCalled = Module.Methods.TryGetValue(callInstructionContext.FunctionOperand);
 						MaybeAddAccessors(callInstructionContext, callInstructionContext.ArgumentOperands);
 					}
 					break;
