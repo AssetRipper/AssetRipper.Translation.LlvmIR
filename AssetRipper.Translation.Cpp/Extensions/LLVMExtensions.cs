@@ -137,4 +137,10 @@ internal static class LLVMExtensions
 			? LLVM.ConstRealGetDouble(value, &losesInfo)
 			: default;
 	}
+
+	public static unsafe ulong GetABISize(this LLVMTypeRef type, LLVMModuleRef module)
+	{
+		LLVMTargetDataRef targetData = LLVM.GetModuleDataLayout(module);
+		return LLVM.ABISizeOfType(targetData, type);
+	}
 }

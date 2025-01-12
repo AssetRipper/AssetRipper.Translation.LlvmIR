@@ -36,7 +36,7 @@ internal sealed class ModuleContext
 	public TypeDefinition PrivateImplementationDetails { get; }
 	private IMethodDefOrRef CompilerGeneratedAttributeConstructor { get; }
 	public Dictionary<LLVMValueRef, FunctionContext> Methods { get; } = new();
-	public Dictionary<string, TypeDefinition> Structs { get; } = new();
+	public Dictionary<string, StructContext> Structs { get; } = new();
 	public Dictionary<LLVMValueRef, FieldDefinition> GlobalConstants { get; } = new();
 	private readonly Dictionary<(TypeSignature, int), TypeDefinition> inlineArrayCache = new();
 
@@ -120,6 +120,108 @@ internal sealed class ModuleContext
 		}
 	}
 
+	/// <summary>
+	/// Gets the exact type signature if it can be determined statically.
+	/// </summary>
+	/// <param name="type">The LLVM type.</param>
+	/// <returns>The <see cref="TypeSignature"/> or null.</returns>
+	public TypeSignature? GetExactTypeSignature(LLVMTypeRef type)
+	{
+		switch (type.Kind)
+		{
+			case LLVMTypeKind.LLVMVoidTypeKind:
+				return Definition.CorLibTypeFactory.Void;
+
+			case LLVMTypeKind.LLVMHalfTypeKind:
+				return Definition.DefaultImporter.ImportTypeSignature(typeof(Half));
+
+			case LLVMTypeKind.LLVMFloatTypeKind:
+				return Definition.CorLibTypeFactory.Single;
+
+			case LLVMTypeKind.LLVMDoubleTypeKind:
+				return Definition.CorLibTypeFactory.Double;
+
+			case LLVMTypeKind.LLVMX86_FP80TypeKind:
+				//x86_fp80 has a very unique structure and uses 10 bytes
+				return null;
+
+			case LLVMTypeKind.LLVMFP128TypeKind:
+				//IEEE 754 floating point number with 128 bits.
+				return null;
+
+			case LLVMTypeKind.LLVMPPC_FP128TypeKind:
+				//ppc_fp128 can be approximated by fp128, which conforms to IEEE 754 standards.
+				goto case LLVMTypeKind.LLVMFP128TypeKind;
+
+			case LLVMTypeKind.LLVMLabelTypeKind:
+				return null;
+
+			case LLVMTypeKind.LLVMIntegerTypeKind:
+				return type.IntWidth switch
+				{
+					//Note: non-powers of 2 are valid and might be used for bitfields.
+					1 => Definition.CorLibTypeFactory.Boolean,
+					8 => Definition.CorLibTypeFactory.SByte,
+					16 => Definition.CorLibTypeFactory.Int16,
+					32 => Definition.CorLibTypeFactory.Int32,
+					64 => Definition.CorLibTypeFactory.Int64,
+					128 => Definition.DefaultImporter.ImportTypeSignature(typeof(Int128)),
+					_ => throw new NotSupportedException(),
+				};
+
+			case LLVMTypeKind.LLVMFunctionTypeKind:
+				return null;
+
+			case LLVMTypeKind.LLVMStructTypeKind:
+				{
+					string name = type.StructName;
+					if (!Structs.TryGetValue(name, out StructContext? structContext))
+					{
+						structContext = StructContext.Create(name, type, this);
+						Structs[name] = structContext;
+						structContext.SetKnownFieldTypeSignatures();
+					}
+					return structContext.Definition.ToTypeSignature();
+				}
+
+			case LLVMTypeKind.LLVMArrayTypeKind:
+				return null;
+
+			case LLVMTypeKind.LLVMPointerTypeKind:
+				//All pointers are opaque in IR
+				return null;
+
+			case LLVMTypeKind.LLVMVectorTypeKind:
+				return null;
+
+			case LLVMTypeKind.LLVMMetadataTypeKind:
+				return null;
+
+			case LLVMTypeKind.LLVMX86_MMXTypeKind:
+				return null;
+
+			case LLVMTypeKind.LLVMTokenTypeKind:
+				return null;
+
+			case LLVMTypeKind.LLVMScalableVectorTypeKind:
+				return null;
+
+			case LLVMTypeKind.LLVMBFloatTypeKind:
+				//Half is just an approximation of BFloat16, which is not yet supported in .NET
+				//Maybe we can use this instead: https://www.nuget.org/packages/UltimateOrb.TruncatedFloatingPoints
+				return Definition.DefaultImporter.ImportTypeSignature(typeof(Half));
+
+			case LLVMTypeKind.LLVMX86_AMXTypeKind:
+				return null;
+
+			case LLVMTypeKind.LLVMTargetExtTypeKind:
+				return null;
+
+			default:
+				return null;
+		}
+	}
+
 	public TypeSignature? GetTypeSignature(LLVMTypeRef type)
 	{
 		switch (type.Kind)
@@ -152,7 +254,7 @@ internal sealed class ModuleContext
 					16 => Definition.CorLibTypeFactory.Int16,
 					32 => Definition.CorLibTypeFactory.Int32,
 					64 => Definition.CorLibTypeFactory.Int64,
-					//128
+					128 => Definition.DefaultImporter.ImportTypeSignature(typeof(Int128)),
 					_ => throw new NotSupportedException(),
 				};
 			case LLVMTypeKind.LLVMFunctionTypeKind:
@@ -161,27 +263,13 @@ internal sealed class ModuleContext
 			case LLVMTypeKind.LLVMStructTypeKind:
 				{
 					string name = type.StructName;
-					if (!Structs.TryGetValue(name, out TypeDefinition? typeDefinition))
+					if (!Structs.TryGetValue(name, out StructContext? structContext))
 					{
-						typeDefinition = new(
-							null,
-							name,
-							TypeAttributes.Public | TypeAttributes.SequentialLayout | TypeAttributes.BeforeFieldInit,
-							Definition.DefaultImporter.ImportType(typeof(ValueType)));
-						Definition.TopLevelTypes.Add(typeDefinition);
-						Structs.Add(name, typeDefinition);
-
-						LLVMTypeRef[] array = type.GetSubtypes();
-						for (int i = 0; i < array.Length; i++)
-						{
-							LLVMTypeRef subType = array[i];
-							TypeSignature fieldType = GetTypeSignature(subType);
-							string fieldName = $"field_{i}";
-							FieldDefinition field = new(fieldName, FieldAttributes.Public, fieldType);
-							typeDefinition.Fields.Add(field);
-						}
+						structContext = StructContext.Create(name, type, this);
+						Structs[name] = structContext;
+						structContext.SetKnownFieldTypeSignatures();
 					}
-					return typeDefinition.ToTypeSignature();
+					return structContext.Definition.ToTypeSignature();
 				}
 			case LLVMTypeKind.LLVMArrayTypeKind:
 				goto default;
