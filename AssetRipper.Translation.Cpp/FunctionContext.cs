@@ -195,8 +195,8 @@ internal sealed class FunctionContext
 			{
 				case LoadInstructionContext loadInstructionContext:
 					{
-						loadInstructionContext.SourceInstruction = InstructionLookup[loadInstructionContext.SourceOperand];
-						loadInstructionContext.SourceInstruction.Loads.Add(loadInstructionContext);
+						loadInstructionContext.SourceInstruction = InstructionLookup.TryGetValue(loadInstructionContext.SourceOperand);
+						loadInstructionContext.SourceInstruction?.Loads.Add(loadInstructionContext);
 					}
 					break;
 				case StoreInstructionContext storeInstructionContext:
