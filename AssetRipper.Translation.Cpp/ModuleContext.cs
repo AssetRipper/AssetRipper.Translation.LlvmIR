@@ -391,6 +391,25 @@ internal sealed class ModuleContext
 		}
 	}
 
+	public FieldDefinition AddStaticField(TypeSignature fieldType)
+	{
+		FieldDefinition field = new($"C_{ConstantsType.Fields.Count}", FieldAttributes.Public | FieldAttributes.Static, fieldType);
+		ConstantsType.Fields.Add(field);
+		return field;
+	}
+
+	public FieldDefinition AddIntegerStaticField(CorLibTypeSignature type, long value)
+	{
+		FieldDefinition field = AddStaticField(type);
+		MethodDefinition staticConstructor = ConstantsType.GetOrCreateStaticConstructor();
+		staticConstructor.CilMethodBody!.Instructions.InsertRange(staticConstructor.CilMethodBody.Instructions.Count - 1,
+		[
+			type.ElementType is ElementType.I8 ? new CilInstruction(CilOpCodes.Ldc_I8, value) : new CilInstruction(CilOpCodes.Ldc_I4, checked((int)value)),
+			new CilInstruction(CilOpCodes.Stsfld, field),
+		]);
+		return field;
+	}
+
 	private TypeDefinition GetOrCreateStaticArrayInitType(int length)
 	{
 		string name = $"__StaticArrayInitTypeSize={length}";

@@ -18,9 +18,8 @@ public class TranslationTests
 			  ret i32 %3
 			}
 			""";
-		ModuleDefinition module = CppTranslator.Translate(nameof(NoopTest), Text);
+		ModuleDefinition module = Text.TranslateToCIL();
 
-		AssertionHelpers.AssertSuccessfullySaves(module);
 		AssertionHelpers.AssertPublicMethodCount(module.GetGlobalMembersType(), 1);
 		AssertionHelpers.AssertPublicFieldCount(module.GetConstantsType(), 0);
 
@@ -32,5 +31,24 @@ public class TranslationTests
 			Assert.That(method.Signature?.ReturnType is CorLibTypeSignature { ElementType: ElementType.I4 });
 			Assert.That(method.Signature?.ParameterTypes[0] is CorLibTypeSignature { ElementType: ElementType.I4 });
 		});
+
+		AssertionHelpers.AssertSuccessfullySaves(module);
+	}
+
+	[Test]
+	[Ignore("Not implemented")]
+	public void GlobalVariableTest()
+	{
+		const string Text = """
+			@X = global i32 17
+			@Y = global i32 42
+			@Z = global [2 x ptr] [ ptr @X, ptr @Y ]
+			""";
+		ModuleDefinition module = Text.TranslateToCIL();
+
+		AssertionHelpers.AssertPublicMethodCount(module.GetGlobalMembersType(), 0);
+		AssertionHelpers.AssertPublicFieldCount(module.GetConstantsType(), 3);
+
+		AssertionHelpers.AssertSuccessfullySaves(module);
 	}
 }

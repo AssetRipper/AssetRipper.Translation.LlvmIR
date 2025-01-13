@@ -91,20 +91,34 @@ public static unsafe class CppTranslator
 			}
 
 			LLVMValueRef operand = global.GetOperand(0);
-			//LLVMTypeRef type = operand.TypeOf;
-			//LLVMTypeRef globalType = LLVM.GlobalGetValueType(global);
+			LLVMTypeRef type = operand.TypeOf;
+			LLVMTypeRef globalType = LLVM.GlobalGetValueType(global);
 			//https://github.com/llvm/llvm-project/blob/ccf357ff643c6af86bb459eba5a00f40f1dcaf22/llvm/include/llvm/IR/Constants.h#L584
 
-			if (operand.Kind != LLVMValueKind.LLVMConstantDataArrayValueKind)
+			switch (operand.Kind)
 			{
-				continue;
+				case LLVMValueKind.LLVMConstantDataArrayValueKind:
+					{
+						ReadOnlySpan<byte> data = LibLLVMSharp.ConstantDataArrayGetData(operand);
+
+						FieldDefinition field = moduleContext.AddStoredDataField(data.ToArray());
+
+						moduleContext.GlobalConstants.Add(global, field);
+					}
+					break;
+				case LLVMValueKind.LLVMConstantIntValueKind:
+					{
+						long value = operand.ConstIntSExt;
+						FieldDefinition field = moduleContext.AddIntegerStaticField((CorLibTypeSignature)moduleContext.GetTypeSignature(type), value);
+						moduleContext.GlobalConstants.Add(global, field);
+					}
+					break;
+				case LLVMValueKind.LLVMConstantArrayValueKind:
+					{
+						LLVMValueRef[] elements = operand.GetOperands();
+					}
+					break;
 			}
-
-			ReadOnlySpan<byte> data = LibLLVMSharp.ConstantDataArrayGetData(operand);
-
-			FieldDefinition field = moduleContext.AddStoredDataField(data.ToArray());
-
-			moduleContext.GlobalConstants.Add(global, field);
 		}
 
 		moduleContext.CreateFunctions();
