@@ -46,7 +46,11 @@ public static unsafe class CppTranslator
 			}
 			finally
 			{
-				LLVM.DisposeMemoryBuffer(buffer);
+				// This fails randomly with no real explanation.
+				// I'm fairly certain that the IR text data is only referenced (not copied),
+				// so the memory leak of not disposing the buffer is probably not a big deal.
+				//LLVM.DisposeMemoryBuffer(buffer);
+
 				Marshal.FreeHGlobal(namePtr);
 			}
 		}
