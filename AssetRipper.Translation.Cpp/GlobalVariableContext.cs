@@ -48,11 +48,6 @@ internal sealed partial class GlobalVariableContext : IHasName
 
 	public void CreateFields()
 	{
-		if (!HasSingleOperand)
-		{
-			return;
-		}
-
 		TypeSignature underlyingType = Module.GetTypeSignature(Type);
 		TypeSignature pointerType = underlyingType.MakePointerType();
 
@@ -124,6 +119,7 @@ internal sealed partial class GlobalVariableContext : IHasName
 			property.SetSemanticMethods(DataGetMethod, DataSetMethod);
 
 			// Field initialization
+			if (HasSingleOperand)
 			{
 				MethodDefinition staticConstructor = Module.GlobalVariablesType.GetOrCreateStaticConstructor();
 
