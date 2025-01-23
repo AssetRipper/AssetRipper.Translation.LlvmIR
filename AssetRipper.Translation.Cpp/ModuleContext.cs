@@ -321,7 +321,7 @@ internal sealed class ModuleContext
 	{
 		LoadValue(CilInstructions, value, out _);
 	}
-	public void LoadValue(CilInstructionCollection CilInstructions, LLVMValueRef value, out TypeSignature typeSignature)
+	public void LoadValue(CilInstructionCollection instructions, LLVMValueRef value, out TypeSignature typeSignature)
 	{
 		switch (value.Kind)
 		{
@@ -331,11 +331,11 @@ internal sealed class ModuleContext
 					LLVMTypeRef operandType = value.TypeOf;
 					if (integer is <= int.MaxValue and >= int.MinValue && operandType is { IntWidth: <= sizeof(int) * 8 })
 					{
-						CilInstructions.Add(CilOpCodes.Ldc_I4, (int)integer);
+						instructions.Add(CilOpCodes.Ldc_I4, (int)integer);
 					}
 					else
 					{
-						CilInstructions.Add(CilOpCodes.Ldc_I8, integer);
+						instructions.Add(CilOpCodes.Ldc_I8, integer);
 					}
 					typeSignature = GetTypeSignature(operandType);
 				}
@@ -349,7 +349,7 @@ internal sealed class ModuleContext
 
 					MethodDefinition pointerGetMethod = global.PointerGetMethod;
 
-					CilInstructions.Add(CilOpCodes.Call, pointerGetMethod);
+					instructions.Add(CilOpCodes.Call, pointerGetMethod);
 
 					typeSignature = pointerGetMethod.Signature!.ReturnType;
 				}
@@ -361,14 +361,110 @@ internal sealed class ModuleContext
 					switch (typeSignature)
 					{
 						case CorLibTypeSignature { ElementType: ElementType.R4 }:
-							CilInstructions.Add(CilOpCodes.Ldc_R4, (float)floatingPoint);
+							instructions.Add(CilOpCodes.Ldc_R4, (float)floatingPoint);
 							break;
 						case CorLibTypeSignature { ElementType: ElementType.R8 }:
-							CilInstructions.Add(CilOpCodes.Ldc_R8, floatingPoint);
+							instructions.Add(CilOpCodes.Ldc_R8, floatingPoint);
 							break;
 						default:
 							throw new NotSupportedException();
 					}
+				}
+				break;
+			case LLVMValueKind.LLVMConstantDataArrayValueKind:
+				{
+					TypeSignature underlyingType = GetTypeSignature(value.TypeOf);
+
+					ReadOnlySpan<byte> data = LibLLVMSharp.ConstantDataArrayGetData(value);
+
+					FieldDefinition field = AddStoredDataField(data.ToArray());
+
+					IMethodDefOrRef createSpan = (IMethodDefOrRef)Definition.DefaultImporter
+						.ImportMethod(typeof(RuntimeHelpers).GetMethod(nameof(RuntimeHelpers.CreateSpan))!);
+					IMethodDescriptor createSpanInstance = createSpan.MakeGenericInstanceMethod(Definition.CorLibTypeFactory.Byte);
+
+					IMethodDefOrRef spanConstructor = (IMethodDefOrRef)Definition.DefaultImporter
+						.ImportMethod(typeof(ReadOnlySpan<byte>).GetConstructor([typeof(void*), typeof(int)])!);
+
+					IMethodDescriptor createInlineArray = InlineArrayHelperType.Methods
+						.Single(m => m.Name == nameof(InlineArrayHelper.Create))
+						.MakeGenericInstanceMethod(underlyingType, Definition.CorLibTypeFactory.Byte);
+
+					ITypeDescriptor spanType = Definition.DefaultImporter
+						.ImportType(typeof(ReadOnlySpan<>))
+						.MakeGenericInstanceType(Definition.CorLibTypeFactory.Byte);
+
+					CilLocalVariable spanLocal = instructions.AddLocalVariable(spanType.ToTypeSignature());
+
+					//Used when the data is not a byte array
+					//instructions.Add(CilOpCodes.Ldtoken, field);
+					//instructions.Add(CilOpCodes.Call, createSpanInstance);
+					//instructions.Add(CilOpCodes.Stloc, spanLocal);
+
+					instructions.Add(CilOpCodes.Ldloca, spanLocal);
+					instructions.Add(CilOpCodes.Ldsflda, field);
+					instructions.Add(CilOpCodes.Ldc_I4, data.Length);
+					instructions.Add(CilOpCodes.Call, spanConstructor);
+
+					instructions.Add(CilOpCodes.Ldloc, spanLocal);
+					instructions.Add(CilOpCodes.Call, createInlineArray);
+
+					typeSignature = underlyingType;
+				}
+				break;
+			case LLVMValueKind.LLVMConstantArrayValueKind:
+				{
+					TypeSignature underlyingType = GetTypeSignature(value.TypeOf);
+
+					LLVMValueRef[] elements = value.GetOperands();
+
+					(TypeSignature elementType, int elementCount) = InlineArrayTypes[(TypeDefinition)underlyingType.ToTypeDefOrRef()];
+
+					if (elementCount != elements.Length)
+					{
+						throw new Exception("Array element count mismatch");
+					}
+
+					if (elementType is PointerTypeSignature)
+					{
+						elementType = Definition.CorLibTypeFactory.IntPtr;
+					}
+
+					TypeSignature spanType = Definition.DefaultImporter
+						.ImportType(typeof(Span<>))
+						.MakeGenericInstanceType(elementType);
+
+					IMethodDescriptor inlineArrayAsSpan = InlineArrayHelperType.Methods
+						.Single(m => m.Name == nameof(InlineArrayHelper.InlineArrayAsSpan))
+						.MakeGenericInstanceMethod(underlyingType, elementType);
+
+					MethodSignature getItemSignature = MethodSignature.CreateInstance(new GenericParameterSignature(GenericParameterType.Type, 0).MakeByReferenceType(), Definition.CorLibTypeFactory.Int32);
+					IMethodDescriptor getItem = new MemberReference(spanType.ToTypeDefOrRef(), "get_Item", getItemSignature);
+
+					CilLocalVariable bufferLocal = instructions.AddLocalVariable(underlyingType);
+					CilLocalVariable spanLocal = instructions.AddLocalVariable(spanType);
+
+					instructions.AddDefaultValue(underlyingType);
+					instructions.Add(CilOpCodes.Stloc, bufferLocal);
+
+					instructions.Add(CilOpCodes.Ldloca, bufferLocal);
+					instructions.Add(CilOpCodes.Ldc_I4, elementCount);
+					instructions.Add(CilOpCodes.Call, inlineArrayAsSpan);
+					instructions.Add(CilOpCodes.Stloc, spanLocal);
+
+					for (int i = 0; i < elements.Length; i++)
+					{
+						LLVMValueRef element = elements[i];
+						instructions.Add(CilOpCodes.Ldloca, spanLocal);
+						instructions.Add(CilOpCodes.Ldc_I4, i);
+						instructions.Add(CilOpCodes.Call, getItem);
+						LoadValue(instructions, element);
+						instructions.AddStoreIndirect(elementType);
+					}
+
+					instructions.Add(CilOpCodes.Ldloc, bufferLocal);
+
+					typeSignature = underlyingType;
 				}
 				break;
 			default:

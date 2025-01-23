@@ -49,6 +49,5 @@ public class TranslationTests
 		AssertionHelpers.AssertPublicFieldCount(module.GetPointerCacheType(), 3);
 
 		AssertionHelpers.AssertSuccessfullySaves(module);
-		module.Write("Converted.dll");
 	}
 }
