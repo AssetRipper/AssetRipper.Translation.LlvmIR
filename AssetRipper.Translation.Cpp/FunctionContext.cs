@@ -60,6 +60,7 @@ internal sealed class FunctionContext : IHasName
 	/// <inheritdoc/>
 	public string Name { get; set; } = "";
 	public LLVMValueRef Function { get; }
+	public unsafe bool IsVariadic => LLVM.IsFunctionVarArg(FunctionType) != 0;
 	public LLVMTypeRef FunctionType => LibLLVMSharp.FunctionGetFunctionType(Function);
 	public LLVMTypeRef ReturnType => LibLLVMSharp.FunctionGetReturnType(Function);
 	public LLVMValueRef[] Parameters { get; }

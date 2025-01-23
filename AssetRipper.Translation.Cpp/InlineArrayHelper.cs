@@ -26,4 +26,9 @@ internal static class InlineArrayHelper
 		SetInlineArray(ref buffer, contents.Length, contents);
 		return buffer;
 	}
+
+	public static ReadOnlySpan<T> ToReadOnly<T>(this Span<T> span)
+	{
+		return span;
+	}
 }
