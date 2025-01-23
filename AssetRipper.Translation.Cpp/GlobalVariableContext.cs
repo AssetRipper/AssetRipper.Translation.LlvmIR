@@ -27,6 +27,10 @@ internal sealed partial class GlobalVariableContext : IHasName
 		{
 			CleanName = "Variable";
 		}
+		else if (char.IsDigit(CleanName[0]))
+		{
+			CleanName = '_' + CleanName;
+		}
 	}
 
 	/// <inheritdoc/>
