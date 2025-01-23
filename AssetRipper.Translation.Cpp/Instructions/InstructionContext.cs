@@ -38,6 +38,7 @@ internal class InstructionContext
 			LLVMOpcode.LLVMPHI => new PhiInstructionContext(instruction, block, function),
 			LLVMOpcode.LLVMGetElementPtr => new GetElementPointerInstructionContext(instruction, block, function),
 			LLVMOpcode.LLVMSwitch => new SwitchBranchInstructionContext(instruction, block, function),
+			LLVMOpcode.LLVMSelect => new SelectInstructionContext(instruction, block, function),
 			_ when UnaryMathInstructionContext.Supported(instruction.InstructionOpcode) => new UnaryMathInstructionContext(instruction, block, function),
 			_ when BinaryMathInstructionContext.Supported(instruction.InstructionOpcode) => new BinaryMathInstructionContext(instruction, block, function),
 			_ => new InstructionContext(instruction, block, function),

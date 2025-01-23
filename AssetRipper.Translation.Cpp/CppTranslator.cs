@@ -386,6 +386,24 @@ public static unsafe class CppTranslator
 						case PhiInstructionContext:
 							// Handled by branches
 							break;
+						case SelectInstructionContext selectInstructionContext:
+							{
+								CilInstructionLabel falseLabel = new();
+								CilInstructionLabel endLabel = new();
+
+								functionContext.LoadOperand(selectInstructionContext.ConditionOperand);
+								instructions.Add(CilOpCodes.Brfalse, falseLabel);
+
+								functionContext.LoadOperand(selectInstructionContext.TrueOperand);
+								instructions.Add(CilOpCodes.Br, endLabel);
+
+								falseLabel.Instruction = instructions.Add(CilOpCodes.Nop);
+								functionContext.LoadOperand(selectInstructionContext.FalseOperand);
+
+								endLabel.Instruction = instructions.Add(CilOpCodes.Nop);
+								instructions.Add(CilOpCodes.Stloc, functionContext.InstructionLocals[instructionContext.Instruction]);
+							}
+							break;
 						case GetElementPointerInstructionContext gepInstructionContext:
 							{
 								//This is the pointer. It's generally void* due to stripping.
@@ -496,8 +514,6 @@ public static unsafe class CppTranslator
 								case LLVMOpcode.LLVMBitCast:
 									goto default;
 								case LLVMOpcode.LLVMAddrSpaceCast:
-									goto default;
-								case LLVMOpcode.LLVMSelect:
 									goto default;
 								case LLVMOpcode.LLVMUserOp1:
 									goto default;
