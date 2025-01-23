@@ -22,7 +22,7 @@ internal class InstructionContext
 
 	public static InstructionContext Create(LLVMValueRef instruction, BasicBlockContext block, FunctionContext function)
 	{
-		return instruction.InstructionOpcode switch
+		return instruction.GetOpcode() switch
 		{
 			LLVMOpcode.LLVMAlloca => new AllocaInstructionContext(instruction, block, function),
 			LLVMOpcode.LLVMLoad => new LoadInstructionContext(instruction, block, function),
@@ -39,13 +39,13 @@ internal class InstructionContext
 			LLVMOpcode.LLVMGetElementPtr => new GetElementPointerInstructionContext(instruction, block, function),
 			LLVMOpcode.LLVMSwitch => new SwitchBranchInstructionContext(instruction, block, function),
 			LLVMOpcode.LLVMSelect => new SelectInstructionContext(instruction, block, function),
-			_ when UnaryMathInstructionContext.Supported(instruction.InstructionOpcode) => new UnaryMathInstructionContext(instruction, block, function),
-			_ when BinaryMathInstructionContext.Supported(instruction.InstructionOpcode) => new BinaryMathInstructionContext(instruction, block, function),
+			_ when UnaryMathInstructionContext.Supported(instruction.GetOpcode()) => new UnaryMathInstructionContext(instruction, block, function),
+			_ when BinaryMathInstructionContext.Supported(instruction.GetOpcode()) => new BinaryMathInstructionContext(instruction, block, function),
 			_ => new InstructionContext(instruction, block, function),
 		};
 	}
 
-	public LLVMOpcode Opcode => Instruction.InstructionOpcode;
+	public LLVMOpcode Opcode => Instruction.GetOpcode();
 	public LLVMValueRef Instruction { get; }
 	public CilInstructionCollection CilInstructions => Function.CilInstructions;
 	public FunctionContext Function { get; }

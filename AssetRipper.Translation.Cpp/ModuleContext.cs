@@ -508,6 +508,7 @@ internal sealed class ModuleContext
 					instructions.Add(CilOpCodes.Ldftn, method);
 				}
 				break;
+			case LLVMValueKind.LLVMConstantExprValueKind:
 			case LLVMValueKind.LLVMInstructionValueKind:
 			case LLVMValueKind.LLVMArgumentValueKind:
 				throw new NotSupportedException();

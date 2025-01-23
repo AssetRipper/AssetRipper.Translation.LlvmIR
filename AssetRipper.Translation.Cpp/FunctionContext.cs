@@ -3,9 +3,6 @@ using AsmResolver.DotNet.Code.Cil;
 using AsmResolver.DotNet.Collections;
 using AsmResolver.DotNet.Signatures;
 using AsmResolver.PE.DotNet.Cil;
-using AsmResolver.PE.DotNet.Metadata.Tables;
-using AssetRipper.CIL;
-using AssetRipper.Translation.Cpp.Extensions;
 using AssetRipper.Translation.Cpp.Instructions;
 using LLVMSharp.Interop;
 using System.Diagnostics;
@@ -96,6 +93,7 @@ internal sealed class FunctionContext : IHasName
 	{
 		switch (operand.Kind)
 		{
+			case LLVMValueKind.LLVMConstantExprValueKind:
 			case LLVMValueKind.LLVMInstructionValueKind:
 				{
 					CilLocalVariable local = InstructionLocals[operand];

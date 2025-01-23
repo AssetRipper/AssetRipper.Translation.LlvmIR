@@ -20,12 +20,29 @@ internal sealed class BasicBlockContext
 
 	public static BasicBlockContext Create(LLVMBasicBlockRef block, FunctionContext function)
 	{
+		Stack<InstructionContext> stack = new();
 		BasicBlockContext context = new(block, function);
 		foreach (LLVMValueRef instruction in block.GetInstructions())
 		{
-			InstructionContext instructionContext = InstructionContext.Create(instruction, context, function);
-			context.Instructions.Add(instructionContext);
+			stack.Push(InstructionContext.Create(instruction, context, function));
+			MaybeAddOperandsToStack(stack.Peek(), stack);
+			context.Instructions.AddRange(stack);
+			stack.Clear();
 		}
 		return context;
+
+		static void MaybeAddOperandsToStack(InstructionContext instructionContext, Stack<InstructionContext> stack)
+		{
+			for (int i = instructionContext.Operands.Length - 1; i >= 0; i--)
+			{
+				LLVMValueRef operand = instructionContext.Operands[i];
+				if (operand.Kind == LLVMValueKind.LLVMConstantExprValueKind)
+				{
+					InstructionContext operandInstruction = InstructionContext.Create(operand, instructionContext.Block, instructionContext.Function);
+					stack.Push(operandInstruction);
+					MaybeAddOperandsToStack(operandInstruction, stack);
+				}
+			}
+		}
 	}
 }

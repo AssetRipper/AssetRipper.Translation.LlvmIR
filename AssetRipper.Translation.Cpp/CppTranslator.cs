@@ -500,7 +500,7 @@ public static unsafe class CppTranslator
 							}
 							break;
 						default:
-							switch (instruction.InstructionOpcode)
+							switch (instructionContext.Opcode)
 							{
 								case LLVMOpcode.LLVMIndirectBr:
 									goto default;

@@ -131,6 +131,11 @@ internal static class LLVMExtensions
 		return value.Kind == LLVMValueKind.LLVMInstructionValueKind;
 	}
 
+	public static LLVMOpcode GetOpcode(this LLVMValueRef value)
+	{
+		return value.IsInstruction() ? value.InstructionOpcode : value.ConstOpcode;
+	}
+
 	public static unsafe double GetFloatingPointValue(this LLVMValueRef value)
 	{
 		int losesInfo = default;
