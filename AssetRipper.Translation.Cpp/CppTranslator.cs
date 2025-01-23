@@ -462,17 +462,28 @@ public static unsafe class CppTranslator
 									if (currentType is TypeDefOrRefSignature structTypeSignature)
 									{
 										TypeDefinition structType = (TypeDefinition)structTypeSignature.ToTypeDefOrRef();
-										if (operand.Kind == LLVMValueKind.LLVMConstantIntValueKind)
+										if (functionContext.Module.InlineArrayTypes.TryGetValue(structType, out (TypeSignature, int) pair))
 										{
-											long index = operand.ConstIntSExt;
-											string fieldName = $"field_{index}";
-											FieldDefinition field = structType.Fields.First(t => t.Name == fieldName);
-											functionContext.CilInstructions.Add(CilOpCodes.Ldflda, field);
-											currentType = field.Signature!.FieldType;
+											currentType = pair.Item1;
+											instructions.Add(CilOpCodes.Sizeof, currentType.ToTypeDefOrRef());
+											functionContext.LoadOperand(operand);
+											instructions.Add(CilOpCodes.Mul);
+											instructions.Add(CilOpCodes.Add);
 										}
 										else
 										{
-											throw new NotSupportedException();
+											if (operand.Kind == LLVMValueKind.LLVMConstantIntValueKind)
+											{
+												long index = operand.ConstIntSExt;
+												string fieldName = $"field_{index}";
+												FieldDefinition field = structType.Fields.First(t => t.Name == fieldName);
+												functionContext.CilInstructions.Add(CilOpCodes.Ldflda, field);
+												currentType = field.Signature!.FieldType;
+											}
+											else
+											{
+												throw new NotSupportedException();
+											}
 										}
 									}
 									else if (currentType is CorLibTypeSignature)
