@@ -58,11 +58,6 @@ internal class InstructionContext
 	[MemberNotNullWhen(true, nameof(ResultTypeSignature))]
 	public bool HasResult => ResultTypeSignature is not null and not CorLibTypeSignature { ElementType: ElementType.Void };
 
-	public TypeSignature GetOperandTypeSignature(int index)
-	{
-		return Function.GetOperandTypeSignature(Operands[index]);
-	}
-
 	public void LoadOperand(int index, out TypeSignature typeSignature)
 	{
 		Function.LoadOperand(Operands[index], out typeSignature);

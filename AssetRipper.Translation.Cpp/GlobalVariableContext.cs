@@ -187,8 +187,54 @@ internal sealed partial class GlobalVariableContext : IHasName
 						break;
 					case LLVMValueKind.LLVMConstantArrayValueKind:
 						{
-							// Todo: initialization of the field
 							LLVMValueRef[] elements = Operand.GetOperands();
+
+							(TypeSignature elementType, int elementCount) = Module.InlineArrayTypes[(TypeDefinition)underlyingType.ToTypeDefOrRef()];
+
+							if (elementCount != elements.Length)
+							{
+								throw new Exception("Array element count mismatch");
+							}
+
+							if (elementType is PointerTypeSignature)
+							{
+								elementType = Module.Definition.CorLibTypeFactory.IntPtr;
+							}
+
+							TypeSignature spanType = Module.Definition.DefaultImporter
+								.ImportType(typeof(Span<>))
+								.MakeGenericInstanceType(elementType);
+
+							IMethodDescriptor inlineArrayAsSpan = Module.InlineArrayHelperType.Methods
+								.Single(m => m.Name == nameof(InlineArrayHelper.InlineArrayAsSpan))
+								.MakeGenericInstanceMethod(underlyingType, elementType);
+
+							MethodSignature getItemSignature = MethodSignature.CreateInstance(new GenericParameterSignature(GenericParameterType.Type, 0).MakeByReferenceType(), Module.Definition.CorLibTypeFactory.Int32);
+							IMethodDescriptor getItem = new MemberReference(spanType.ToTypeDefOrRef(), "get_Item", getItemSignature);
+
+							CilLocalVariable bufferLocal = instructions.AddLocalVariable(underlyingType);
+							CilLocalVariable spanLocal = instructions.AddLocalVariable(spanType);
+
+							instructions.AddDefaultValue(underlyingType);
+							instructions.Add(CilOpCodes.Stloc, bufferLocal);
+
+							instructions.Add(CilOpCodes.Ldloca, bufferLocal);
+							instructions.Add(CilOpCodes.Ldc_I4, elementCount);
+							instructions.Add(CilOpCodes.Call, inlineArrayAsSpan);
+							instructions.Add(CilOpCodes.Stloc, spanLocal);
+
+							for (int i = 0; i < elements.Length; i++)
+							{
+								LLVMValueRef element = elements[i];
+								instructions.Add(CilOpCodes.Ldloca, spanLocal);
+								instructions.Add(CilOpCodes.Ldc_I4, i);
+								instructions.Add(CilOpCodes.Call, getItem);
+								Module.LoadValue(instructions, element);
+								instructions.AddStoreIndirect(elementType);
+							}
+
+							instructions.Add(CilOpCodes.Ldloc, bufferLocal);
+							instructions.Add(CilOpCodes.Call, DataSetMethod);
 						}
 						break;
 				}

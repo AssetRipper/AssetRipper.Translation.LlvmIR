@@ -20,10 +20,10 @@ public class TranslationTests
 			""";
 		ModuleDefinition module = Text.TranslateToCIL();
 
-		AssertionHelpers.AssertPublicMethodCount(module.GetGlobalMembersType(), 1);
-		AssertionHelpers.AssertPublicFieldCount(module.GetConstantsType(), 0);
+		AssertionHelpers.AssertPublicMethodCount(module.GetGlobalFunctionsType(), 1);
+		AssertionHelpers.AssertPublicFieldCount(module.GetPointerCacheType(), 0);
 
-		MethodDefinition method = module.GetGlobalMembersType().Methods.First(m => m.IsPublic);
+		MethodDefinition method = module.GetGlobalFunctionsType().Methods.First(m => m.IsPublic);
 		Assert.Multiple(() =>
 		{
 			Assert.That(method.Name, Is.EqualTo("do_nothing"));
@@ -36,7 +36,6 @@ public class TranslationTests
 	}
 
 	[Test]
-	[Ignore("Not implemented")]
 	public void GlobalVariableTest()
 	{
 		const string Text = """
@@ -46,9 +45,10 @@ public class TranslationTests
 			""";
 		ModuleDefinition module = Text.TranslateToCIL();
 
-		AssertionHelpers.AssertPublicMethodCount(module.GetGlobalMembersType(), 0);
-		AssertionHelpers.AssertPublicFieldCount(module.GetConstantsType(), 3);
+		AssertionHelpers.AssertPublicMethodCount(module.GetGlobalFunctionsType(), 0);
+		AssertionHelpers.AssertPublicFieldCount(module.GetPointerCacheType(), 3);
 
 		AssertionHelpers.AssertSuccessfullySaves(module);
+		module.Write("Converted.dll");
 	}
 }

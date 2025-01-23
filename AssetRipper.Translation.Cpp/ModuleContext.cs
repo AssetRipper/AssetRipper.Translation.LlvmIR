@@ -1,7 +1,9 @@
 ﻿using AsmResolver;
 using AsmResolver.DotNet;
 using AsmResolver.DotNet.Cloning;
+using AsmResolver.DotNet.Code.Cil;
 using AsmResolver.DotNet.Signatures;
+using AsmResolver.PE.DotNet.Cil;
 using AsmResolver.PE.DotNet.Metadata.Tables;
 using AssetRipper.CIL;
 using AssetRipper.Translation.Cpp.Extensions;
@@ -18,8 +20,7 @@ internal sealed class ModuleContext
 	{
 		Module = module;
 		Definition = definition;
-		GlobalMembersType = CreateStaticType(definition, "GlobalMembers");
-		ConstantsType = CreateStaticType(definition, "Constants");
+		GlobalFunctionsType = CreateStaticType(definition, "GlobalFunctions");
 		PointerCacheType = CreateStaticType(definition, "PointerCache", false);
 		GlobalVariablePointersType = CreateStaticType(definition, "GlobalVariablePointers", false);
 		GlobalVariablesType = CreateStaticType(definition, "GlobalVariables");
@@ -35,8 +36,7 @@ internal sealed class ModuleContext
 
 	public LLVMModuleRef Module { get; }
 	public ModuleDefinition Definition { get; }
-	public TypeDefinition GlobalMembersType { get; }
-	public TypeDefinition ConstantsType { get; }
+	public TypeDefinition GlobalFunctionsType { get; }
 	public TypeDefinition PointerCacheType { get; }
 	public TypeDefinition GlobalVariablePointersType { get; }
 	public TypeDefinition GlobalVariablesType { get; }
@@ -88,7 +88,7 @@ internal sealed class ModuleContext
 	{
 		foreach (LLVMValueRef function in Module.GetFunctions())
 		{
-			MethodDefinition method = CreateNewMethod(GlobalMembersType);
+			MethodDefinition method = CreateNewMethod(GlobalFunctionsType);
 			FunctionContext functionContext = FunctionContext.Create(function, method, this);
 			Methods.Add(function, functionContext);
 		}
@@ -312,6 +312,65 @@ internal sealed class ModuleContext
 			case LLVMTypeKind.LLVMTargetExtTypeKind:
 				goto default;
 
+			default:
+				throw new NotSupportedException();
+		}
+	}
+
+	public void LoadValue(CilInstructionCollection CilInstructions, LLVMValueRef value)
+	{
+		LoadValue(CilInstructions, value, out _);
+	}
+	public void LoadValue(CilInstructionCollection CilInstructions, LLVMValueRef value, out TypeSignature typeSignature)
+	{
+		switch (value.Kind)
+		{
+			case LLVMValueKind.LLVMConstantIntValueKind:
+				{
+					long integer = value.ConstIntSExt;
+					LLVMTypeRef operandType = value.TypeOf;
+					if (integer is <= int.MaxValue and >= int.MinValue && operandType is { IntWidth: <= sizeof(int) * 8 })
+					{
+						CilInstructions.Add(CilOpCodes.Ldc_I4, (int)integer);
+					}
+					else
+					{
+						CilInstructions.Add(CilOpCodes.Ldc_I8, integer);
+					}
+					typeSignature = GetTypeSignature(operandType);
+				}
+				break;
+			case LLVMValueKind.LLVMInstructionValueKind:
+			case LLVMValueKind.LLVMArgumentValueKind:
+				throw new NotSupportedException();
+			case LLVMValueKind.LLVMGlobalVariableValueKind:
+				{
+					GlobalVariableContext global = GlobalVariables[value];
+
+					MethodDefinition pointerGetMethod = global.PointerGetMethod;
+
+					CilInstructions.Add(CilOpCodes.Call, pointerGetMethod);
+
+					typeSignature = pointerGetMethod.Signature!.ReturnType;
+				}
+				break;
+			case LLVMValueKind.LLVMConstantFPValueKind:
+				{
+					double floatingPoint = value.GetFloatingPointValue();
+					typeSignature = GetTypeSignature(value.TypeOf);
+					switch (typeSignature)
+					{
+						case CorLibTypeSignature { ElementType: ElementType.R4 }:
+							CilInstructions.Add(CilOpCodes.Ldc_R4, (float)floatingPoint);
+							break;
+						case CorLibTypeSignature { ElementType: ElementType.R8 }:
+							CilInstructions.Add(CilOpCodes.Ldc_R8, floatingPoint);
+							break;
+						default:
+							throw new NotSupportedException();
+					}
+				}
+				break;
 			default:
 				throw new NotSupportedException();
 		}

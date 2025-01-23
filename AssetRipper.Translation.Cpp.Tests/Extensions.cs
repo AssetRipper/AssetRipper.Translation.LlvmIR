@@ -5,14 +5,14 @@ namespace AssetRipper.Translation.Cpp.Tests;
 
 internal static class Extensions
 {
-	public static TypeDefinition GetGlobalMembersType(this ModuleDefinition module)
+	public static TypeDefinition GetGlobalFunctionsType(this ModuleDefinition module)
 	{
-		return module.TopLevelTypes.Single(t => t.Namespace is null && t.Name == "GlobalMembers");
+		return module.TopLevelTypes.Single(t => t.Namespace is null && t.Name == "GlobalFunctions");
 	}
 
-	public static TypeDefinition GetConstantsType(this ModuleDefinition module)
+	public static TypeDefinition GetPointerCacheType(this ModuleDefinition module)
 	{
-		return module.TopLevelTypes.Single(t => t.Namespace is null && t.Name == "Constants");
+		return module.TopLevelTypes.Single(t => t.Namespace is null && t.Name == "PointerCache");
 	}
 
 	public static ModuleDefinition TranslateToCIL(this string text, [CallerMemberName] string? caller = null)

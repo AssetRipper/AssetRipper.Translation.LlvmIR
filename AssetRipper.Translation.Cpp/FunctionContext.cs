@@ -96,21 +96,6 @@ internal sealed class FunctionContext : IHasName
 	{
 		switch (operand.Kind)
 		{
-			case LLVMValueKind.LLVMConstantIntValueKind:
-				{
-					long value = operand.ConstIntSExt;
-					LLVMTypeRef operandType = operand.TypeOf;
-					if (value is <= int.MaxValue and >= int.MinValue && operandType is { IntWidth: <= sizeof(int) * 8 })
-					{
-						CilInstructions.Add(CilOpCodes.Ldc_I4, (int)value);
-					}
-					else
-					{
-						CilInstructions.Add(CilOpCodes.Ldc_I8, value);
-					}
-					typeSignature = Module.GetTypeSignature(operandType);
-				}
-				break;
 			case LLVMValueKind.LLVMInstructionValueKind:
 				{
 					CilLocalVariable local = InstructionLocals[operand];
@@ -125,36 +110,9 @@ internal sealed class FunctionContext : IHasName
 					typeSignature = parameter.ParameterType;
 				}
 				break;
-			case LLVMValueKind.LLVMGlobalVariableValueKind:
-				{
-					GlobalVariableContext global = Module.GlobalVariables[operand];
-
-					MethodDefinition pointerGetMethod = global.PointerGetMethod;
-
-					CilInstructions.Add(CilOpCodes.Call, pointerGetMethod);
-
-					typeSignature = pointerGetMethod.Signature!.ReturnType;
-				}
-				break;
-			case LLVMValueKind.LLVMConstantFPValueKind:
-				{
-					double value = operand.GetFloatingPointValue();
-					typeSignature = Module.GetTypeSignature(operand.TypeOf);
-					switch (typeSignature)
-					{
-						case CorLibTypeSignature { ElementType: ElementType.R4 }:
-							CilInstructions.Add(CilOpCodes.Ldc_R4, (float)value);
-							break;
-						case CorLibTypeSignature { ElementType: ElementType.R8 }:
-							CilInstructions.Add(CilOpCodes.Ldc_R8, value);
-							break;
-						default:
-							throw new NotSupportedException();
-					}
-				}
-				break;
 			default:
-				throw new NotSupportedException();
+				Module.LoadValue(CilInstructions, operand, out typeSignature);
+				break;
 		}
 	}
 
