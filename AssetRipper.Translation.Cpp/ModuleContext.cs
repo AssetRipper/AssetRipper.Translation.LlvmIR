@@ -340,9 +340,6 @@ internal sealed class ModuleContext
 					typeSignature = GetTypeSignature(operandType);
 				}
 				break;
-			case LLVMValueKind.LLVMInstructionValueKind:
-			case LLVMValueKind.LLVMArgumentValueKind:
-				throw new NotSupportedException();
 			case LLVMValueKind.LLVMGlobalVariableValueKind:
 				{
 					GlobalVariableContext global = GlobalVariables[value];
@@ -467,8 +464,55 @@ internal sealed class ModuleContext
 					typeSignature = underlyingType;
 				}
 				break;
-			default:
+			case LLVMValueKind.LLVMConstantStructValueKind:
+				{
+					typeSignature = GetTypeSignature(value.TypeOf);
+					TypeDefinition typeDefinition = (TypeDefinition)typeSignature.ToTypeDefOrRef();
+
+					LLVMValueRef[] fields = value.GetOperands();
+					if (fields.Length != typeDefinition.Fields.Count)
+					{
+						throw new Exception("Struct field count mismatch");
+					}
+
+					CilLocalVariable resultLocal = instructions.AddLocalVariable(typeSignature);
+
+					instructions.AddDefaultValue(typeSignature);
+					instructions.Add(CilOpCodes.Stloc, resultLocal);
+
+					for (int i = 0; i < fields.Length; i++)
+					{
+						LLVMValueRef field = fields[i];
+						FieldDefinition fieldDefinition = typeDefinition.Fields[i];
+						instructions.Add(CilOpCodes.Ldloca, resultLocal);
+						instructions.Add(CilOpCodes.Ldflda, fieldDefinition);
+						LoadValue(instructions, field);
+						instructions.AddStoreIndirect(fieldDefinition.Signature!.FieldType);
+					}
+
+					instructions.Add(CilOpCodes.Ldloc, resultLocal);
+				}
+				break;
+			case LLVMValueKind.LLVMConstantPointerNullValueKind:
+			case LLVMValueKind.LLVMConstantAggregateZeroValueKind:
+				{
+					typeSignature = GetTypeSignature(value.TypeOf);
+					instructions.AddDefaultValue(typeSignature);
+				}
+				break;
+			case LLVMValueKind.LLVMFunctionValueKind:
+				{
+					typeSignature = GetTypeSignature(value.TypeOf);
+					MethodDefinition method = Methods[value].Definition;
+
+					instructions.Add(CilOpCodes.Ldftn, method);
+				}
+				break;
+			case LLVMValueKind.LLVMInstructionValueKind:
+			case LLVMValueKind.LLVMArgumentValueKind:
 				throw new NotSupportedException();
+			default:
+				throw new NotImplementedException();
 		}
 	}
 
