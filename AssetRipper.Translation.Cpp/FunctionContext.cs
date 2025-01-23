@@ -130,26 +130,13 @@ internal sealed class FunctionContext
 				break;
 			case LLVMValueKind.LLVMGlobalVariableValueKind:
 				{
-					FieldDefinition field = Module.GlobalConstants[operand];
+					GlobalVariableContext global = Module.GlobalVariables[operand];
 
-					CilLocalVariable pinned = CilInstructions.AddLocalVariable(Module.Definition.CorLibTypeFactory.Byte.MakeSzArrayType());
-					CilLocalVariable pointer = CilInstructions.AddLocalVariable(Module.Definition.CorLibTypeFactory.Byte.MakePointerType());
+					MethodDefinition pointerGetMethod = global.PointerGetMethod;
 
-					// Pin the array
-					CilInstructions.Add(CilOpCodes.Ldsfld, field);
-					CilInstructions.Add(CilOpCodes.Stloc, pinned);
+					CilInstructions.Add(CilOpCodes.Call, pointerGetMethod);
 
-					// Get the address of the first element
-					CilInstructions.Add(CilOpCodes.Ldloc, pinned);
-					CilInstructions.Add(CilOpCodes.Ldc_I4_0);
-					CilInstructions.Add(CilOpCodes.Ldelema, Module.Definition.CorLibTypeFactory.Byte.ToTypeDefOrRef());
-					CilInstructions.Add(CilOpCodes.Conv_U);
-					CilInstructions.Add(CilOpCodes.Stloc, pointer);
-
-					// Load the pointer
-					CilInstructions.Add(CilOpCodes.Ldloc, pointer);
-
-					typeSignature = Module.Definition.CorLibTypeFactory.Byte.MakePointerType();
+					typeSignature = pointerGetMethod.Signature!.ReturnType;
 				}
 				break;
 			case LLVMValueKind.LLVMConstantFPValueKind:

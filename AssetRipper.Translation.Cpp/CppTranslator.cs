@@ -9,6 +9,7 @@ using AssetRipper.Translation.Cpp.Instructions;
 using LLVMSharp.Interop;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
 using System.Text;
 
 namespace AssetRipper.Translation.Cpp;
@@ -81,44 +82,45 @@ public static unsafe class CppTranslator
 		}
 
 		ModuleDefinition moduleDefinition = new("ConvertedCpp", KnownCorLibs.SystemRuntime_v9_0_0_0);
+
+		// Target framework attribute
+		{
+			IMethodDescriptor constructor = moduleDefinition.DefaultImporter.ImportMethod(typeof(TargetFrameworkAttribute).GetConstructors().Single());
+
+			CustomAttributeSignature signature = new();
+
+			signature.FixedArguments.Add(new(moduleDefinition.CorLibTypeFactory.String, moduleDefinition.OriginalTargetRuntime.ToString()));
+			signature.NamedArguments.Add(new(
+				CustomAttributeArgumentMemberType.Property,
+				nameof(TargetFrameworkAttribute.FrameworkDisplayName),
+				moduleDefinition.CorLibTypeFactory.String,
+				new(moduleDefinition.CorLibTypeFactory.String, ".NET 9.0")));
+
+			CustomAttribute attribute = new((ICustomAttributeType)constructor, signature);
+
+			if (moduleDefinition.Assembly is null)
+			{
+				AssemblyDefinition assembly = new(moduleDefinition.Name, new Version(1, 0, 0, 0));
+				assembly.Modules.Add(moduleDefinition);
+				assembly.CustomAttributes.Add(attribute);
+			}
+			else
+			{
+				moduleDefinition.Assembly.CustomAttributes.Add(attribute);
+			}
+		}
+
 		ModuleContext moduleContext = new(module, moduleDefinition);
 
-		foreach (LLVMValueRef global in module.GetGlobals().Where(g => g.Kind == LLVMValueKind.LLVMGlobalVariableValueKind))
+		foreach (LLVMValueRef global in module.GetGlobals())
 		{
-			if (global.OperandCount != 1)
-			{
-				continue;
-			}
+			GlobalVariableContext globalVariableContext = new(global, moduleContext);
+			moduleContext.GlobalVariables.Add(global, globalVariableContext);
+		}
 
-			LLVMValueRef operand = global.GetOperand(0);
-			LLVMTypeRef type = operand.TypeOf;
-			LLVMTypeRef globalType = LLVM.GlobalGetValueType(global);
-			//https://github.com/llvm/llvm-project/blob/ccf357ff643c6af86bb459eba5a00f40f1dcaf22/llvm/include/llvm/IR/Constants.h#L584
-
-			switch (operand.Kind)
-			{
-				case LLVMValueKind.LLVMConstantDataArrayValueKind:
-					{
-						ReadOnlySpan<byte> data = LibLLVMSharp.ConstantDataArrayGetData(operand);
-
-						FieldDefinition field = moduleContext.AddStoredDataField(data.ToArray());
-
-						moduleContext.GlobalConstants.Add(global, field);
-					}
-					break;
-				case LLVMValueKind.LLVMConstantIntValueKind:
-					{
-						long value = operand.ConstIntSExt;
-						FieldDefinition field = moduleContext.AddIntegerStaticField((CorLibTypeSignature)moduleContext.GetTypeSignature(type), value);
-						moduleContext.GlobalConstants.Add(global, field);
-					}
-					break;
-				case LLVMValueKind.LLVMConstantArrayValueKind:
-					{
-						LLVMValueRef[] elements = operand.GetOperands();
-					}
-					break;
-			}
+		foreach (GlobalVariableContext globalVariableContext in moduleContext.GlobalVariables.Values)
+		{
+			globalVariableContext.CreateFields();
 		}
 
 		moduleContext.CreateFunctions();
@@ -582,6 +584,27 @@ public static unsafe class CppTranslator
 		}
 
 		moduleContext.AssignStructNames();
+
+		// Fixup references
+		{
+			MemoryStream stream = new();
+			moduleDefinition.Write(stream);
+			stream.Position = 0;
+			ModuleDefinition moduleDefinition2 = ModuleDefinition.FromBytes(stream.ToArray());
+			AssemblyReference? systemPrivateCorLib = moduleDefinition2.AssemblyReferences.FirstOrDefault(a => a.Name == "System.Private.CoreLib");
+			AssemblyReference? systemRuntime = moduleDefinition2.AssemblyReferences.FirstOrDefault(a => a.Name == "System.Runtime");
+			if (systemPrivateCorLib is not null && systemRuntime is not null)
+			{
+				foreach (TypeReference typeReference in moduleDefinition2.GetImportedTypeReferences())
+				{
+					if (typeReference.Scope == systemPrivateCorLib)
+					{
+						typeReference.Scope = systemRuntime;
+					}
+				}
+				return moduleDefinition2;
+			}
+		}
 
 		return moduleDefinition;
 	}

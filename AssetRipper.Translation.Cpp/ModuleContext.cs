@@ -1,7 +1,7 @@
 ﻿using AsmResolver;
 using AsmResolver.DotNet;
+using AsmResolver.DotNet.Cloning;
 using AsmResolver.DotNet.Signatures;
-using AsmResolver.PE.DotNet.Cil;
 using AsmResolver.PE.DotNet.Metadata.Tables;
 using AssetRipper.CIL;
 using AssetRipper.Translation.Cpp.Extensions;
@@ -18,9 +18,13 @@ internal sealed class ModuleContext
 	{
 		Module = module;
 		Definition = definition;
-		GlobalMembersType = CreateGlobalMembersType(definition);
-		ConstantsType = CreateConstantsType(definition);
-		IntrinsicsType = IntrinsicFunctionImplementer.InjectIntrinsics(Definition);
+		GlobalMembersType = CreateStaticType(definition, "GlobalMembers");
+		ConstantsType = CreateStaticType(definition, "Constants");
+		PointerCacheType = CreateStaticType(definition, "PointerCache", false);
+		GlobalVariablePointersType = CreateStaticType(definition, "GlobalVariablePointers", false);
+		GlobalVariablesType = CreateStaticType(definition, "GlobalVariables");
+		IntrinsicsType = InjectType(typeof(IntrinsicFunctions), definition);
+		InlineArrayHelperType = InjectType(typeof(InlineArrayHelper), definition);
 
 		CompilerGeneratedAttributeConstructor = (IMethodDefOrRef)definition.DefaultImporter.ImportMethod(typeof(CompilerGeneratedAttribute).GetConstructors()[0]);
 
@@ -33,12 +37,16 @@ internal sealed class ModuleContext
 	public ModuleDefinition Definition { get; }
 	public TypeDefinition GlobalMembersType { get; }
 	public TypeDefinition ConstantsType { get; }
+	public TypeDefinition PointerCacheType { get; }
+	public TypeDefinition GlobalVariablePointersType { get; }
+	public TypeDefinition GlobalVariablesType { get; }
 	public TypeDefinition IntrinsicsType { get; }
+	public TypeDefinition InlineArrayHelperType { get; }
 	public TypeDefinition PrivateImplementationDetails { get; }
 	private IMethodDefOrRef CompilerGeneratedAttributeConstructor { get; }
 	public Dictionary<LLVMValueRef, FunctionContext> Methods { get; } = new();
 	public Dictionary<string, TypeDefinition> Structs { get; } = new();
-	public Dictionary<LLVMValueRef, FieldDefinition> GlobalConstants { get; } = new();
+	public Dictionary<LLVMValueRef, GlobalVariableContext> GlobalVariables { get; } = new();
 	private readonly Dictionary<(TypeSignature, int), TypeDefinition> inlineArrayCache = new(TypeSignatureIntPairComparer);
 	public Dictionary<TypeDefinition, (TypeSignature, int)> InlineArrayTypes { get; } = new(SignatureComparer.Default);
 
@@ -50,14 +58,24 @@ internal sealed class ModuleContext
 		if (!inlineArrayCache.TryGetValue(pair, out TypeDefinition? arrayType))
 		{
 			string name = $"InlineArray_{inlineArrayCache.Count}";//Could be better, but it's unique, so it's good enough for now.
-			arrayType = new TypeDefinition("InlineArrays", name, default(TypeAttributes));
+
+			arrayType = new TypeDefinition("InlineArrays", name, TypeAttributes.Public | TypeAttributes.SequentialLayout | TypeAttributes.Sealed, Definition.DefaultImporter.ImportType(typeof(ValueType)));
 			Definition.TopLevelTypes.Add(arrayType);
 
 			//Add InlineArrayAttribute to arrayType
+			{
+				System.Reflection.ConstructorInfo constructorInfo = typeof(InlineArrayAttribute).GetConstructors().Single();
+				IMethodDescriptor inlineArrayAttributeConstructor = Definition.DefaultImporter.ImportMethod(constructorInfo);
+				CustomAttributeArgument argument = new(Definition.CorLibTypeFactory.Int32, size);
+				CustomAttributeSignature signature = new(argument);
+				arrayType.CustomAttributes.Add(new CustomAttribute((ICustomAttributeType)inlineArrayAttributeConstructor, signature));
+			}
 
 			//Add private instance field with the cooresponding type.
-			FieldDefinition field = new("__element0", FieldAttributes.Private, type);
-			arrayType.Fields.Add(field);
+			{
+				FieldDefinition field = new("__element0", FieldAttributes.Private, type);
+				arrayType.Fields.Add(field);
+			}
 
 			inlineArrayCache.Add(pair, arrayType);
 			InlineArrayTypes.Add(arrayType, pair);
@@ -321,19 +339,9 @@ internal sealed class ModuleContext
 		return method;
 	}
 
-	private static TypeDefinition CreateGlobalMembersType(ModuleDefinition moduleDefinition)
+	private static TypeDefinition CreateStaticType(ModuleDefinition moduleDefinition, string name, bool @public = true)
 	{
-		return CreateStaticType(moduleDefinition, "GlobalMembers");
-	}
-
-	private static TypeDefinition CreateConstantsType(ModuleDefinition moduleDefinition)
-	{
-		return CreateStaticType(moduleDefinition, "Constants");
-	}
-
-	private static TypeDefinition CreateStaticType(ModuleDefinition moduleDefinition, string name)
-	{
-		TypeDefinition typeDefinition = new(null, name, TypeAttributes.Public | TypeAttributes.Abstract | TypeAttributes.Sealed);
+		TypeDefinition typeDefinition = new(null, name, (@public ? TypeAttributes.Public : TypeAttributes.NotPublic) | TypeAttributes.Abstract | TypeAttributes.Sealed);
 		moduleDefinition.TopLevelTypes.Add(typeDefinition);
 		return typeDefinition;
 	}
@@ -365,22 +373,7 @@ internal sealed class ModuleContext
 
 		PrivateImplementationDetails.Fields.Add(privateImplementationField);
 
-		SzArrayTypeSignature byteArrayType = Definition.CorLibTypeFactory.Byte.MakeSzArrayType();
-		FieldDefinition constantsField = new FieldDefinition($"C_{ConstantsType.Fields.Count}", FieldAttributes.Public | FieldAttributes.Static, byteArrayType);
-		constantsField.IsInitOnly = true;
-		ConstantsType.Fields.Add(constantsField);
-		MethodDefinition staticConstructor = ConstantsType.GetOrCreateStaticConstructor();
-		staticConstructor.CilMethodBody!.Instructions.InsertRange(staticConstructor.CilMethodBody.Instructions.Count - 1,
-		[
-			new CilInstruction(CilOpCodes.Ldc_I4, data.Length),
-			new CilInstruction(CilOpCodes.Newarr, Definition.CorLibTypeFactory.Byte.ToTypeDefOrRef()),
-			new CilInstruction(CilOpCodes.Dup),
-			new CilInstruction(CilOpCodes.Ldtoken, privateImplementationField),
-			new CilInstruction(CilOpCodes.Call, Definition.DefaultImporter.ImportMethod(typeof(RuntimeHelpers).GetMethod(nameof(RuntimeHelpers.InitializeArray))!)),
-			new CilInstruction(CilOpCodes.Stsfld, constantsField),
-		]);
-
-		return constantsField;
+		return privateImplementationField;
 
 		//This might not be the correct way to choose a field name, but I think the specification allows it.
 		//In any case, ILSpy handles it the way we want, which is all that matters.
@@ -389,25 +382,6 @@ internal sealed class ModuleContext
 			byte[] hash = SHA256.HashData(data);
 			return Convert.ToBase64String(hash, Base64FormattingOptions.None);
 		}
-	}
-
-	public FieldDefinition AddStaticField(TypeSignature fieldType)
-	{
-		FieldDefinition field = new($"C_{ConstantsType.Fields.Count}", FieldAttributes.Public | FieldAttributes.Static, fieldType);
-		ConstantsType.Fields.Add(field);
-		return field;
-	}
-
-	public FieldDefinition AddIntegerStaticField(CorLibTypeSignature type, long value)
-	{
-		FieldDefinition field = AddStaticField(type);
-		MethodDefinition staticConstructor = ConstantsType.GetOrCreateStaticConstructor();
-		staticConstructor.CilMethodBody!.Instructions.InsertRange(staticConstructor.CilMethodBody.Instructions.Count - 1,
-		[
-			type.ElementType is ElementType.I8 ? new CilInstruction(CilOpCodes.Ldc_I8, value) : new CilInstruction(CilOpCodes.Ldc_I4, checked((int)value)),
-			new CilInstruction(CilOpCodes.Stsfld, field),
-		]);
-		return field;
 	}
 
 	private TypeDefinition GetOrCreateStaticArrayInitType(int length)
@@ -433,6 +407,17 @@ internal sealed class ModuleContext
 		result.ClassLayout = new ClassLayout(1, (uint)length);
 		AddCompilerGeneratedAttribute(result);
 
+		return result;
+	}
+
+	private static TypeDefinition InjectType(Type type, ModuleDefinition targetModule)
+	{
+		ModuleDefinition executingModule = ModuleDefinition.FromFile(type.Assembly.Location);
+		MemberCloner cloner = new(targetModule);
+		cloner.Include(executingModule.TopLevelTypes.First(t => t.Namespace == type.Namespace && t.Name == type.Name));
+		TypeDefinition result = cloner.Clone().ClonedTopLevelTypes.Single();
+		result.Namespace = null;
+		targetModule.TopLevelTypes.Add(result);
 		return result;
 	}
 }

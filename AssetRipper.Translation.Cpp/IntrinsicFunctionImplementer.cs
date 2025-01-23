@@ -1,5 +1,4 @@
 ﻿using AsmResolver.DotNet;
-using AsmResolver.DotNet.Cloning;
 using AsmResolver.DotNet.Code.Cil;
 using AsmResolver.DotNet.Collections;
 using AsmResolver.PE.DotNet.Cil;
@@ -35,16 +34,5 @@ internal static class IntrinsicFunctionImplementer
 	private static MethodDefinition? GetInjectedIntrinsic(ModuleContext context, string name)
 	{
 		return context.IntrinsicsType.Methods.FirstOrDefault(t => t.Name == name);
-	}
-
-	public static TypeDefinition InjectIntrinsics(ModuleDefinition targetModule)
-	{
-		ModuleDefinition executingModule = ModuleDefinition.FromFile(typeof(IntrinsicFunctions).Assembly.Location);
-		MemberCloner cloner = new(targetModule);
-		cloner.Include(executingModule.TopLevelTypes.First(t => t.Name == nameof(IntrinsicFunctions)));
-		TypeDefinition result = cloner.Clone().ClonedTopLevelTypes.Single();
-		result.Namespace = null;
-		targetModule.TopLevelTypes.Add(result);
-		return result;
 	}
 }
