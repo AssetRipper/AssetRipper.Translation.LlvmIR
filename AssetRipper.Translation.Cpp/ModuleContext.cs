@@ -57,9 +57,10 @@ internal sealed class ModuleContext
 		(TypeSignature, int) pair = (type, size);
 		if (!inlineArrayCache.TryGetValue(pair, out TypeDefinition? arrayType))
 		{
-			string name = $"InlineArray_{inlineArrayCache.Count}";//Could be better, but it's unique, so it's good enough for now.
+			string name = $"InlineArray_{size}";
+			string uniqueName = NameGenerator.GenerateName(name, type.FullName);
 
-			arrayType = new TypeDefinition("InlineArrays", name, TypeAttributes.Public | TypeAttributes.SequentialLayout | TypeAttributes.Sealed, Definition.DefaultImporter.ImportType(typeof(ValueType)));
+			arrayType = new TypeDefinition("InlineArrays", uniqueName, TypeAttributes.Public | TypeAttributes.SequentialLayout | TypeAttributes.Sealed, Definition.DefaultImporter.ImportType(typeof(ValueType)));
 			Definition.TopLevelTypes.Add(arrayType);
 
 			//Add InlineArrayAttribute to arrayType
