@@ -161,12 +161,9 @@ internal sealed class ModuleContext
 			const string StructPrefix = "struct.";
 			if (name.StartsWith(StructPrefix, StringComparison.Ordinal))
 			{
-				return name[StructPrefix.Length..];
+				name = name[StructPrefix.Length..];
 			}
-			else
-			{
-				return name;
-			}
+			return name.Length > 0 ? name : "Struct";
 		}
 	}
 
