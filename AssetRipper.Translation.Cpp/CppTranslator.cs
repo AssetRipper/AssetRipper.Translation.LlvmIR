@@ -467,6 +467,7 @@ public static unsafe class CppTranslator
 											currentType = pair.Item1;
 											instructions.Add(CilOpCodes.Sizeof, currentType.ToTypeDefOrRef());
 											functionContext.LoadOperand(operand);
+											instructions.Add(CilOpCodes.Conv_I4);
 											instructions.Add(CilOpCodes.Mul);
 											instructions.Add(CilOpCodes.Add);
 										}
