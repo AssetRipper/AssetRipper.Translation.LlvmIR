@@ -118,6 +118,8 @@ public static unsafe class CppTranslator
 			moduleContext.GlobalVariables.Add(global, globalVariableContext);
 		}
 
+		moduleContext.AssignGlobalVariableNames();
+
 		foreach (GlobalVariableContext globalVariableContext in moduleContext.GlobalVariables.Values)
 		{
 			globalVariableContext.CreateFields();

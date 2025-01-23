@@ -13,7 +13,7 @@ using System.Diagnostics;
 namespace AssetRipper.Translation.Cpp;
 
 [DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
-internal sealed class FunctionContext
+internal sealed class FunctionContext : IHasName
 {
 	public FunctionContext(LLVMValueRef function, MethodDefinition definition, ModuleContext module)
 	{
@@ -29,6 +29,9 @@ internal sealed class FunctionContext
 		{
 			ParameterAttributes[i] = AttributeWrapper.FromArray(function.GetAttributesAtIndex((LLVMAttributeIndex)(i + 1)));
 		}
+
+		DemangledName = LibLLVMSharp.ValueGetDemangledName(function);
+		CleanName = ExtractCleanName(MangledName).Replace('.', '_');
 	}
 
 	public static FunctionContext Create(LLVMValueRef function, MethodDefinition definition, ModuleContext module)
@@ -49,21 +52,15 @@ internal sealed class FunctionContext
 		return context;
 	}
 
-	/// <summary>
-	/// The name used from <see cref="Function"/>.
-	/// </summary>
+	/// <inheritdoc/>
 	public string MangledName => Function.Name;
 	/// <summary>
 	/// The demangled name of the function, which might have signature information.
 	/// </summary>
-	public string? DemangledName { get; set; }
-	/// <summary>
-	/// A clean name that might not be unique.
-	/// </summary>
-	public string CleanName { get; set; } = "";
-	/// <summary>
-	/// The unique name used for <see cref="Definition"/>.
-	/// </summary>
+	public string? DemangledName { get; }
+	/// <inheritdoc/>
+	public string CleanName { get; }
+	/// <inheritdoc/>
 	public string Name { get; set; } = "";
 	public LLVMValueRef Function { get; }
 	public LLVMTypeRef FunctionType => LibLLVMSharp.FunctionGetFunctionType(Function);
@@ -263,5 +260,19 @@ internal sealed class FunctionContext
 	private string GetDebuggerDisplay()
 	{
 		return DemangledName ?? Name;
+	}
+
+	private static string ExtractCleanName(string name)
+	{
+		if (name.StartsWith('?'))
+		{
+			int start = name.StartsWith("??$") ? 3 : 1;
+			int end = name.IndexOf('@', start);
+			return name[start..end];
+		}
+		else
+		{
+			return name;
+		}
 	}
 }

@@ -94,23 +94,24 @@ internal sealed class ModuleContext
 		}
 	}
 
-	public void AssignFunctionNames()
-	{
-		Dictionary<string, List<FunctionContext>> demangledNames = new();
-		foreach ((LLVMValueRef function, FunctionContext functionContext) in Methods)
-		{
-			functionContext.DemangledName = LibLLVMSharp.ValueGetDemangledName(function);
-			functionContext.CleanName = ExtractCleanName(functionContext.MangledName).Replace('.', '_');
+	public void AssignFunctionNames() => AssignNames(Methods.Values);
 
-			if (!demangledNames.TryGetValue(functionContext.CleanName, out List<FunctionContext>? list))
+	public void AssignGlobalVariableNames() => AssignNames(GlobalVariables.Values);
+
+	private static void AssignNames<T>(IEnumerable<T> items) where T : IHasName
+	{
+		Dictionary<string, List<T>> demangledNames = new();
+		foreach (T item in items)
+		{
+			if (!demangledNames.TryGetValue(item.CleanName, out List<T>? list))
 			{
 				list = new();
-				demangledNames.Add(functionContext.CleanName, list);
+				demangledNames.Add(item.CleanName, list);
 			}
-			list.Add(functionContext);
+			list.Add(item);
 		}
 
-		foreach ((string cleanName, List<FunctionContext> list) in demangledNames)
+		foreach ((string cleanName, List<T> list) in demangledNames)
 		{
 			if (list.Count == 1)
 			{
@@ -118,24 +119,10 @@ internal sealed class ModuleContext
 			}
 			else
 			{
-				foreach (FunctionContext functionContext in list)
+				foreach (T item in list)
 				{
-					functionContext.Name = NameGenerator.GenerateName(cleanName, functionContext.MangledName);
+					item.Name = NameGenerator.GenerateName(cleanName, item.MangledName);
 				}
-			}
-		}
-
-		static string ExtractCleanName(string name)
-		{
-			if (name.StartsWith('?'))
-			{
-				int start = name.StartsWith("??$") ? 3 : 1;
-				int end = name.IndexOf('@', start);
-				return name[start..end];
-			}
-			else
-			{
-				return name;
 			}
 		}
 	}

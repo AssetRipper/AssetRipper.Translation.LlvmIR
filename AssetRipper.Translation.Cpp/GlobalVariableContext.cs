@@ -12,7 +12,7 @@ using System.Text.RegularExpressions;
 
 namespace AssetRipper.Translation.Cpp;
 
-internal sealed partial class GlobalVariableContext
+internal sealed partial class GlobalVariableContext : IHasName
 {
 	public GlobalVariableContext(LLVMValueRef globalVariable, ModuleContext module)
 	{
@@ -29,21 +29,13 @@ internal sealed partial class GlobalVariableContext
 		}
 	}
 
-	/// <summary>
-	/// The name used from <see cref="GlobalVariable"/>.
-	/// </summary>
+	/// <inheritdoc/>
 	public string MangledName => GlobalVariable.Name;
-	/// <summary>
-	/// The demangled name of the global.
-	/// </summary>
+	/// <inheritdoc/>
 	public string? DemangledName { get; }
-	/// <summary>
-	/// A clean name that might not be unique.
-	/// </summary>
-	public string CleanName { get; } = "";
-	/// <summary>
-	/// The unique name used for creating output.
-	/// </summary>
+	/// <inheritdoc/>
+	public string CleanName { get; }
+	/// <inheritdoc/>
 	public string Name { get; set; } = "";
 	public LLVMValueRef GlobalVariable { get; }
 	public ModuleContext Module { get; }
@@ -64,11 +56,10 @@ internal sealed partial class GlobalVariableContext
 		TypeSignature underlyingType = Module.GetTypeSignature(Type);
 		TypeSignature pointerType = underlyingType.MakePointerType();
 
-		string name = CleanName;
 
 		FieldDefinition pointerField;
 		{
-			string pointerName = "variable_" + name;
+			string pointerName = "variable_" + Name;
 
 			pointerField = new FieldDefinition(pointerName, FieldAttributes.Public | FieldAttributes.Static, Module.Definition.CorLibTypeFactory.IntPtr);
 			Module.PointerCacheType.Fields.Add(pointerField);
@@ -76,10 +67,10 @@ internal sealed partial class GlobalVariableContext
 
 		// Pointer property
 		{
-			PointerGetMethod = new MethodDefinition("get_" + name, MethodAttributes.Public | MethodAttributes.Static | MethodAttributes.HideBySig | MethodAttributes.SpecialName, MethodSignature.CreateStatic(pointerType));
+			PointerGetMethod = new MethodDefinition("get_" + Name, MethodAttributes.Public | MethodAttributes.Static | MethodAttributes.HideBySig | MethodAttributes.SpecialName, MethodSignature.CreateStatic(pointerType));
 			Module.GlobalVariablePointersType.Methods.Add(PointerGetMethod);
 
-			PropertyDefinition property = new PropertyDefinition(name, PropertyAttributes.None, PropertySignature.CreateStatic(pointerType));
+			PropertyDefinition property = new PropertyDefinition(Name, PropertyAttributes.None, PropertySignature.CreateStatic(pointerType));
 			Module.GlobalVariablePointersType.Properties.Add(property);
 			property.GetMethod = PointerGetMethod;
 
@@ -104,10 +95,10 @@ internal sealed partial class GlobalVariableContext
 
 		// Data property
 		{
-			PropertyDefinition property = new PropertyDefinition(name, PropertyAttributes.None, PropertySignature.CreateStatic(underlyingType));
+			PropertyDefinition property = new PropertyDefinition(Name, PropertyAttributes.None, PropertySignature.CreateStatic(underlyingType));
 			Module.GlobalVariablesType.Properties.Add(property);
 
-			DataGetMethod = new MethodDefinition("get_" + name, MethodAttributes.Public | MethodAttributes.Static | MethodAttributes.HideBySig | MethodAttributes.SpecialName, MethodSignature.CreateStatic(underlyingType));
+			DataGetMethod = new MethodDefinition("get_" + Name, MethodAttributes.Public | MethodAttributes.Static | MethodAttributes.HideBySig | MethodAttributes.SpecialName, MethodSignature.CreateStatic(underlyingType));
 			Module.GlobalVariablesType.Methods.Add(DataGetMethod);
 
 			DataGetMethod.CilMethodBody = new(DataGetMethod);
@@ -118,7 +109,7 @@ internal sealed partial class GlobalVariableContext
 				instructions.Add(CilOpCodes.Ret);
 			}
 
-			DataSetMethod = new MethodDefinition("set_" + name, MethodAttributes.Public | MethodAttributes.Static | MethodAttributes.HideBySig | MethodAttributes.SpecialName, MethodSignature.CreateStatic(Module.Definition.CorLibTypeFactory.Void, underlyingType));
+			DataSetMethod = new MethodDefinition("set_" + Name, MethodAttributes.Public | MethodAttributes.Static | MethodAttributes.HideBySig | MethodAttributes.SpecialName, MethodSignature.CreateStatic(Module.Definition.CorLibTypeFactory.Void, underlyingType));
 			Module.GlobalVariablesType.Methods.Add(DataSetMethod);
 
 			DataSetMethod.CilMethodBody = new(DataSetMethod);
