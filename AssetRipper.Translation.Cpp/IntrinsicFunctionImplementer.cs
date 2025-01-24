@@ -47,6 +47,6 @@ internal static class IntrinsicFunctionImplementer
 
 	private static MethodDefinition? GetInjectedIntrinsic(ModuleContext context, string name)
 	{
-		return context.IntrinsicsType.Methods.FirstOrDefault(t => t.Name == name);
+		return context.IntrinsicsType.Methods.FirstOrDefault(t => t.Name == name && t.IsPublic && t.GenericParameters.Count is 0);
 	}
 }
