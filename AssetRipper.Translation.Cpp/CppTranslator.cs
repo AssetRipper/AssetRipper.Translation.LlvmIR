@@ -83,32 +83,7 @@ public static unsafe class CppTranslator
 
 		ModuleDefinition moduleDefinition = new("ConvertedCpp", KnownCorLibs.SystemRuntime_v9_0_0_0);
 
-		// Target framework attribute
-		{
-			IMethodDescriptor constructor = moduleDefinition.DefaultImporter.ImportMethod(typeof(TargetFrameworkAttribute).GetConstructors().Single());
-
-			CustomAttributeSignature signature = new();
-
-			signature.FixedArguments.Add(new(moduleDefinition.CorLibTypeFactory.String, moduleDefinition.OriginalTargetRuntime.ToString()));
-			signature.NamedArguments.Add(new(
-				CustomAttributeArgumentMemberType.Property,
-				nameof(TargetFrameworkAttribute.FrameworkDisplayName),
-				moduleDefinition.CorLibTypeFactory.String,
-				new(moduleDefinition.CorLibTypeFactory.String, ".NET 9.0")));
-
-			CustomAttribute attribute = new((ICustomAttributeType)constructor, signature);
-
-			if (moduleDefinition.Assembly is null)
-			{
-				AssemblyDefinition assembly = new(moduleDefinition.Name, new Version(1, 0, 0, 0));
-				assembly.Modules.Add(moduleDefinition);
-				assembly.CustomAttributes.Add(attribute);
-			}
-			else
-			{
-				moduleDefinition.Assembly.CustomAttributes.Add(attribute);
-			}
-		}
+		moduleDefinition.AddTargetFrameworkAttributeForDotNet9();
 
 		ModuleContext moduleContext = new(module, moduleDefinition);
 
