@@ -6,6 +6,7 @@ using AsmResolver.PE.DotNet.Metadata.Tables;
 using AssetRipper.CIL;
 using LLVMSharp.Interop;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
 
@@ -19,18 +20,7 @@ internal sealed partial class GlobalVariableContext : IHasName
 		GlobalVariable = globalVariable;
 		Module = module;
 		DemangledName = LibLLVMSharp.ValueGetDemangledName(globalVariable);
-		if (!string.IsNullOrEmpty(DemangledName))
-		{
-			CleanName = NotAlphanumericRegex.Replace(DemangledName, "_").Trim('_');
-		}
-		if (string.IsNullOrEmpty(CleanName))
-		{
-			CleanName = "Variable";
-		}
-		else if (char.IsDigit(CleanName[0]))
-		{
-			CleanName = '_' + CleanName;
-		}
+		CleanName = ExtractCleanName(MangledName, DemangledName);
 	}
 
 	/// <inheritdoc/>
@@ -136,6 +126,68 @@ internal sealed partial class GlobalVariableContext : IHasName
 				instructions.Add(CilOpCodes.Ret); // Undo the pop
 
 				instructions.OptimizeMacros();
+			}
+		}
+	}
+
+	private static string ExtractCleanName(string mangledName, string? demangledName)
+	{
+		if (mangledName.StartsWith("??_C@", StringComparison.Ordinal))
+		{
+			return "String"; // Not certain this is just strings
+		}
+
+		if (TryGetNameFromBeginning(mangledName, out string? result))
+		{
+		}
+		else if (TryGetNameFromEnd(mangledName, out result))
+		{
+		}
+		else
+		{
+			result = demangledName ?? "";
+		}
+
+		result = NotAlphanumericRegex.Replace(result, "_").Trim('_');
+		if (result.Length == 0)
+		{
+			result = "Variable";
+		}
+		else if (char.IsDigit(result[0]))
+		{
+			result = '_' + result;
+		}
+
+		return result;
+
+		static bool TryGetNameFromBeginning(string mangledName, [NotNullWhen(true)] out string? result)
+		{
+			int questionMarkIndex = mangledName.IndexOf('?');
+			int atIndex = mangledName.IndexOf('@');
+			if (questionMarkIndex == 0 && atIndex > 0)
+			{
+				result = mangledName[(questionMarkIndex + 1)..atIndex];
+				return result.Length > 0;
+			}
+			else
+			{
+				result = null;
+				return false;
+			}
+		}
+
+		static bool TryGetNameFromEnd(string mangledName, [NotNullWhen(true)] out string? result)
+		{
+			int periodIndex = mangledName.LastIndexOf('.');
+			if (mangledName.StartsWith("__const.", StringComparison.Ordinal))
+			{
+				result = mangledName[(periodIndex + 1)..];
+				return result.Length > 0;
+			}
+			else
+			{
+				result = null;
+				return false;
 			}
 		}
 	}
