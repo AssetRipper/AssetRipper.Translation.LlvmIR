@@ -5,6 +5,13 @@ namespace AssetRipper.Translation.Cpp;
 #pragma warning disable IDE0060 // Remove unused parameter
 internal static class IntrinsicFunctions
 {
+	public static class Implemented
+	{
+	}
+	public static class Unimplemented
+	{
+	}
+
 	public unsafe static void llvm_memcpy_p0_p0_i32(void* destination, void* source, int length, bool isVolatile)
 	{
 		Unsafe.CopyBlock(destination, source, (uint)length);

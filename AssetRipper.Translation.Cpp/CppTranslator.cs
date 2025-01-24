@@ -190,13 +190,8 @@ public static unsafe class CppTranslator
 
 			CilInstructionCollection instructions = method.CilMethodBody!.Instructions;
 
-			if (functionContext.BasicBlocks.Count == 0)
+			if (IntrinsicFunctionImplementer.TryHandleIntrinsicFunction(functionContext))
 			{
-				if (!IntrinsicFunctionImplementer.TryFillIntrinsicFunction(functionContext))
-				{
-					instructions.Add(CilOpCodes.Ldnull);
-					instructions.Add(CilOpCodes.Throw);
-				}
 				continue;
 			}
 
