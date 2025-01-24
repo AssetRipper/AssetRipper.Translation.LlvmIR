@@ -381,43 +381,48 @@ internal sealed class ModuleContext
 				break;
 			case LLVMValueKind.LLVMConstantDataArrayValueKind:
 				{
-					TypeSignature underlyingType = GetTypeSignature(value.TypeOf);
+					typeSignature = GetTypeSignature(value.TypeOf);
+
+					TypeDefinition inlineArrayType = (TypeDefinition)typeSignature.ToTypeDefOrRef();
+					(TypeSignature elementType, int elementCount) = InlineArrayTypes[inlineArrayType];
 
 					ReadOnlySpan<byte> data = LibLLVMSharp.ConstantDataArrayGetData(value);
 
 					FieldDefinition field = AddStoredDataField(data.ToArray());
 
-					IMethodDefOrRef createSpan = (IMethodDefOrRef)Definition.DefaultImporter
-						.ImportMethod(typeof(RuntimeHelpers).GetMethod(nameof(RuntimeHelpers.CreateSpan))!);
-					IMethodDescriptor createSpanInstance = createSpan.MakeGenericInstanceMethod(Definition.CorLibTypeFactory.Byte);
-
-					IMethodDefOrRef spanConstructor = (IMethodDefOrRef)Definition.DefaultImporter
-						.ImportMethod(typeof(ReadOnlySpan<byte>).GetConstructor([typeof(void*), typeof(int)])!);
-
 					IMethodDescriptor createInlineArray = InlineArrayHelperType.Methods
 						.Single(m => m.Name == nameof(InlineArrayHelper.Create))
-						.MakeGenericInstanceMethod(underlyingType, Definition.CorLibTypeFactory.Byte);
+						.MakeGenericInstanceMethod(typeSignature, elementType);
 
 					ITypeDescriptor spanType = Definition.DefaultImporter
 						.ImportType(typeof(ReadOnlySpan<>))
-						.MakeGenericInstanceType(Definition.CorLibTypeFactory.Byte);
+						.MakeGenericInstanceType(elementType);
 
 					CilLocalVariable spanLocal = instructions.AddLocalVariable(spanType.ToTypeSignature());
 
-					//Used when the data is not a byte array
-					//instructions.Add(CilOpCodes.Ldtoken, field);
-					//instructions.Add(CilOpCodes.Call, createSpanInstance);
-					//instructions.Add(CilOpCodes.Stloc, spanLocal);
+					if (elementType is CorLibTypeSignature { ElementType: ElementType.U1 })
+					{
+						IMethodDefOrRef spanConstructor = (IMethodDefOrRef)Definition.DefaultImporter
+							.ImportMethod(typeof(ReadOnlySpan<byte>).GetConstructor([typeof(void*), typeof(int)])!);
 
-					instructions.Add(CilOpCodes.Ldloca, spanLocal);
-					instructions.Add(CilOpCodes.Ldsflda, field);
-					instructions.Add(CilOpCodes.Ldc_I4, data.Length);
-					instructions.Add(CilOpCodes.Call, spanConstructor);
+						instructions.Add(CilOpCodes.Ldloca, spanLocal);
+						instructions.Add(CilOpCodes.Ldsflda, field);
+						instructions.Add(CilOpCodes.Ldc_I4, data.Length);
+						instructions.Add(CilOpCodes.Call, spanConstructor);
+					}
+					else
+					{
+						IMethodDefOrRef createSpan = (IMethodDefOrRef)Definition.DefaultImporter
+							.ImportMethod(typeof(RuntimeHelpers).GetMethod(nameof(RuntimeHelpers.CreateSpan))!);
+						IMethodDescriptor createSpanInstance = createSpan.MakeGenericInstanceMethod(elementType);
+
+						instructions.Add(CilOpCodes.Ldtoken, field);
+						instructions.Add(CilOpCodes.Call, createSpanInstance);
+						instructions.Add(CilOpCodes.Stloc, spanLocal);
+					}
 
 					instructions.Add(CilOpCodes.Ldloc, spanLocal);
 					instructions.Add(CilOpCodes.Call, createInlineArray);
-
-					typeSignature = underlyingType;
 				}
 				break;
 			case LLVMValueKind.LLVMConstantArrayValueKind:
