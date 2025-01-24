@@ -4,14 +4,14 @@ using AsmResolver.DotNet.Signatures;
 using AsmResolver.PE.DotNet.Cil;
 using AsmResolver.PE.DotNet.Metadata.Tables;
 using AssetRipper.CIL;
-using AssetRipper.Translation.Cpp.Extensions;
 using LLVMSharp.Interop;
-using System.Runtime.CompilerServices;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
 
 namespace AssetRipper.Translation.Cpp;
 
+[DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
 internal sealed partial class GlobalVariableContext : IHasName
 {
 	public GlobalVariableContext(LLVMValueRef globalVariable, ModuleContext module)
@@ -142,4 +142,9 @@ internal sealed partial class GlobalVariableContext : IHasName
 
 	[GeneratedRegex(@"[^a-zA-Z0-9]")]
 	private static partial Regex NotAlphanumericRegex { get; }
+
+	private string GetDebuggerDisplay()
+	{
+		return Name;
+	}
 }

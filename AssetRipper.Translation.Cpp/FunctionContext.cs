@@ -216,7 +216,7 @@ internal sealed class FunctionContext : IHasName
 
 	private string GetDebuggerDisplay()
 	{
-		return DemangledName ?? Name;
+		return Name;
 	}
 
 	private static string ExtractCleanName(string name)
