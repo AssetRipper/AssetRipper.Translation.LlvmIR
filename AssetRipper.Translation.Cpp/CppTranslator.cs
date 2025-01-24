@@ -222,8 +222,7 @@ public static unsafe class CppTranslator
 								else if (allocaInstructionContext.PointerLocal is not null)
 								{
 									//Zero out the memory
-									instructions.Add(CilOpCodes.Ldloca, allocaInstructionContext.DataLocal);
-									instructions.Add(CilOpCodes.Initobj, allocatedTypeSignature.ToTypeDefOrRef());
+									instructions.InitializeDefaultValue(allocaInstructionContext.DataLocal);
 
 									//Might need slight modifications for fixed size arrays.
 									instructions.Add(CilOpCodes.Ldloca, allocaInstructionContext.DataLocal);
