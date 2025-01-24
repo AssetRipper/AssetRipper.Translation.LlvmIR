@@ -31,4 +31,9 @@ internal static class InlineArrayHelper
 	{
 		return span;
 	}
+
+	public static ReadOnlySpan<char> ToCharacterSpan(this string str)
+	{
+		return str.AsSpan();
+	}
 }

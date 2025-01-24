@@ -8,7 +8,9 @@ using AsmResolver.PE.DotNet.Metadata.Tables;
 using AssetRipper.CIL;
 using AssetRipper.Translation.Cpp.Extensions;
 using LLVMSharp.Interop;
+using System.Buffers.Binary;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 
@@ -388,23 +390,27 @@ internal sealed class ModuleContext
 
 					ReadOnlySpan<byte> data = LibLLVMSharp.ConstantDataArrayGetData(value);
 
-					FieldDefinition field = AddStoredDataField(data.ToArray());
+					CilLocalVariable spanLocal = instructions.AddLocalVariable(null!);
 
-					IMethodDescriptor createInlineArray = InlineArrayHelperType.Methods
-						.Single(m => m.Name == nameof(InlineArrayHelper.Create))
-						.MakeGenericInstanceMethod(typeSignature, elementType);
-
-					ITypeDescriptor spanType = Definition.DefaultImporter
-						.ImportType(typeof(ReadOnlySpan<>))
-						.MakeGenericInstanceType(elementType);
-
-					CilLocalVariable spanLocal = instructions.AddLocalVariable(spanType.ToTypeSignature());
-
-					if (elementType is CorLibTypeSignature { ElementType: ElementType.U1 })
+					if (elementType is CorLibTypeSignature { ElementType: ElementType.I2 } && TryParseCharacterArray(data, out string? @string))
 					{
+						elementType = Definition.CorLibTypeFactory.Char;
+
+						IMethodDescriptor toCharacterSpan = InlineArrayHelperType.Methods
+							.Single(m => m.Name == nameof(InlineArrayHelper.ToCharacterSpan));
+
+						instructions.Add(CilOpCodes.Ldstr, @string);
+						instructions.Add(CilOpCodes.Call, toCharacterSpan);
+						instructions.Add(CilOpCodes.Stloc, spanLocal);
+					}
+					else if (elementType is CorLibTypeSignature { ElementType: ElementType.I1 or ElementType.U1 })
+					{
+						elementType = Definition.CorLibTypeFactory.Byte;
+
 						IMethodDefOrRef spanConstructor = (IMethodDefOrRef)Definition.DefaultImporter
 							.ImportMethod(typeof(ReadOnlySpan<byte>).GetConstructor([typeof(void*), typeof(int)])!);
 
+						FieldDefinition field = AddStoredDataField(data.ToArray());
 						instructions.Add(CilOpCodes.Ldloca, spanLocal);
 						instructions.Add(CilOpCodes.Ldsflda, field);
 						instructions.Add(CilOpCodes.Ldc_I4, data.Length);
@@ -416,10 +422,21 @@ internal sealed class ModuleContext
 							.ImportMethod(typeof(RuntimeHelpers).GetMethod(nameof(RuntimeHelpers.CreateSpan))!);
 						IMethodDescriptor createSpanInstance = createSpan.MakeGenericInstanceMethod(elementType);
 
+						FieldDefinition field = AddStoredDataField(data.ToArray());
 						instructions.Add(CilOpCodes.Ldtoken, field);
 						instructions.Add(CilOpCodes.Call, createSpanInstance);
 						instructions.Add(CilOpCodes.Stloc, spanLocal);
 					}
+
+					ITypeDescriptor spanType = Definition.DefaultImporter
+						.ImportType(typeof(ReadOnlySpan<>))
+						.MakeGenericInstanceType(elementType);
+
+					IMethodDescriptor createInlineArray = InlineArrayHelperType.Methods
+						.Single(m => m.Name == nameof(InlineArrayHelper.Create))
+						.MakeGenericInstanceMethod(typeSignature, elementType);
+
+					spanLocal.VariableType = spanType.ToTypeSignature();
 
 					instructions.Add(CilOpCodes.Ldloc, spanLocal);
 					instructions.Add(CilOpCodes.Call, createInlineArray);
@@ -622,5 +639,33 @@ internal sealed class ModuleContext
 		result.Namespace = null;
 		targetModule.TopLevelTypes.Add(result);
 		return result;
+	}
+
+	private static bool TryParseCharacterArray(ReadOnlySpan<byte> data, [NotNullWhen(true)] out string? value)
+	{
+		if (data.Length % sizeof(char) != 0)
+		{
+			value = null;
+			return false;
+		}
+		
+		char[] chars = new char[data.Length / sizeof(char)];
+		for (int i = 0; i < chars.Length; i++)
+		{
+			char c = (char)BinaryPrimitives.ReadUInt16LittleEndian(data.Slice(i * sizeof(char)));
+			if (!char.IsAscii(c))
+			{
+				value = null;
+				return false;
+			}
+			if (char.IsControl(c) && (i != chars.Length - 1 || c != '\0')) // Allow null terminator
+			{
+				value = null;
+				return false;
+			}
+			chars[i] = c;
+		}
+		value = new string(chars);
+		return true;
 	}
 }
