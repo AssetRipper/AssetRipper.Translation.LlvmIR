@@ -1,4 +1,5 @@
-﻿using AsmResolver.PE.DotNet.Cil;
+﻿using AsmResolver.DotNet.Code.Cil;
+using AsmResolver.PE.DotNet.Cil;
 using LLVMSharp.Interop;
 using System.Diagnostics;
 
@@ -42,4 +43,9 @@ internal sealed class BinaryMathInstructionContext : InstructionContext
 		LLVMOpcode.LLVMAnd or LLVMOpcode.LLVMOr or LLVMOpcode.LLVMXor => true,
 		_ => false,
 	};
+
+	public void AddOperation(CilInstructionCollection instructions)
+	{
+		instructions.Add(CilOpCode);
+	}
 }

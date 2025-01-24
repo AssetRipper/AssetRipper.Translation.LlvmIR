@@ -451,7 +451,7 @@ public static unsafe class CppTranslator
 						case UnaryMathInstructionContext unaryMathInstructionContext:
 							{
 								functionContext.LoadOperand(unaryMathInstructionContext.Operand);
-								instructions.Add(unaryMathInstructionContext.CilOpCode);
+								unaryMathInstructionContext.AddOperation(instructions);
 								instructions.Add(CilOpCodes.Stloc, functionContext.InstructionLocals[instructionContext.Instruction]);
 							}
 							break;
@@ -459,7 +459,7 @@ public static unsafe class CppTranslator
 							{
 								functionContext.LoadOperand(binaryMathInstructionContext.Operand1);
 								functionContext.LoadOperand(binaryMathInstructionContext.Operand2);
-								instructions.Add(binaryMathInstructionContext.CilOpCode);
+								binaryMathInstructionContext.AddOperation(instructions);
 								instructions.Add(CilOpCodes.Stloc, functionContext.InstructionLocals[instructionContext.Instruction]);
 							}
 							break;
@@ -467,14 +467,14 @@ public static unsafe class CppTranslator
 							{
 								functionContext.LoadOperand(numericComparisonInstructionContext.Operand1);
 								functionContext.LoadOperand(numericComparisonInstructionContext.Operand2);
-								numericComparisonInstructionContext.AddComparisonInstruction(instructions);
+								numericComparisonInstructionContext.AddComparison(instructions);
 								instructions.Add(CilOpCodes.Stloc, functionContext.InstructionLocals[instructionContext.Instruction]);
 							}
 							break;
-						case NumericConversionInstructionContext integerExtendInstructionContext:
+						case NumericConversionInstructionContext numericConversionInstructionContext:
 							{
-								functionContext.LoadOperand(integerExtendInstructionContext.Operand);
-								instructions.Add(integerExtendInstructionContext.CilOpCode);
+								functionContext.LoadOperand(numericConversionInstructionContext.Operand);
+								numericConversionInstructionContext.AddConversion(instructions);
 								instructions.Add(CilOpCodes.Stloc, functionContext.InstructionLocals[instructionContext.Instruction]);
 							}
 							break;
@@ -619,16 +619,6 @@ public static unsafe class CppTranslator
 									instructions.Add(CilOpCodes.Throw);
 									break;
 								case LLVMOpcode.LLVMCallBr:
-									goto default;
-								case LLVMOpcode.LLVMFPToUI:
-									goto default;
-								case LLVMOpcode.LLVMFPToSI:
-									goto default;
-								case LLVMOpcode.LLVMUIToFP:
-									goto default;
-								case LLVMOpcode.LLVMSIToFP:
-									goto default;
-								case LLVMOpcode.LLVMIntToPtr:
 									goto default;
 								case LLVMOpcode.LLVMBitCast:
 									goto default;

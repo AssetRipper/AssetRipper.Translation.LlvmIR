@@ -14,5 +14,5 @@ internal abstract class NumericComparisonInstructionContext : InstructionContext
 	public LLVMValueRef Operand1 => Operands[0];
 	public LLVMValueRef Operand2 => Operands[1];
 
-	public abstract void AddComparisonInstruction(CilInstructionCollection instructions);
+	public abstract void AddComparison(CilInstructionCollection instructions);
 }

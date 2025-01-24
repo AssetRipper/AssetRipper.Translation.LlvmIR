@@ -11,7 +11,7 @@ internal sealed class FloatComparisonInstructionContext : NumericComparisonInstr
 	{
 	}
 
-	public override void AddComparisonInstruction(CilInstructionCollection instructions)
+	public override void AddComparison(CilInstructionCollection instructions)
 	{
 		switch (Instruction.FCmpPredicate)
 		{

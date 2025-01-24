@@ -30,7 +30,6 @@ internal class InstructionContext
 			LLVMOpcode.LLVMCall => new CallInstructionContext(instruction, block, function),
 			LLVMOpcode.LLVMICmp => new IntegerComparisonInstructionContext(instruction, block, function),
 			LLVMOpcode.LLVMFCmp => new FloatComparisonInstructionContext(instruction, block, function),
-			LLVMOpcode.LLVMZExt or LLVMOpcode.LLVMSExt or LLVMOpcode.LLVMTrunc or LLVMOpcode.LLVMFPExt or LLVMOpcode.LLVMFPTrunc or LLVMOpcode.LLVMPtrToInt => new NumericConversionInstructionContext(instruction, block, function),
 			LLVMOpcode.LLVMBr => instruction.IsConditional
 				? new ConditionalBranchInstructionContext(instruction, block, function)
 				: new UnconditionalBranchInstructionContext(instruction, block, function),
@@ -41,6 +40,7 @@ internal class InstructionContext
 			LLVMOpcode.LLVMSelect => new SelectInstructionContext(instruction, block, function),
 			_ when UnaryMathInstructionContext.Supported(instruction.GetOpcode()) => new UnaryMathInstructionContext(instruction, block, function),
 			_ when BinaryMathInstructionContext.Supported(instruction.GetOpcode()) => new BinaryMathInstructionContext(instruction, block, function),
+			_ when NumericConversionInstructionContext.Supported(instruction.GetOpcode()) => new NumericConversionInstructionContext(instruction, block, function),
 			_ => new InstructionContext(instruction, block, function),
 		};
 	}
