@@ -19,7 +19,7 @@ internal sealed class ReturnInstructionContext : InstructionContext
 	{
 		if (HasReturnValue)
 		{
-			LoadValue(instructions, ResultOperand);
+			Module.LoadValue(instructions, ResultOperand);
 		}
 		instructions.Add(CilOpCodes.Ret);
 	}

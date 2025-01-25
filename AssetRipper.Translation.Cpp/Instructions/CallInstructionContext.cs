@@ -26,7 +26,7 @@ internal sealed class CallInstructionContext : InstructionContext
 		for (int i = 0; i < ArgumentOperands.Length; i++)
 		{
 			LLVMValueRef operand = ArgumentOperands[i];
-			parameterTypes[i] = GetTypeSignature(operand);
+			parameterTypes[i] = Module.GetTypeSignature(operand);
 		}
 		MethodSignature methodSignature = MethodSignature.CreateStatic(ResultTypeSignature, parameterTypes);
 		return new StandAloneSignature(methodSignature);
@@ -40,10 +40,10 @@ internal sealed class CallInstructionContext : InstructionContext
 			ReadOnlySpan<LLVMValueRef> arguments = ArgumentOperands;
 			for (int i = 0; i < arguments.Length; i++)
 			{
-				LoadValue(instructions, arguments[i]);
+				Module.LoadValue(instructions, arguments[i]);
 			}
 
-			LoadValue(instructions, FunctionOperand);
+			Module.LoadValue(instructions, FunctionOperand);
 			instructions.Add(CilOpCodes.Calli, MakeStandaloneSignature());
 		}
 		else
@@ -55,14 +55,14 @@ internal sealed class CallInstructionContext : InstructionContext
 			{
 				for (int i = 0; i < functionCalled.Parameters.Length; i++)
 				{
-					LoadValue(instructions, arguments[i]);
+					Module.LoadValue(instructions, arguments[i]);
 				}
 			}
 			else if (variadicParameterCount == 0)
 			{
 				for (int i = 0; i < functionCalled.Parameters.Length; i++)
 				{
-					LoadValue(instructions, arguments[i]);
+					Module.LoadValue(instructions, arguments[i]);
 				}
 				instructions.AddDefaultValue(functionCalled.Definition.Signature!.ParameterTypes[^2]);
 				instructions.AddDefaultValue(functionCalled.Definition.Signature!.ParameterTypes[^1]);
@@ -103,7 +103,7 @@ internal sealed class CallInstructionContext : InstructionContext
 				{
 					int index = i - functionCalled.Parameters.Length;
 
-					LoadValue(instructions, arguments[i], out TypeSignature typeSignature);
+					Module.LoadValue(instructions, arguments[i], out TypeSignature typeSignature);
 					CilLocalVariable local = instructions.AddLocalVariable(typeSignature);
 					instructions.Add(CilOpCodes.Stloc, local);
 					variadicLocals[index] = local;
@@ -138,7 +138,7 @@ internal sealed class CallInstructionContext : InstructionContext
 
 				for (int i = functionCalled.Parameters.Length; i < arguments.Length; i++)
 				{
-					TypeSignature type = GetTypeSignature(arguments[i]);
+					TypeSignature type = Module.GetTypeSignature(arguments[i]);
 					instructions.Add(CilOpCodes.Ldloca, typeSpanLocal);
 					instructions.Add(CilOpCodes.Ldc_I4, i - functionCalled.Parameters.Length);
 					instructions.Add(CilOpCodes.Call, typeSpanGetItem);
@@ -150,7 +150,7 @@ internal sealed class CallInstructionContext : InstructionContext
 				// Push the arguments
 				for (int i = 0; i < functionCalled.Parameters.Length; i++)
 				{
-					LoadValue(instructions, arguments[i]);
+					Module.LoadValue(instructions, arguments[i]);
 				}
 				instructions.Add(CilOpCodes.Ldloc, intPtrSpanLocal);
 				instructions.Add(CilOpCodes.Call, spanToReadOnly.MakeGenericInstanceMethod(intPtr));

@@ -26,7 +26,7 @@ internal abstract class BranchInstructionContext : InstructionContext
 			if (instruction is PhiInstructionContext phiInstruction)
 			{
 				LLVMValueRef phiOperand = phiInstruction.GetOperandForOriginBlock(BasicBlock);
-				LoadValue(instructions, phiOperand);
+				Module.LoadValue(instructions, phiOperand);
 				instructions.Add(CilOpCodes.Stloc, phiInstruction.GetLocalVariable());
 			}
 			else

@@ -37,7 +37,7 @@ internal sealed class LoadInstructionContext : InstructionContext
 		}
 		else
 		{
-			LoadValue(instructions, SourceOperand);
+			Module.LoadValue(instructions, SourceOperand);
 			instructions.AddLoadIndirect(ResultTypeSignature);
 		}
 

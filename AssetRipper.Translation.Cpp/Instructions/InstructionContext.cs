@@ -100,43 +100,4 @@ internal abstract class InstructionContext
 			throw new InvalidOperationException("Function is null");
 		}
 	}
-
-	protected void LoadValue(CilInstructionCollection instructions, LLVMValueRef operand)
-	{
-		FunctionContext? function = Function;
-		if (function is not null)
-		{
-			function.LoadValue(instructions, operand);
-		}
-		else
-		{
-			Module.LoadValue(instructions, operand);
-		}
-	}
-
-	protected void LoadValue(CilInstructionCollection instructions, LLVMValueRef operand, out TypeSignature typeSignature)
-	{
-		FunctionContext? function = Function;
-		if (function is not null)
-		{
-			function.LoadValue(instructions, operand, out typeSignature);
-		}
-		else
-		{
-			Module.LoadValue(instructions, operand, out typeSignature);
-		}
-	}
-
-	protected TypeSignature GetTypeSignature(LLVMValueRef operand)
-	{
-		FunctionContext? function = Function;
-		if (function is not null)
-		{
-			return function.GetTypeSignature(operand);
-		}
-		else
-		{
-			return Module.GetTypeSignature(operand.TypeOf);
-		}
-	}
 }

@@ -23,7 +23,7 @@ internal sealed class UnaryMathInstructionContext : InstructionContext
 
 	public override void AddInstructions(CilInstructionCollection instructions)
 	{
-		LoadValue(instructions, Operand);
+		Module.LoadValue(instructions, Operand);
 		instructions.Add(CilOpCode);
 		instructions.Add(CilOpCodes.Stloc, GetLocalVariable());
 	}

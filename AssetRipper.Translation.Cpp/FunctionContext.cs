@@ -81,46 +81,6 @@ internal sealed class FunctionContext : IHasName
 	public Dictionary<LLVMValueRef, InstructionContext> InstructionLookup { get; } = new();
 	public Dictionary<LLVMBasicBlockRef, BasicBlockContext> BasicBlockLookup { get; } = new();
 
-	public void LoadValue(CilInstructionCollection instructions, LLVMValueRef operand)
-	{
-		LoadValue(instructions, operand, out _);
-	}
-
-	public void LoadValue(CilInstructionCollection instructions, LLVMValueRef operand, out TypeSignature typeSignature)
-	{
-		switch (operand.Kind)
-		{
-			case LLVMValueKind.LLVMInstructionValueKind:
-				{
-					CilLocalVariable local = InstructionLookup[operand].GetLocalVariable();
-					instructions.Add(CilOpCodes.Ldloc, local);
-					typeSignature = local.VariableType;
-				}
-				break;
-			case LLVMValueKind.LLVMArgumentValueKind:
-				{
-					Parameter parameter = ParameterDictionary[operand];
-					instructions.Add(CilOpCodes.Ldarg, parameter);
-					typeSignature = parameter.ParameterType;
-				}
-				break;
-			default:
-				Module.LoadValue(instructions, operand, out typeSignature);
-				break;
-		}
-	}
-
-	public TypeSignature GetTypeSignature(LLVMValueRef operand)
-	{
-		return operand.Kind switch
-		{
-			LLVMValueKind.LLVMInstructionValueKind or LLVMValueKind.LLVMConstantExprValueKind => InstructionLookup[operand].ResultTypeSignature,
-			LLVMValueKind.LLVMArgumentValueKind => ParameterDictionary[operand].ParameterType,
-			LLVMValueKind.LLVMGlobalVariableValueKind => Module.GlobalVariables[operand].PointerGetMethod.Signature!.ReturnType,
-			_ => Module.GetTypeSignature(operand.TypeOf),
-		};
-	}
-
 	public void AnalyzeDataFlow()
 	{
 		foreach (InstructionContext instruction in Instructions)

@@ -20,14 +20,14 @@ internal sealed class SelectInstructionContext : InstructionContext
 		CilInstructionLabel falseLabel = new();
 		CilInstructionLabel endLabel = new();
 
-		LoadValue(instructions, ConditionOperand);
+		Module.LoadValue(instructions, ConditionOperand);
 		instructions.Add(CilOpCodes.Brfalse, falseLabel);
 
-		LoadValue(instructions, TrueOperand);
+		Module.LoadValue(instructions, TrueOperand);
 		instructions.Add(CilOpCodes.Br, endLabel);
 
 		falseLabel.Instruction = instructions.Add(CilOpCodes.Nop);
-		LoadValue(instructions, FalseOperand);
+		Module.LoadValue(instructions, FalseOperand);
 
 		endLabel.Instruction = instructions.Add(CilOpCodes.Nop);
 		instructions.Add(CilOpCodes.Stloc, GetLocalVariable());

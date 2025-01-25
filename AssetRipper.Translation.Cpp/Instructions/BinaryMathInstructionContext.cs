@@ -46,8 +46,8 @@ internal sealed class BinaryMathInstructionContext : InstructionContext
 
 	public override void AddInstructions(CilInstructionCollection instructions)
 	{
-		LoadValue(instructions, Operand1);
-		LoadValue(instructions, Operand2);
+		Module.LoadValue(instructions, Operand1);
+		Module.LoadValue(instructions, Operand2);
 		instructions.Add(CilOpCode);
 		instructions.Add(CilOpCodes.Stloc, GetLocalVariable());
 	}

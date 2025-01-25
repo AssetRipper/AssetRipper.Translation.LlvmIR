@@ -31,7 +31,7 @@ internal sealed class GetElementPointerInstructionContext : InstructionContext
 	public override void AddInstructions(CilInstructionCollection instructions)
 	{
 		//This is the pointer. It's generally void* due to stripping.
-		LoadValue(instructions, SourceOperand);//Pointer
+		Module.LoadValue(instructions, SourceOperand);//Pointer
 
 		//This isn't strictly necessary, but it might make ILSpy output better someday.
 		CilLocalVariable pointerLocal = instructions.AddLocalVariable(SourceElementTypeSignature.MakePointerType());
@@ -39,7 +39,7 @@ internal sealed class GetElementPointerInstructionContext : InstructionContext
 		instructions.Add(CilOpCodes.Ldloc, pointerLocal);
 
 		//This is the index, which might be a constant.
-		LoadValue(instructions, Operands[1]);
+		Module.LoadValue(instructions, Operands[1]);
 		CilInstruction previousInstruction = instructions[^1];
 
 		if (previousInstruction.IsLoadConstantInteger(out long value) && value == 0)
@@ -90,7 +90,7 @@ internal sealed class GetElementPointerInstructionContext : InstructionContext
 				{
 					currentType = pair.Item1;
 					instructions.Add(CilOpCodes.Sizeof, currentType.ToTypeDefOrRef());
-					LoadValue(instructions, operand);
+					Module.LoadValue(instructions, operand);
 					instructions.Add(CilOpCodes.Conv_I4);
 					instructions.Add(CilOpCodes.Mul);
 					instructions.Add(CilOpCodes.Add);

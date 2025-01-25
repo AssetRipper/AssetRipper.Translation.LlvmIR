@@ -2,6 +2,7 @@
 using AsmResolver.DotNet;
 using AsmResolver.DotNet.Cloning;
 using AsmResolver.DotNet.Code.Cil;
+using AsmResolver.DotNet.Collections;
 using AsmResolver.DotNet.Signatures;
 using AsmResolver.PE.DotNet.Cil;
 using AsmResolver.PE.DotNet.Metadata.Tables;
@@ -331,6 +332,17 @@ internal sealed class ModuleContext
 		}
 	}
 
+	public TypeSignature GetTypeSignature(LLVMValueRef value)
+	{
+		return value.Kind switch
+		{
+			LLVMValueKind.LLVMInstructionValueKind or LLVMValueKind.LLVMConstantExprValueKind => Methods[value.InstructionParent.Parent].InstructionLookup[value].ResultTypeSignature,
+			LLVMValueKind.LLVMArgumentValueKind => Methods[value.ParamParent].ParameterDictionary[value].ParameterType,
+			LLVMValueKind.LLVMGlobalVariableValueKind => GlobalVariables[value].PointerGetMethod.Signature!.ReturnType,
+			_ => GetTypeSignature(value.TypeOf),
+		};
+	}
+
 	public void LoadValue(CilInstructionCollection CilInstructions, LLVMValueRef value)
 	{
 		LoadValue(CilInstructions, value, out _);
@@ -552,8 +564,19 @@ internal sealed class ModuleContext
 				}
 				break;
 			case LLVMValueKind.LLVMInstructionValueKind:
+				{
+					CilLocalVariable local = Methods[value.InstructionParent.Parent].InstructionLookup[value].GetLocalVariable();
+					instructions.Add(CilOpCodes.Ldloc, local);
+					typeSignature = local.VariableType;
+				}
+				break;
 			case LLVMValueKind.LLVMArgumentValueKind:
-				throw new NotSupportedException();
+				{
+					Parameter parameter = Methods[value.ParamParent].ParameterDictionary[value];
+					instructions.Add(CilOpCodes.Ldarg, parameter);
+					typeSignature = parameter.ParameterType;
+				}
+				break;
 			default:
 				throw new NotImplementedException();
 		}

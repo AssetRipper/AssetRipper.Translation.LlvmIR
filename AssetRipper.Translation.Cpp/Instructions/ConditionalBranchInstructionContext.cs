@@ -25,7 +25,7 @@ internal sealed class ConditionalBranchInstructionContext : BranchInstructionCon
 
 	public override void AddInstructions(CilInstructionCollection instructions)
 	{
-		LoadValue(instructions, Condition);
+		Module.LoadValue(instructions, Condition);
 
 		ThrowIfFunctionIsNull();
 		Debug.Assert(TrueBlock is not null);
