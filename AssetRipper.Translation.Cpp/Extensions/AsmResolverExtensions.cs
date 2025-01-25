@@ -36,6 +36,31 @@ internal static class AsmResolverExtensions
 		}
 	}
 
+	public static ModuleDefinition FixCorLibAssemblyReferences(this ModuleDefinition module)
+	{
+		MemoryStream stream = new();
+		module.Write(stream);
+		stream.Position = 0;
+		ModuleDefinition module2 = ModuleDefinition.FromBytes(stream.ToArray());
+		AssemblyReference? systemPrivateCorLib = module2.AssemblyReferences.FirstOrDefault(a => a.Name == "System.Private.CoreLib");
+		AssemblyReference? systemRuntime = module2.AssemblyReferences.FirstOrDefault(a => a.Name == "System.Runtime");
+		if (systemPrivateCorLib is not null && systemRuntime is not null)
+		{
+			foreach (TypeReference typeReference in module2.GetImportedTypeReferences())
+			{
+				if (typeReference.Scope == systemPrivateCorLib)
+				{
+					typeReference.Scope = systemRuntime;
+				}
+			}
+			return module2;
+		}
+		else
+		{
+			return module;
+		}
+	}
+
 	public static int GetSize(this TypeSignature type)
 	{
 		if (type is CorLibTypeSignature corLibTypeSignature)

@@ -21,12 +21,12 @@ public static unsafe class CppTranslator
 		Patches.Apply();
 	}
 
-	public static ModuleDefinition Translate(string name, string content)
+	public static ModuleDefinition Translate(string name, string content, bool fixAssemblyReferences = false)
 	{
-		return Translate(name, Encoding.UTF8.GetBytes(content));
+		return Translate(name, Encoding.UTF8.GetBytes(content), fixAssemblyReferences);
 	}
 
-	public static ModuleDefinition Translate(string name, ReadOnlySpan<byte> content)
+	public static ModuleDefinition Translate(string name, ReadOnlySpan<byte> content, bool fixAssemblyReferences = false)
 	{
 		fixed (byte* ptr = content)
 		{
@@ -38,7 +38,7 @@ public static unsafe class CppTranslator
 				try
 				{
 					LLVMModuleRef module = context.ParseIR(buffer);
-					return Translate(module);
+					return Translate(module, fixAssemblyReferences);
 				}
 				finally
 				{
@@ -57,8 +57,9 @@ public static unsafe class CppTranslator
 		}
 	}
 
-	private static ModuleDefinition Translate(LLVMModuleRef module, bool removeDeadCode = false)
+	private static ModuleDefinition Translate(LLVMModuleRef module, bool fixAssemblyReferences)
 	{
+		bool removeDeadCode = false;
 		if (removeDeadCode)
 		{
 			//Need to expose these in libLLVMSharp
@@ -686,27 +687,6 @@ public static unsafe class CppTranslator
 
 		moduleContext.AssignStructNames();
 
-		// Fixup references
-		{
-			MemoryStream stream = new();
-			moduleDefinition.Write(stream);
-			stream.Position = 0;
-			ModuleDefinition moduleDefinition2 = ModuleDefinition.FromBytes(stream.ToArray());
-			AssemblyReference? systemPrivateCorLib = moduleDefinition2.AssemblyReferences.FirstOrDefault(a => a.Name == "System.Private.CoreLib");
-			AssemblyReference? systemRuntime = moduleDefinition2.AssemblyReferences.FirstOrDefault(a => a.Name == "System.Runtime");
-			if (systemPrivateCorLib is not null && systemRuntime is not null)
-			{
-				foreach (TypeReference typeReference in moduleDefinition2.GetImportedTypeReferences())
-				{
-					if (typeReference.Scope == systemPrivateCorLib)
-					{
-						typeReference.Scope = systemRuntime;
-					}
-				}
-				return moduleDefinition2;
-			}
-		}
-
-		return moduleDefinition;
+		return fixAssemblyReferences ? moduleDefinition.FixCorLibAssemblyReferences() : moduleDefinition;
 	}
 }

@@ -10,7 +10,7 @@ internal static class Program
 		string name = Path.GetFileNameWithoutExtension(inputPath);
 		byte[] data = File.ReadAllBytes(inputPath);
 
-		ModuleDefinition moduleDefinition = CppTranslator.Translate(name, data);
+		ModuleDefinition moduleDefinition = CppTranslator.Translate(name, data, true);
 		moduleDefinition.Write("ConvertedCpp.dll");
 		Console.WriteLine("Done!");
 	}
