@@ -15,4 +15,12 @@ internal static class Patches
 		__result = 0;
 		return false;
 	}
+
+	[HarmonyPrefix]
+	[HarmonyPatch(typeof(LLVMValueRef), $"get_{nameof(LLVMValueRef.InstructionClone)}")]
+	public static bool GetInstructionClonePatch(ref LLVMValueRef __result)
+	{
+		__result = default;
+		return false;
+	}
 }
