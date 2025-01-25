@@ -91,16 +91,16 @@ public static unsafe class CppTranslator
 
 		moduleContext.AssignGlobalVariableNames();
 
-		foreach (GlobalVariableContext globalVariableContext in moduleContext.GlobalVariables.Values)
-		{
-			globalVariableContext.CreateFields();
-		}
-
 		moduleContext.CreateFunctions();
 
 		moduleContext.AssignFunctionNames();
 
 		moduleContext.InitializeMethodSignatures();
+
+		foreach (GlobalVariableContext globalVariableContext in moduleContext.GlobalVariables.Values)
+		{
+			globalVariableContext.CreateFields();
+		}
 
 		foreach (FunctionContext functionContext in moduleContext.Methods.Values)
 		{
