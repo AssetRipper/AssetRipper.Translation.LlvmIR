@@ -1,11 +1,12 @@
-﻿using LLVMSharp.Interop;
+﻿using AsmResolver.DotNet.Code.Cil;
+using LLVMSharp.Interop;
 using System.Diagnostics;
 
 namespace AssetRipper.Translation.Cpp.Instructions;
 
 internal sealed class PhiInstructionContext : InstructionContext
 {
-	internal PhiInstructionContext(LLVMValueRef instruction, BasicBlockContext block, FunctionContext function) : base(instruction, block, function)
+	internal PhiInstructionContext(LLVMValueRef instruction, ModuleContext module) : base(instruction, module)
 	{
 		Debug.Assert(Operands.Length > 0);
 		IncomingBlocks = new BasicBlockContext[Operands.Length];
@@ -15,6 +16,7 @@ internal sealed class PhiInstructionContext : InstructionContext
 
 	public void InitializeIncomingBlocks()
 	{
+		ThrowIfFunctionIsNull();
 		for (int i = 0; i < Operands.Length; i++)
 		{
 			IncomingBlocks[i] = Function.BasicBlockLookup[Instruction.GetIncomingBlock((uint)i)];
@@ -31,5 +33,10 @@ internal sealed class PhiInstructionContext : InstructionContext
 			}
 		}
 		throw new InvalidOperationException("The origin block is not among the phi instruction's incoming blocks.");
+	}
+
+	public override void AddInstructions(CilInstructionCollection instructions)
+	{
+		// Handled by branches
 	}
 }

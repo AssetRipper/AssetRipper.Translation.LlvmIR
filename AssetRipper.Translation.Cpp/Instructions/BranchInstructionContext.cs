@@ -1,31 +1,33 @@
-﻿using AsmResolver.PE.DotNet.Cil;
+﻿using AsmResolver.DotNet.Code.Cil;
+using AsmResolver.PE.DotNet.Cil;
 using LLVMSharp.Interop;
 
 namespace AssetRipper.Translation.Cpp.Instructions;
 
 internal abstract class BranchInstructionContext : InstructionContext
 {
-	internal BranchInstructionContext(LLVMValueRef instruction, BasicBlockContext block, FunctionContext function) : base(instruction, block, function)
+	internal BranchInstructionContext(LLVMValueRef instruction, ModuleContext module) : base(instruction, module)
 	{
-		ResultTypeSignature = function.Module.Definition.CorLibTypeFactory.Void;
+		ResultTypeSignature = module.Definition.CorLibTypeFactory.Void;
 	}
 
-	public abstract void AddBranchInstruction();
-
-	protected void AddLoadIfBranchingToPhi(BasicBlockContext targetBlock)
+	protected void AddLoadIfBranchingToPhi(CilInstructionCollection instructions, BasicBlockContext targetBlock)
 	{
 		if (!TargetBlockStartsWithPhi(targetBlock))
 		{
 			return;
 		}
 
+		ThrowIfBasicBlockIsNull();
+		ThrowIfFunctionIsNull();
+
 		foreach (InstructionContext instruction in targetBlock.Instructions)
 		{
 			if (instruction is PhiInstructionContext phiInstruction)
 			{
-				LLVMValueRef phiOperand = phiInstruction.GetOperandForOriginBlock(Block);
-				Function.LoadOperand(phiOperand);
-				CilInstructions.Add(CilOpCodes.Stloc, Function.InstructionLocals[phiInstruction.Instruction]);
+				LLVMValueRef phiOperand = phiInstruction.GetOperandForOriginBlock(BasicBlock);
+				LoadOperand(instructions, phiOperand);
+				instructions.Add(CilOpCodes.Stloc, phiInstruction.GetLocalVariable());
 			}
 			else
 			{

@@ -1,4 +1,5 @@
-﻿using AsmResolver.PE.DotNet.Cil;
+﻿using AsmResolver.DotNet.Code.Cil;
+using AsmResolver.PE.DotNet.Cil;
 using AssetRipper.Translation.Cpp.Extensions;
 using LLVMSharp.Interop;
 using System.Diagnostics;
@@ -7,7 +8,7 @@ namespace AssetRipper.Translation.Cpp.Instructions;
 
 internal sealed class ConditionalBranchInstructionContext : BranchInstructionContext
 {
-	internal ConditionalBranchInstructionContext(LLVMValueRef instruction, BasicBlockContext block, FunctionContext function) : base(instruction, block, function)
+	internal ConditionalBranchInstructionContext(LLVMValueRef instruction, ModuleContext module) : base(instruction, module)
 	{
 		Debug.Assert(Operands.Length == 3);
 		Debug.Assert(Operands[0].IsInstruction());
@@ -19,29 +20,33 @@ internal sealed class ConditionalBranchInstructionContext : BranchInstructionCon
 	// I have no idea why, but the second and third operands seem to be swapped.
 	public LLVMBasicBlockRef TrueBlockRef => Operands[2].AsBasicBlock();
 	public LLVMBasicBlockRef FalseBlockRef => Operands[1].AsBasicBlock();
-	public BasicBlockContext TrueBlock => Function.BasicBlockLookup[TrueBlockRef];
-	public BasicBlockContext FalseBlock => Function.BasicBlockLookup[FalseBlockRef];
+	public BasicBlockContext? TrueBlock => Function?.BasicBlockLookup[TrueBlockRef];
+	public BasicBlockContext? FalseBlock => Function?.BasicBlockLookup[FalseBlockRef];
 
-	public override void AddBranchInstruction()
+	public override void AddInstructions(CilInstructionCollection instructions)
 	{
-		CilInstructions.Add(CilOpCodes.Ldloc, Function.InstructionLocals[Operands[0]]);
+		LoadOperand(instructions, Condition);
+
+		ThrowIfFunctionIsNull();
+		Debug.Assert(TrueBlock is not null);
+		Debug.Assert(FalseBlock is not null);
 
 		if (TargetBlockStartsWithPhi(TrueBlock))
 		{
 			CilInstructionLabel falseLabel = new();
-			CilInstructions.Add(CilOpCodes.Brfalse, falseLabel);
+			instructions.Add(CilOpCodes.Brfalse, falseLabel);
 
-			AddLoadIfBranchingToPhi(TrueBlock);
-			CilInstructions.Add(CilOpCodes.Br, Function.Labels[TrueBlockRef]);
+			AddLoadIfBranchingToPhi(instructions, TrueBlock);
+			instructions.Add(CilOpCodes.Br, Function.Labels[TrueBlockRef]);
 
-			falseLabel.Instruction = CilInstructions.Add(CilOpCodes.Nop);
+			falseLabel.Instruction = instructions.Add(CilOpCodes.Nop);
 		}
 		else
 		{
-			CilInstructions.Add(CilOpCodes.Brtrue, Function.Labels[TrueBlockRef]);
+			instructions.Add(CilOpCodes.Brtrue, Function.Labels[TrueBlockRef]);
 		}
 
-		AddLoadIfBranchingToPhi(FalseBlock);
-		CilInstructions.Add(CilOpCodes.Br, Function.Labels[FalseBlockRef]);
+		AddLoadIfBranchingToPhi(instructions, FalseBlock);
+		instructions.Add(CilOpCodes.Br, Function.Labels[FalseBlockRef]);
 	}
 }

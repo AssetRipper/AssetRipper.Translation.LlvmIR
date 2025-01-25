@@ -10,10 +10,10 @@ namespace AssetRipper.Translation.Cpp.Instructions;
 
 internal sealed class NumericConversionInstructionContext : InstructionContext
 {
-	internal NumericConversionInstructionContext(LLVMValueRef instruction, BasicBlockContext block, FunctionContext function) : base(instruction, block, function)
+	internal NumericConversionInstructionContext(LLVMValueRef instruction, ModuleContext module) : base(instruction, module)
 	{
 		Debug.Assert(Operands.Length == 1);
-		ResultTypeSignature = (CorLibTypeSignature)function.Module.GetTypeSignature(Instruction.TypeOf);
+		ResultTypeSignature = (CorLibTypeSignature)module.GetTypeSignature(Instruction.TypeOf);
 	}
 	public LLVMValueRef Operand => Operands[0];
 	public static bool Supported(LLVMOpcode opcode) => opcode switch
@@ -59,7 +59,7 @@ internal sealed class NumericConversionInstructionContext : InstructionContext
 								cilInstructions.Add(CilOpCodes.Conv_I);
 								break;
 							case ElementType.Boolean:
-								cilInstructions.AddDefaultValue(Function.Module.GetTypeSignature(Operand.TypeOf));
+								cilInstructions.AddDefaultValue(Module.GetTypeSignature(Operand.TypeOf));
 								cilInstructions.Add(CilOpCodes.Ceq);
 								break;
 							default:
@@ -96,7 +96,7 @@ internal sealed class NumericConversionInstructionContext : InstructionContext
 								cilInstructions.Add(CilOpCodes.Conv_U);
 								break;
 							case ElementType.Boolean:
-								cilInstructions.AddDefaultValue(Function.Module.GetTypeSignature(Operand.TypeOf));
+								cilInstructions.AddDefaultValue(Module.GetTypeSignature(Operand.TypeOf));
 								cilInstructions.Add(CilOpCodes.Ceq);
 								break;
 							default:
@@ -134,5 +134,12 @@ internal sealed class NumericConversionInstructionContext : InstructionContext
 				}
 				break;
 		}
+	}
+
+	public override void AddInstructions(CilInstructionCollection instructions)
+	{
+		LoadOperand(instructions, Operand);
+		AddConversion(instructions);
+		instructions.Add(CilOpCodes.Stloc, GetLocalVariable());
 	}
 }

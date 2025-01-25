@@ -3,6 +3,7 @@ using AsmResolver.DotNet.Code.Cil;
 using AsmResolver.DotNet.Collections;
 using AsmResolver.DotNet.Signatures;
 using AsmResolver.PE.DotNet.Cil;
+using AssetRipper.CIL;
 using AssetRipper.Translation.Cpp.Instructions;
 using LLVMSharp.Interop;
 using System.Diagnostics;
@@ -12,7 +13,7 @@ namespace AssetRipper.Translation.Cpp;
 [DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
 internal sealed class FunctionContext : IHasName
 {
-	public FunctionContext(LLVMValueRef function, MethodDefinition definition, ModuleContext module)
+	private FunctionContext(LLVMValueRef function, MethodDefinition definition, ModuleContext module)
 	{
 		Function = function;
 		Parameters = function.GetParams();
@@ -46,6 +47,10 @@ internal sealed class FunctionContext : IHasName
 		{
 			context.InstructionLookup.Add(instruction.Instruction, instruction);
 		}
+		foreach (LLVMBasicBlockRef basicBlock in context.Function.GetBasicBlocks())
+		{
+			context.Labels[basicBlock] = new();
+		}
 		return context;
 	}
 
@@ -71,46 +76,37 @@ internal sealed class FunctionContext : IHasName
 	public ModuleContext Module { get; }
 	public List<BasicBlockContext> BasicBlocks { get; } = new();
 	public List<InstructionContext> Instructions { get; } = new();
-	public CilInstructionCollection CilInstructions => Definition.CilMethodBody!.Instructions;
-	public Dictionary<LLVMValueRef, CilLocalVariable> InstructionLocals { get; } = new();
-	/// <summary>
-	/// Some local variables are simply pointers to other local variables, which hold the actual value.
-	/// </summary>
-	/// <remarks>
-	/// Keys are the pointer locals, and the values are the data locals.
-	/// </remarks>
-	public Dictionary<CilLocalVariable, CilLocalVariable> DataLocals { get; } = new();
 	public Dictionary<LLVMBasicBlockRef, CilInstructionLabel> Labels { get; } = new();
 	public Dictionary<LLVMValueRef, Parameter> ParameterDictionary { get; } = new();
 	public Dictionary<LLVMValueRef, InstructionContext> InstructionLookup { get; } = new();
 	public Dictionary<LLVMBasicBlockRef, BasicBlockContext> BasicBlockLookup { get; } = new();
 
-	public void LoadOperand(LLVMValueRef operand)
+	public void LoadOperand(CilInstructionCollection instructions, LLVMValueRef operand)
 	{
-		LoadOperand(operand, out _);
+		LoadOperand(instructions, operand, out _);
 	}
 
-	public void LoadOperand(LLVMValueRef operand, out TypeSignature typeSignature)
+	public void LoadOperand(CilInstructionCollection instructions, LLVMValueRef operand, out TypeSignature typeSignature)
 	{
 		switch (operand.Kind)
 		{
 			case LLVMValueKind.LLVMConstantExprValueKind:
 			case LLVMValueKind.LLVMInstructionValueKind:
 				{
-					CilLocalVariable local = InstructionLocals[operand];
-					CilInstructions.Add(CilOpCodes.Ldloc, local);
+					CilLocalVariable local = InstructionLookup[operand].GetLocalVariable();
+					instructions.Add(CilOpCodes.Ldloc, local);
 					typeSignature = local.VariableType;
 				}
 				break;
 			case LLVMValueKind.LLVMArgumentValueKind:
 				{
 					Parameter parameter = ParameterDictionary[operand];
-					CilInstructions.Add(CilOpCodes.Ldarg, parameter);
+					instructions.Add(CilOpCodes.Ldarg, parameter);
 					typeSignature = parameter.ParameterType;
 				}
 				break;
 			default:
-				Module.LoadValue(CilInstructions, operand, out typeSignature);
+				Module.LoadValue(instructions, operand, out typeSignature);
 				break;
 		}
 	}
@@ -127,9 +123,8 @@ internal sealed class FunctionContext : IHasName
 		};
 	}
 
-	public void Analyze()
+	public void AnalyzeDataFlow()
 	{
-		// Initial pass
 		foreach (InstructionContext instruction in Instructions)
 		{
 			switch (instruction)
@@ -145,12 +140,6 @@ internal sealed class FunctionContext : IHasName
 						MaybeAddAccessor(storeInstructionContext, storeInstructionContext.SourceOperand);
 						storeInstructionContext.DestinationInstruction = InstructionLookup.TryGetValue(storeInstructionContext.DestinationOperand);
 						storeInstructionContext.DestinationInstruction?.Stores.Add(storeInstructionContext);
-					}
-					break;
-				case CallInstructionContext callInstructionContext:
-					{
-						callInstructionContext.FunctionCalled = Module.Methods.TryGetValue(callInstructionContext.FunctionOperand);
-						MaybeAddAccessors(callInstructionContext, callInstructionContext.ArgumentOperands);
 					}
 					break;
 				case PhiInstructionContext phiInstructionContext:
@@ -183,14 +172,6 @@ internal sealed class FunctionContext : IHasName
 		}
 	}
 
-	public void CreateLabelsForBasicBlocks()
-	{
-		foreach (LLVMBasicBlockRef basicBlock in Function.GetBasicBlocks())
-		{
-			Labels[basicBlock] = new();
-		}
-	}
-
 	public bool TryGetStructReturnType(out LLVMTypeRef type)
 	{
 		if (ReturnType.Kind != LLVMTypeKind.LLVMVoidTypeKind || Parameters.Length == 0 || Parameters[0].TypeOf.Kind != LLVMTypeKind.LLVMPointerTypeKind)
@@ -212,6 +193,41 @@ internal sealed class FunctionContext : IHasName
 
 		type = default;
 		return false;
+	}
+
+	public void MaybeAddStructReturnMethod()
+	{
+		if (!TryGetStructReturnType(out LLVMTypeRef structReturnType))
+		{
+			return;
+		}
+
+		TypeSignature returnTypeSignature = Module.GetTypeSignature(structReturnType);
+
+		MethodDefinition method = Definition;
+
+		MethodDefinition newMethod = new(method.Name, method.Attributes, MethodSignature.CreateStatic(returnTypeSignature, method.Parameters.Skip(1).Select(p => p.ParameterType)));
+		method.DeclaringType!.Methods.Add(newMethod);
+		newMethod.CilMethodBody = new(newMethod);
+
+		CilInstructionCollection instructions = newMethod.CilMethodBody.Instructions;
+		CilLocalVariable returnLocal = instructions.AddLocalVariable(returnTypeSignature);
+		instructions.InitializeDefaultValue(returnLocal);
+		instructions.Add(CilOpCodes.Ldloca, returnLocal);
+		foreach (Parameter parameter in newMethod.Parameters)
+		{
+			instructions.Add(CilOpCodes.Ldarg, parameter);
+		}
+		instructions.Add(CilOpCodes.Call, method);
+		instructions.Add(CilOpCodes.Ldloc, returnLocal);
+		instructions.Add(CilOpCodes.Ret);
+		instructions.OptimizeMacros();
+
+		// Hide the original method
+		method.IsAssembly = true;
+
+		// Annotate the original return parameter
+		method.Parameters[0].GetOrCreateDefinition().Name = "result";
 	}
 
 	private string GetDebuggerDisplay()

@@ -7,7 +7,7 @@ namespace AssetRipper.Translation.Cpp.Instructions;
 
 internal sealed class FloatComparisonInstructionContext : NumericComparisonInstructionContext
 {
-	internal FloatComparisonInstructionContext(LLVMValueRef instruction, BasicBlockContext block, FunctionContext function) : base(instruction, block, function)
+	internal FloatComparisonInstructionContext(LLVMValueRef instruction, ModuleContext module) : base(instruction, module)
 	{
 	}
 

@@ -7,10 +7,10 @@ namespace AssetRipper.Translation.Cpp.Instructions;
 
 internal sealed class UnaryMathInstructionContext : InstructionContext
 {
-	internal UnaryMathInstructionContext(LLVMValueRef instruction, BasicBlockContext block, FunctionContext function) : base(instruction, block, function)
+	internal UnaryMathInstructionContext(LLVMValueRef instruction, ModuleContext module) : base(instruction, module)
 	{
 		Debug.Assert(Operands.Length == 1);
-		ResultTypeSignature = function.Module.GetTypeSignature(instruction.TypeOf);
+		ResultTypeSignature = module.GetTypeSignature(instruction.TypeOf);
 	}
 	public LLVMValueRef Operand => Operands[0];
 	public CilOpCode CilOpCode => Opcode switch
@@ -21,8 +21,10 @@ internal sealed class UnaryMathInstructionContext : InstructionContext
 
 	public static bool Supported(LLVMOpcode opcode) => opcode is LLVMOpcode.LLVMFNeg;
 
-	public void AddOperation(CilInstructionCollection instructions)
+	public override void AddInstructions(CilInstructionCollection instructions)
 	{
+		LoadOperand(instructions, Operand);
 		instructions.Add(CilOpCode);
+		instructions.Add(CilOpCodes.Stloc, GetLocalVariable());
 	}
 }

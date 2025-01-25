@@ -7,7 +7,7 @@ namespace AssetRipper.Translation.Cpp.Instructions;
 
 internal sealed class IntegerComparisonInstructionContext : NumericComparisonInstructionContext
 {
-	internal IntegerComparisonInstructionContext(LLVMValueRef instruction, BasicBlockContext block, FunctionContext function) : base(instruction, block, function)
+	internal IntegerComparisonInstructionContext(LLVMValueRef instruction, ModuleContext module) : base(instruction, module)
 	{
 	}
 

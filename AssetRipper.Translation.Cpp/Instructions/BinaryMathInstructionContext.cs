@@ -7,7 +7,7 @@ namespace AssetRipper.Translation.Cpp.Instructions;
 
 internal sealed class BinaryMathInstructionContext : InstructionContext
 {
-	internal BinaryMathInstructionContext(LLVMValueRef instruction, BasicBlockContext block, FunctionContext function) : base(instruction, block, function)
+	internal BinaryMathInstructionContext(LLVMValueRef instruction, ModuleContext module) : base(instruction, module)
 	{
 		Debug.Assert(Operands.Length == 2);
 	}
@@ -44,8 +44,11 @@ internal sealed class BinaryMathInstructionContext : InstructionContext
 		_ => false,
 	};
 
-	public void AddOperation(CilInstructionCollection instructions)
+	public override void AddInstructions(CilInstructionCollection instructions)
 	{
+		LoadOperand(instructions, Operand1);
+		LoadOperand(instructions, Operand2);
 		instructions.Add(CilOpCode);
+		instructions.Add(CilOpCodes.Stloc, GetLocalVariable());
 	}
 }

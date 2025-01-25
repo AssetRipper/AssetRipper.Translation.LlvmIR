@@ -10,7 +10,7 @@ namespace AssetRipper.Translation.Cpp.Instructions;
 
 internal sealed class SwitchBranchInstructionContext : BranchInstructionContext
 {
-	internal SwitchBranchInstructionContext(LLVMValueRef instruction, BasicBlockContext block, FunctionContext function) : base(instruction, block, function)
+	internal SwitchBranchInstructionContext(LLVMValueRef instruction, ModuleContext module) : base(instruction, module)
 	{
 		Debug.Assert(Operands.Length >= 2);
 		Debug.Assert(Operands.Length % 2 == 0); // First two operands are the index and the default block. The rest are pairs of case values and blocks.
@@ -18,7 +18,7 @@ internal sealed class SwitchBranchInstructionContext : BranchInstructionContext
 
 	public LLVMValueRef IndexOperand => Operands[0];
 	public LLVMBasicBlockRef DefaultBlockRef => Operands[1].AsBasicBlock();
-	public BasicBlockContext DefaultBlock => Function.BasicBlockLookup[DefaultBlockRef];
+	public BasicBlockContext? DefaultBlock => Function?.BasicBlockLookup[DefaultBlockRef];
 	public ReadOnlySpan<(LLVMValueRef Case, LLVMValueRef Target)> Cases
 	{
 		get
@@ -27,40 +27,43 @@ internal sealed class SwitchBranchInstructionContext : BranchInstructionContext
 		}
 	}
 
-	public override void AddBranchInstruction()
+	public override void AddInstructions(CilInstructionCollection instructions)
 	{
-		Function.LoadOperand(IndexOperand, out TypeSignature indexTypeSignature);
-		CilLocalVariable indexLocal = CilInstructions.AddLocalVariable(indexTypeSignature);
-		CilInstructions.Add(CilOpCodes.Stloc, indexLocal);
+		ThrowIfFunctionIsNull();
+		Debug.Assert(DefaultBlock is not null);
+
+		LoadOperand(instructions, IndexOperand, out TypeSignature indexTypeSignature);
+		CilLocalVariable indexLocal = instructions.AddLocalVariable(indexTypeSignature);
+		instructions.Add(CilOpCodes.Stloc, indexLocal);
 
 		CilInstructionLabel[] caseLabels = new CilInstructionLabel[Cases.Length];
 		for (int i = 0; i < Cases.Length; i++)
 		{
 			caseLabels[i] = new();
 
-			CilInstructions.Add(CilOpCodes.Ldloc, indexLocal);
-			Function.LoadOperand(Cases[i].Case);
-			CilInstructions.Add(CilOpCodes.Ceq);
-			CilInstructions.Add(CilOpCodes.Brtrue, caseLabels[i]);
+			instructions.Add(CilOpCodes.Ldloc, indexLocal);
+			LoadOperand(instructions, Cases[i].Case);
+			instructions.Add(CilOpCodes.Ceq);
+			instructions.Add(CilOpCodes.Brtrue, caseLabels[i]);
 		}
 
 		CilInstructionLabel defaultLabel = new();
-		CilInstructions.Add(CilOpCodes.Br, defaultLabel);
+		instructions.Add(CilOpCodes.Br, defaultLabel);
 
 		for (int i = 0; i < Cases.Length; i++)
 		{
 			BasicBlockContext targetBlock = Function.BasicBlockLookup[Cases[i].Target.AsBasicBlock()];
 
-			caseLabels[i].Instruction = CilInstructions.Add(CilOpCodes.Nop);
-			AddLoadIfBranchingToPhi(targetBlock);
-			CilInstructions.Add(CilOpCodes.Br, Function.Labels[targetBlock.Block]);
+			caseLabels[i].Instruction = instructions.Add(CilOpCodes.Nop);
+			AddLoadIfBranchingToPhi(instructions, targetBlock);
+			instructions.Add(CilOpCodes.Br, Function.Labels[targetBlock.Block]);
 		}
 
 		// Default case
 		{
-			defaultLabel.Instruction = CilInstructions.Add(CilOpCodes.Nop);
-			AddLoadIfBranchingToPhi(DefaultBlock);
-			CilInstructions.Add(CilOpCodes.Br, Function.Labels[DefaultBlockRef]);
+			defaultLabel.Instruction = instructions.Add(CilOpCodes.Nop);
+			AddLoadIfBranchingToPhi(instructions, DefaultBlock);
+			instructions.Add(CilOpCodes.Br, Function.Labels[DefaultBlockRef]);
 		}
 	}
 }

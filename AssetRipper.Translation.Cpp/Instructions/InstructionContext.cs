@@ -1,6 +1,7 @@
 ﻿using AsmResolver.DotNet.Code.Cil;
 using AsmResolver.DotNet.Signatures;
 using AsmResolver.PE.DotNet.Metadata.Tables;
+using AssetRipper.CIL;
 using AssetRipper.Translation.Cpp.Extensions;
 using LLVMSharp.Interop;
 using System.Diagnostics;
@@ -9,52 +10,62 @@ using System.Diagnostics.CodeAnalysis;
 namespace AssetRipper.Translation.Cpp.Instructions;
 
 [DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
-internal class InstructionContext
+internal abstract class InstructionContext
 {
-	protected InstructionContext(LLVMValueRef instruction, BasicBlockContext block, FunctionContext function)
+	protected InstructionContext(LLVMValueRef instruction, ModuleContext module)
 	{
 		Instruction = instruction;
-		Function = function;
-		Block = block;
+		Module = module;
 		Operands = instruction.GetOperands();
-		ResultTypeSignature = function.Module.GetTypeSignature(instruction.TypeOf);
+		ResultTypeSignature = module.GetTypeSignature(instruction.TypeOf);
+	}
+
+	public static InstructionContext Create(LLVMValueRef instruction, ModuleContext module)
+	{
+		return instruction.GetOpcode() switch
+		{
+			LLVMOpcode.LLVMAlloca => new AllocaInstructionContext(instruction, module),
+			LLVMOpcode.LLVMLoad => new LoadInstructionContext(instruction, module),
+			LLVMOpcode.LLVMStore => new StoreInstructionContext(instruction, module),
+			LLVMOpcode.LLVMCall => new CallInstructionContext(instruction, module),
+			LLVMOpcode.LLVMICmp => new IntegerComparisonInstructionContext(instruction, module),
+			LLVMOpcode.LLVMFCmp => new FloatComparisonInstructionContext(instruction, module),
+			LLVMOpcode.LLVMBr => instruction.IsConditional
+				? new ConditionalBranchInstructionContext(instruction, module)
+				: new UnconditionalBranchInstructionContext(instruction, module),
+			LLVMOpcode.LLVMRet => new ReturnInstructionContext(instruction, module),
+			LLVMOpcode.LLVMPHI => new PhiInstructionContext(instruction, module),
+			LLVMOpcode.LLVMGetElementPtr => new GetElementPointerInstructionContext(instruction, module),
+			LLVMOpcode.LLVMSwitch => new SwitchBranchInstructionContext(instruction, module),
+			LLVMOpcode.LLVMSelect => new SelectInstructionContext(instruction, module),
+			_ when UnaryMathInstructionContext.Supported(instruction.GetOpcode()) => new UnaryMathInstructionContext(instruction, module),
+			_ when BinaryMathInstructionContext.Supported(instruction.GetOpcode()) => new BinaryMathInstructionContext(instruction, module),
+			_ when NumericConversionInstructionContext.Supported(instruction.GetOpcode()) => new NumericConversionInstructionContext(instruction, module),
+			_ => new GenericInstructionContext(instruction, module),
+		};
 	}
 
 	public static InstructionContext Create(LLVMValueRef instruction, BasicBlockContext block, FunctionContext function)
 	{
 		return instruction.GetOpcode() switch
 		{
-			LLVMOpcode.LLVMAlloca => new AllocaInstructionContext(instruction, block, function),
-			LLVMOpcode.LLVMLoad => new LoadInstructionContext(instruction, block, function),
-			LLVMOpcode.LLVMStore => new StoreInstructionContext(instruction, block, function),
-			LLVMOpcode.LLVMCall => new CallInstructionContext(instruction, block, function),
-			LLVMOpcode.LLVMICmp => new IntegerComparisonInstructionContext(instruction, block, function),
-			LLVMOpcode.LLVMFCmp => new FloatComparisonInstructionContext(instruction, block, function),
-			LLVMOpcode.LLVMBr => instruction.IsConditional
-				? new ConditionalBranchInstructionContext(instruction, block, function)
-				: new UnconditionalBranchInstructionContext(instruction, block, function),
-			LLVMOpcode.LLVMRet => new ReturnInstructionContext(instruction, block, function),
-			LLVMOpcode.LLVMPHI => new PhiInstructionContext(instruction, block, function),
-			LLVMOpcode.LLVMGetElementPtr => new GetElementPointerInstructionContext(instruction, block, function),
-			LLVMOpcode.LLVMSwitch => new SwitchBranchInstructionContext(instruction, block, function),
-			LLVMOpcode.LLVMSelect => new SelectInstructionContext(instruction, block, function),
-			_ when UnaryMathInstructionContext.Supported(instruction.GetOpcode()) => new UnaryMathInstructionContext(instruction, block, function),
-			_ when BinaryMathInstructionContext.Supported(instruction.GetOpcode()) => new BinaryMathInstructionContext(instruction, block, function),
-			_ when NumericConversionInstructionContext.Supported(instruction.GetOpcode()) => new NumericConversionInstructionContext(instruction, block, function),
-			_ => new InstructionContext(instruction, block, function),
+			_ => Create(instruction, function.Module),
 		};
 	}
 
 	public LLVMOpcode Opcode => Instruction.GetOpcode();
 	public LLVMValueRef Instruction { get; }
-	public CilInstructionCollection CilInstructions => Function.CilInstructions;
-	public FunctionContext Function { get; }
-	public BasicBlockContext Block { get; }
+	public LLVMBasicBlockRef BasicBlockRef => Instruction.InstructionParent;
+	public LLVMValueRef FunctionRef => BasicBlockRef.Parent;
+	public BasicBlockContext? BasicBlock => Function?.BasicBlockLookup.TryGetValue(BasicBlockRef);
+	public FunctionContext? Function => Module.Methods.TryGetValue(FunctionRef);
+	public ModuleContext Module { get; }
 	public LLVMValueRef[] Operands { get; }
 	public List<InstructionContext> Loads { get; } = new();
 	public List<InstructionContext> Stores { get; } = new();
 	public List<InstructionContext> Accessors { get; } = new();
 	public TypeSignature ResultTypeSignature { get; set; }
+	public CilLocalVariable? ResultLocal { get; set; }
 
 	[MemberNotNullWhen(true, nameof(ResultTypeSignature))]
 	public bool HasResult => ResultTypeSignature is not null and not CorLibTypeSignature { ElementType: ElementType.Void };
@@ -62,5 +73,76 @@ internal class InstructionContext
 	private string GetDebuggerDisplay()
 	{
 		return Instruction.ToString();
+	}
+
+	public CilLocalVariable GetLocalVariable() => ResultLocal ?? throw new NullReferenceException("Result local is null");
+
+	public virtual void CreateLocal(CilInstructionCollection instructions)
+	{
+		if (HasResult)
+		{
+			ResultLocal = instructions.AddLocalVariable(ResultTypeSignature);
+		}
+	}
+
+	public abstract void AddInstructions(CilInstructionCollection instructions);
+
+	[MemberNotNull(nameof(BasicBlock))]
+	[StackTraceHidden]
+	protected void ThrowIfBasicBlockIsNull()
+	{
+		if (BasicBlock is null)
+		{
+			throw new InvalidOperationException("Basic block is null");
+		}
+	}
+
+	[MemberNotNull(nameof(Function))]
+	[StackTraceHidden]
+	protected void ThrowIfFunctionIsNull()
+	{
+		if (Function is null)
+		{
+			throw new InvalidOperationException("Function is null");
+		}
+	}
+
+	protected void LoadOperand(CilInstructionCollection instructions, LLVMValueRef operand)
+	{
+		FunctionContext? function = Function;
+		if (function is not null)
+		{
+			function.LoadOperand(instructions, operand);
+		}
+		else
+		{
+			Module.LoadValue(instructions, operand);
+		}
+	}
+
+	protected void LoadOperand(CilInstructionCollection instructions, LLVMValueRef operand, out TypeSignature typeSignature)
+	{
+		FunctionContext? function = Function;
+		if (function is not null)
+		{
+			function.LoadOperand(instructions, operand, out typeSignature);
+		}
+		else
+		{
+			Module.LoadValue(instructions, operand, out typeSignature);
+		}
+	}
+
+	protected TypeSignature GetOperandTypeSignature(LLVMValueRef operand)
+	{
+		FunctionContext? function = Function;
+		if (function is not null)
+		{
+			return function.GetOperandTypeSignature(operand);
+		}
+		else
+		{
+			return Module.GetTypeSignature(operand.TypeOf);
+		}
 	}
 }
