@@ -115,11 +115,10 @@ internal sealed class FunctionContext : IHasName
 	{
 		return operand.Kind switch
 		{
-			LLVMValueKind.LLVMConstantIntValueKind or LLVMValueKind.LLVMConstantFPValueKind => Module.GetTypeSignature(operand.TypeOf),
 			LLVMValueKind.LLVMInstructionValueKind or LLVMValueKind.LLVMConstantExprValueKind => InstructionLookup[operand].ResultTypeSignature,
 			LLVMValueKind.LLVMArgumentValueKind => ParameterDictionary[operand].ParameterType,
 			LLVMValueKind.LLVMGlobalVariableValueKind => Module.GlobalVariables[operand].PointerGetMethod.Signature!.ReturnType,
-			_ => throw new NotSupportedException(),
+			_ => Module.GetTypeSignature(operand.TypeOf),
 		};
 	}
 
