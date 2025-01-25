@@ -666,8 +666,7 @@ public static unsafe class CppTranslator
 
 			CilInstructionCollection instructions = newMethod.CilMethodBody.Instructions;
 			CilLocalVariable returnLocal = instructions.AddLocalVariable(returnTypeSignature);
-			instructions.Add(CilOpCodes.Ldloca, returnLocal);
-			instructions.Add(CilOpCodes.Initobj, returnTypeSignature.ToTypeDefOrRef());
+			instructions.InitializeDefaultValue(returnLocal);
 			instructions.Add(CilOpCodes.Ldloca, returnLocal);
 			foreach (Parameter parameter in newMethod.Parameters)
 			{
