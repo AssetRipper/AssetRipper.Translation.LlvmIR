@@ -7,6 +7,7 @@ using AsmResolver.PE.DotNet.Cil;
 using AsmResolver.PE.DotNet.Metadata.Tables;
 using AssetRipper.CIL;
 using AssetRipper.Translation.Cpp.Extensions;
+using AssetRipper.Translation.Cpp.Instructions;
 using LLVMSharp.Interop;
 using System.Buffers.Binary;
 using System.Diagnostics;
@@ -542,6 +543,14 @@ internal sealed class ModuleContext
 				}
 				break;
 			case LLVMValueKind.LLVMConstantExprValueKind:
+				{
+					typeSignature = GetTypeSignature(value.TypeOf);
+					InstructionContext expression = InstructionContext.Create(value, this);
+					expression.CreateLocal(instructions);
+					expression.AddInstructions(instructions);
+					instructions.Add(CilOpCodes.Ldloc, expression.GetLocalVariable());
+				}
+				break;
 			case LLVMValueKind.LLVMInstructionValueKind:
 			case LLVMValueKind.LLVMArgumentValueKind:
 				throw new NotSupportedException();

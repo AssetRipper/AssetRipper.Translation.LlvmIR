@@ -90,7 +90,6 @@ internal sealed class FunctionContext : IHasName
 	{
 		switch (operand.Kind)
 		{
-			case LLVMValueKind.LLVMConstantExprValueKind:
 			case LLVMValueKind.LLVMInstructionValueKind:
 				{
 					CilLocalVariable local = InstructionLookup[operand].GetLocalVariable();
