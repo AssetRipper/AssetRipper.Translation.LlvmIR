@@ -39,8 +39,14 @@ internal static class Program
 		}
 
 		const string PathToSamples = "../../../../Samples";
-		foreach (string file in Directory.EnumerateFiles(PathToSamples, "*.cpp", SearchOption.TopDirectoryOnly))
+		foreach (string file in Directory.EnumerateFiles(PathToSamples, "*", SearchOption.TopDirectoryOnly))
 		{
+			if (!file.EndsWith(".cpp", StringComparison.Ordinal)
+				&& !file.EndsWith(".c", StringComparison.Ordinal))
+			{
+				continue;
+			}
+
 			uint hash = ComputeHash(file);
 			string ir_path = Path.ChangeExtension(file, ".ll");
 			if (!hashes.TryGetValue(file, out uint old_hash) || old_hash != hash || !File.Exists(ir_path))
