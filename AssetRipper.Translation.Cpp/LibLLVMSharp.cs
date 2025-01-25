@@ -1,24 +1,37 @@
 ﻿using LLVMSharp.Interop;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
 
 namespace AssetRipper.Translation.Cpp;
 
-internal static unsafe class LibLLVMSharp
+internal static unsafe partial class LibLLVMSharp
 {
-#pragma warning disable SYSLIB1054 // Use 'LibraryImportAttribute' instead of 'DllImportAttribute' to generate P/Invoke marshalling code at compile time
-	[DllImport("libLLVMSharp", CallingConvention = CallingConvention.Cdecl, EntryPoint = "llvmsharp_Function_getReturnType", ExactSpelling = true)]
-	private static extern LLVMOpaqueType* FunctionGetReturnType(LLVMOpaqueValue* Fn);
+	[LibraryImport("libLLVMSharp", EntryPoint = "llvmsharp_Function_getReturnType")]
+	[UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+	private static partial LLVMOpaqueType* FunctionGetReturnType(LLVMOpaqueValue* Fn);
 
-	[DllImport("libLLVMSharp", CallingConvention = CallingConvention.Cdecl, EntryPoint = "llvmsharp_Function_getFunctionType", ExactSpelling = true)]
-	private static extern LLVMOpaqueType* FunctionGetFunctionType(LLVMOpaqueValue* Fn);
+	[LibraryImport("libLLVMSharp", EntryPoint = "llvmsharp_Function_getFunctionType")]
+	[UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+	private static partial LLVMOpaqueType* FunctionGetFunctionType(LLVMOpaqueValue* Fn);
 
-	[DllImport("libLLVMSharp", CallingConvention = CallingConvention.Cdecl, EntryPoint = "llvmsharp_ConstantDataArray_getData", ExactSpelling = true)]
-	private static extern byte* ConstantDataArrayGetData(LLVMOpaqueValue* ConstantDataArray, int* out_size);
+	[LibraryImport("libLLVMSharp", EntryPoint = "llvmsharp_ConstantDataArray_getData")]
+	[UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+	private static partial byte* ConstantDataArrayGetData(LLVMOpaqueValue* ConstantDataArray, int* out_size);
 
-	[DllImport("libLLVMSharp", CallingConvention = CallingConvention.Cdecl, EntryPoint = "llvmsharp_Value_getDemangledName", ExactSpelling = true)]
-	private static extern int ValueGetDemangledName(LLVMOpaqueValue* value, byte* buffer, int buffer_size);
-#pragma warning restore SYSLIB1054 // Use 'LibraryImportAttribute' instead of 'DllImportAttribute' to generate P/Invoke marshalling code at compile time
+	[LibraryImport("libLLVMSharp", EntryPoint = "llvmsharp_Value_getDemangledName")]
+	[UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+	private static partial int ValueGetDemangledName(LLVMOpaqueValue* value, byte* buffer, int buffer_size);
+
+	[LibraryImport("libLLVMSharp", EntryPoint = "llvmsharp_Instruction_hasNoSignedWrap")]
+	[UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+	[return: MarshalAs(UnmanagedType.U1)]
+	private static partial bool InstructionHasNoSignedWrap(LLVMOpaqueValue* instruction);
+
+	[LibraryImport("libLLVMSharp", EntryPoint = "llvmsharp_Instruction_hasNoUnsignedWrap")]
+	[UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+	[return: MarshalAs(UnmanagedType.U1)]
+	private static partial bool InstructionHasNoUnsignedWrap(LLVMOpaqueValue* instruction);
 
 	private static int ValueGetDemangledName(LLVMOpaqueValue* value, Span<byte> buffer)
 	{
@@ -55,5 +68,15 @@ internal static unsafe class LibLLVMSharp
 			return null;
 		}
 		return Encoding.UTF8.GetString(buffer[..length]);
+	}
+
+	public static bool InstructionHasNoSignedWrap(LLVMValueRef instruction)
+	{
+		return InstructionHasNoSignedWrap((LLVMOpaqueValue*)instruction);
+	}
+
+	public static bool InstructionHasNoUnsignedWrap(LLVMValueRef instruction)
+	{
+		return InstructionHasNoUnsignedWrap((LLVMOpaqueValue*)instruction);
 	}
 }

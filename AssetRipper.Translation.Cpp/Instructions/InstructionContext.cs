@@ -45,15 +45,9 @@ internal abstract class InstructionContext
 		};
 	}
 
-	public static InstructionContext Create(LLVMValueRef instruction, BasicBlockContext block, FunctionContext function)
-	{
-		return instruction.GetOpcode() switch
-		{
-			_ => Create(instruction, function.Module),
-		};
-	}
-
 	public LLVMOpcode Opcode => Instruction.GetOpcode();
+	public bool NoSignedWrap => LibLLVMSharp.InstructionHasNoSignedWrap(Instruction);
+	public bool NoUnsignedWrap => LibLLVMSharp.InstructionHasNoUnsignedWrap(Instruction);
 	public LLVMValueRef Instruction { get; }
 	public LLVMBasicBlockRef BasicBlockRef => Instruction.InstructionParent;
 	public LLVMValueRef FunctionRef => BasicBlockRef.Parent;
