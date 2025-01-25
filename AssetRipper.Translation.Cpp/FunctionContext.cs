@@ -81,12 +81,12 @@ internal sealed class FunctionContext : IHasName
 	public Dictionary<LLVMValueRef, InstructionContext> InstructionLookup { get; } = new();
 	public Dictionary<LLVMBasicBlockRef, BasicBlockContext> BasicBlockLookup { get; } = new();
 
-	public void LoadOperand(CilInstructionCollection instructions, LLVMValueRef operand)
+	public void LoadValue(CilInstructionCollection instructions, LLVMValueRef operand)
 	{
-		LoadOperand(instructions, operand, out _);
+		LoadValue(instructions, operand, out _);
 	}
 
-	public void LoadOperand(CilInstructionCollection instructions, LLVMValueRef operand, out TypeSignature typeSignature)
+	public void LoadValue(CilInstructionCollection instructions, LLVMValueRef operand, out TypeSignature typeSignature)
 	{
 		switch (operand.Kind)
 		{
@@ -111,7 +111,7 @@ internal sealed class FunctionContext : IHasName
 		}
 	}
 
-	public TypeSignature GetOperandTypeSignature(LLVMValueRef operand)
+	public TypeSignature GetTypeSignature(LLVMValueRef operand)
 	{
 		return operand.Kind switch
 		{

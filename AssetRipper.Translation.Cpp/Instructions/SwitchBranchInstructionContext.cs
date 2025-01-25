@@ -32,7 +32,7 @@ internal sealed class SwitchBranchInstructionContext : BranchInstructionContext
 		ThrowIfFunctionIsNull();
 		Debug.Assert(DefaultBlock is not null);
 
-		LoadOperand(instructions, IndexOperand, out TypeSignature indexTypeSignature);
+		LoadValue(instructions, IndexOperand, out TypeSignature indexTypeSignature);
 		CilLocalVariable indexLocal = instructions.AddLocalVariable(indexTypeSignature);
 		instructions.Add(CilOpCodes.Stloc, indexLocal);
 
@@ -42,7 +42,7 @@ internal sealed class SwitchBranchInstructionContext : BranchInstructionContext
 			caseLabels[i] = new();
 
 			instructions.Add(CilOpCodes.Ldloc, indexLocal);
-			LoadOperand(instructions, Cases[i].Case);
+			LoadValue(instructions, Cases[i].Case);
 			instructions.Add(CilOpCodes.Ceq);
 			instructions.Add(CilOpCodes.Brtrue, caseLabels[i]);
 		}

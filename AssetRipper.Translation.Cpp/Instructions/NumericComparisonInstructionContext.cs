@@ -19,8 +19,8 @@ internal abstract class NumericComparisonInstructionContext : InstructionContext
 
 	public override void AddInstructions(CilInstructionCollection instructions)
 	{
-		LoadOperand(instructions, Operand1);
-		LoadOperand(instructions, Operand2);
+		LoadValue(instructions, Operand1);
+		LoadValue(instructions, Operand2);
 		AddComparison(instructions);
 		instructions.Add(CilOpCodes.Stloc, GetLocalVariable());
 	}

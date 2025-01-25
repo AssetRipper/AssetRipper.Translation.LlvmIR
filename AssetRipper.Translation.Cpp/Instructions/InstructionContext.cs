@@ -107,12 +107,12 @@ internal abstract class InstructionContext
 		}
 	}
 
-	protected void LoadOperand(CilInstructionCollection instructions, LLVMValueRef operand)
+	protected void LoadValue(CilInstructionCollection instructions, LLVMValueRef operand)
 	{
 		FunctionContext? function = Function;
 		if (function is not null)
 		{
-			function.LoadOperand(instructions, operand);
+			function.LoadValue(instructions, operand);
 		}
 		else
 		{
@@ -120,12 +120,12 @@ internal abstract class InstructionContext
 		}
 	}
 
-	protected void LoadOperand(CilInstructionCollection instructions, LLVMValueRef operand, out TypeSignature typeSignature)
+	protected void LoadValue(CilInstructionCollection instructions, LLVMValueRef operand, out TypeSignature typeSignature)
 	{
 		FunctionContext? function = Function;
 		if (function is not null)
 		{
-			function.LoadOperand(instructions, operand, out typeSignature);
+			function.LoadValue(instructions, operand, out typeSignature);
 		}
 		else
 		{
@@ -133,12 +133,12 @@ internal abstract class InstructionContext
 		}
 	}
 
-	protected TypeSignature GetOperandTypeSignature(LLVMValueRef operand)
+	protected TypeSignature GetTypeSignature(LLVMValueRef operand)
 	{
 		FunctionContext? function = Function;
 		if (function is not null)
 		{
-			return function.GetOperandTypeSignature(operand);
+			return function.GetTypeSignature(operand);
 		}
 		else
 		{

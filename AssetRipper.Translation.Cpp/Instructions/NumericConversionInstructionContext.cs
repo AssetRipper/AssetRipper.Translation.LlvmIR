@@ -138,7 +138,7 @@ internal sealed class NumericConversionInstructionContext : InstructionContext
 
 	public override void AddInstructions(CilInstructionCollection instructions)
 	{
-		LoadOperand(instructions, Operand);
+		LoadValue(instructions, Operand);
 		AddConversion(instructions);
 		instructions.Add(CilOpCodes.Stloc, GetLocalVariable());
 	}

@@ -30,20 +30,20 @@ internal sealed class StoreInstructionContext : InstructionContext
 			if (allocaDestination.DataLocal.VariableType is PointerTypeSignature
 				|| SignatureComparer.Default.Equals(allocaDestination.DataLocal.VariableType, StoreTypeSignature))
 			{
-				LoadOperand(instructions, SourceOperand);
+				LoadValue(instructions, SourceOperand);
 				instructions.Add(CilOpCodes.Stloc, allocaDestination.DataLocal);
 			}
 			else
 			{
 				instructions.Add(CilOpCodes.Ldloca, allocaDestination.DataLocal);
-				LoadOperand(instructions, SourceOperand);
+				LoadValue(instructions, SourceOperand);
 				instructions.AddStoreIndirect(StoreTypeSignature);
 			}
 		}
 		else
 		{
-			LoadOperand(instructions, DestinationOperand);
-			LoadOperand(instructions, SourceOperand);
+			LoadValue(instructions, DestinationOperand);
+			LoadValue(instructions, SourceOperand);
 			instructions.AddStoreIndirect(StoreTypeSignature);
 		}
 
