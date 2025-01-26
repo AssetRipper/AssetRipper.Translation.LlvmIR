@@ -336,7 +336,7 @@ internal sealed class ModuleContext
 	{
 		return value.Kind switch
 		{
-			LLVMValueKind.LLVMInstructionValueKind or LLVMValueKind.LLVMConstantExprValueKind => Methods[value.InstructionParent.Parent].InstructionLookup[value].ResultTypeSignature,
+			LLVMValueKind.LLVMInstructionValueKind => Methods[value.InstructionParent.Parent].InstructionLookup[value].ResultTypeSignature,
 			LLVMValueKind.LLVMArgumentValueKind => Methods[value.ParamParent].ParameterDictionary[value].ParameterType,
 			LLVMValueKind.LLVMGlobalVariableValueKind => GlobalVariables[value].PointerGetMethod.Signature!.ReturnType,
 			_ => GetTypeSignature(value.TypeOf),
