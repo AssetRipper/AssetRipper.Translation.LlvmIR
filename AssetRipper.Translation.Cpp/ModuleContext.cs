@@ -30,6 +30,8 @@ internal sealed class ModuleContext
 		GlobalVariablesType = CreateStaticType(definition, "GlobalVariables");
 		IntrinsicsType = InjectType(typeof(IntrinsicFunctions), definition);
 		InlineArrayHelperType = InjectType(typeof(InlineArrayHelper), definition);
+		InlineArrayInterface = InjectType(typeof(IInlineArray<>), definition);
+		SpanHelperType = InjectType(typeof(SpanHelper), definition);
 
 		CompilerGeneratedAttributeConstructor = (IMethodDefOrRef)definition.DefaultImporter.ImportMethod(typeof(CompilerGeneratedAttribute).GetConstructors()[0]);
 
@@ -46,44 +48,27 @@ internal sealed class ModuleContext
 	public TypeDefinition GlobalVariablesType { get; }
 	public TypeDefinition IntrinsicsType { get; }
 	public TypeDefinition InlineArrayHelperType { get; }
+	public TypeDefinition InlineArrayInterface { get; }
+	public TypeDefinition SpanHelperType { get; }
 	public TypeDefinition PrivateImplementationDetails { get; }
 	private IMethodDefOrRef CompilerGeneratedAttributeConstructor { get; }
 	public Dictionary<LLVMValueRef, FunctionContext> Methods { get; } = new();
 	public Dictionary<string, TypeDefinition> Structs { get; } = new();
 	public Dictionary<LLVMValueRef, GlobalVariableContext> GlobalVariables { get; } = new();
-	private readonly Dictionary<(TypeSignature, int), TypeDefinition> inlineArrayCache = new(TypeSignatureIntPairComparer);
-	public Dictionary<TypeDefinition, (TypeSignature, int)> InlineArrayTypes { get; } = new(SignatureComparer.Default);
+	private readonly Dictionary<(TypeSignature, int), InlineArrayContext> inlineArrayCache = new(TypeSignatureIntPairComparer);
+	public Dictionary<TypeDefinition, InlineArrayContext> InlineArrayTypes { get; } = new(SignatureComparer.Default);
 
 	private static PairEqualityComparer<TypeSignature, int> TypeSignatureIntPairComparer { get; } = new(SignatureComparer.Default, EqualityComparer<int>.Default);
 
-	public TypeDefinition GetOrCreateInlineArray(TypeSignature type, int size)
+	public InlineArrayContext GetOrCreateInlineArray(TypeSignature type, int size)
 	{
 		(TypeSignature, int) pair = (type, size);
-		if (!inlineArrayCache.TryGetValue(pair, out TypeDefinition? arrayType))
+		if (!inlineArrayCache.TryGetValue(pair, out InlineArrayContext? arrayType))
 		{
-			string name = $"InlineArray_{size}";
-			string uniqueName = NameGenerator.GenerateName(name, type.FullName);
-
-			arrayType = new TypeDefinition("InlineArrays", uniqueName, TypeAttributes.Public | TypeAttributes.SequentialLayout | TypeAttributes.Sealed, Definition.DefaultImporter.ImportType(typeof(ValueType)));
-			Definition.TopLevelTypes.Add(arrayType);
-
-			//Add InlineArrayAttribute to arrayType
-			{
-				System.Reflection.ConstructorInfo constructorInfo = typeof(InlineArrayAttribute).GetConstructors().Single();
-				IMethodDescriptor inlineArrayAttributeConstructor = Definition.DefaultImporter.ImportMethod(constructorInfo);
-				CustomAttributeArgument argument = new(Definition.CorLibTypeFactory.Int32, size);
-				CustomAttributeSignature signature = new(argument);
-				arrayType.CustomAttributes.Add(new CustomAttribute((ICustomAttributeType)inlineArrayAttributeConstructor, signature));
-			}
-
-			//Add private instance field with the cooresponding type.
-			{
-				FieldDefinition field = new("__element0", FieldAttributes.Private, type);
-				arrayType.Fields.Add(field);
-			}
+			arrayType = InlineArrayContext.CreateInlineArray(type, size, this);
 
 			inlineArrayCache.Add(pair, arrayType);
-			InlineArrayTypes.Add(arrayType, pair);
+			InlineArrayTypes.Add(arrayType.Type, arrayType);
 		}
 
 		return arrayType;
@@ -293,7 +278,7 @@ internal sealed class ModuleContext
 				{
 					TypeSignature elementType = GetTypeSignature(type.ElementType);
 					int count = (int)type.ArrayLength;
-					TypeDefinition arrayType = GetOrCreateInlineArray(elementType, count);
+					TypeDefinition arrayType = GetOrCreateInlineArray(elementType, count).Type;
 					return arrayType.ToTypeSignature();
 				}
 
@@ -399,7 +384,7 @@ internal sealed class ModuleContext
 					typeSignature = GetTypeSignature(value.TypeOf);
 
 					TypeDefinition inlineArrayType = (TypeDefinition)typeSignature.ToTypeDefOrRef();
-					(TypeSignature elementType, int elementCount) = InlineArrayTypes[inlineArrayType];
+					InlineArrayTypes[inlineArrayType].GetUltimateElementType(out TypeSignature elementType, out int elementCount);
 
 					ReadOnlySpan<byte> data = LibLLVMSharp.ConstantDataArrayGetData(value);
 
@@ -409,8 +394,8 @@ internal sealed class ModuleContext
 					{
 						elementType = Definition.CorLibTypeFactory.Char;
 
-						IMethodDescriptor toCharacterSpan = InlineArrayHelperType.Methods
-							.Single(m => m.Name == nameof(InlineArrayHelper.ToCharacterSpan));
+						IMethodDescriptor toCharacterSpan = SpanHelperType.Methods
+							.Single(m => m.Name == nameof(SpanHelper.ToCharacterSpan));
 
 						instructions.Add(CilOpCodes.Ldstr, @string);
 						instructions.Add(CilOpCodes.Call, toCharacterSpan);
@@ -461,7 +446,7 @@ internal sealed class ModuleContext
 
 					LLVMValueRef[] elements = value.GetOperands();
 
-					(TypeSignature elementType, int elementCount) = InlineArrayTypes[(TypeDefinition)underlyingType.ToTypeDefOrRef()];
+					InlineArrayTypes[(TypeDefinition)underlyingType.ToTypeDefOrRef()].GetElementType(out TypeSignature elementType, out int elementCount);
 
 					if (elementCount != elements.Length)
 					{
@@ -478,7 +463,7 @@ internal sealed class ModuleContext
 						.MakeGenericInstanceType(elementType);
 
 					IMethodDescriptor inlineArrayAsSpan = InlineArrayHelperType.Methods
-						.Single(m => m.Name == nameof(InlineArrayHelper.InlineArrayAsSpan))
+						.Single(m => m.Name == nameof(InlineArrayHelper.AsSpan))
 						.MakeGenericInstanceMethod(underlyingType, elementType);
 
 					MethodSignature getItemSignature = MethodSignature.CreateInstance(new GenericParameterSignature(GenericParameterType.Type, 0).MakeByReferenceType(), Definition.CorLibTypeFactory.Int32);
@@ -491,7 +476,6 @@ internal sealed class ModuleContext
 					instructions.Add(CilOpCodes.Stloc, bufferLocal);
 
 					instructions.Add(CilOpCodes.Ldloca, bufferLocal);
-					instructions.Add(CilOpCodes.Ldc_I4, elementCount);
 					instructions.Add(CilOpCodes.Call, inlineArrayAsSpan);
 					instructions.Add(CilOpCodes.Stloc, spanLocal);
 

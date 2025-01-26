@@ -86,9 +86,9 @@ internal sealed class GetElementPointerInstructionContext : InstructionContext
 			if (currentType is TypeDefOrRefSignature structTypeSignature)
 			{
 				TypeDefinition structType = (TypeDefinition)structTypeSignature.ToTypeDefOrRef();
-				if (Module.InlineArrayTypes.TryGetValue(structType, out (TypeSignature, int) pair))
+				if (Module.InlineArrayTypes.TryGetValue(structType, out InlineArrayContext? inlineArray))
 				{
-					currentType = pair.Item1;
+					currentType = inlineArray.ElementType;
 					instructions.Add(CilOpCodes.Sizeof, currentType.ToTypeDefOrRef());
 					Module.LoadValue(instructions, operand);
 					instructions.Add(CilOpCodes.Conv_I4);
@@ -133,9 +133,9 @@ internal sealed class GetElementPointerInstructionContext : InstructionContext
 			if (currentType is TypeDefOrRefSignature structTypeSignature)
 			{
 				TypeDefinition structType = (TypeDefinition)structTypeSignature.ToTypeDefOrRef();
-				if (Module.InlineArrayTypes.TryGetValue(structType, out (TypeSignature, int) pair))
+				if (Module.InlineArrayTypes.TryGetValue(structType, out InlineArrayContext? inlineArray))
 				{
-					currentType = pair.Item1;
+					currentType = inlineArray.ElementType;
 				}
 				else if (operand.Kind == LLVMValueKind.LLVMConstantIntValueKind)
 				{

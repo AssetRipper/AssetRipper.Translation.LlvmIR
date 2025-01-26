@@ -72,8 +72,8 @@ internal sealed class CallInstructionContext : InstructionContext
 				CorLibTypeSignature intPtr = Module.Definition.CorLibTypeFactory.IntPtr;
 				TypeSignature systemType = Module.Definition.DefaultImporter.ImportType(typeof(Type)).ToTypeSignature();
 
-				TypeDefinition intPtrBuffer = Module.GetOrCreateInlineArray(intPtr, variadicParameterCount);
-				TypeDefinition systemTypeBuffer = Module.GetOrCreateInlineArray(systemType, variadicParameterCount);
+				TypeDefinition intPtrBuffer = Module.GetOrCreateInlineArray(intPtr, variadicParameterCount).Type;
+				TypeDefinition systemTypeBuffer = Module.GetOrCreateInlineArray(systemType, variadicParameterCount).Type;
 
 				TypeSignature intPtrSpan = Module.Definition.DefaultImporter
 					.ImportType(typeof(Span<>))
@@ -90,9 +90,9 @@ internal sealed class CallInstructionContext : InstructionContext
 
 				IMethodDescriptor typeSpanGetItem = new MemberReference(typeSpan.ToTypeDefOrRef(), "get_Item", getItemSignature);
 
-				MethodDefinition inlineArrayAsSpan = Module.InlineArrayHelperType.Methods.Single(m => m.Name == nameof(InlineArrayHelper.InlineArrayAsSpan));
+				MethodDefinition inlineArrayAsSpan = Module.InlineArrayHelperType.Methods.Single(m => m.Name == nameof(InlineArrayHelper.AsSpan));
 
-				MethodDefinition spanToReadOnly = Module.InlineArrayHelperType.Methods.Single(m => m.Name == nameof(InlineArrayHelper.ToReadOnly));
+				MethodDefinition spanToReadOnly = Module.SpanHelperType.Methods.Single(m => m.Name == nameof(SpanHelper.ToReadOnly));
 
 				CilLocalVariable intPtrBufferLocal = instructions.AddLocalVariable(intPtrBuffer.ToTypeSignature());
 				instructions.AddDefaultValue(intPtrBuffer.ToTypeSignature());
@@ -111,7 +111,6 @@ internal sealed class CallInstructionContext : InstructionContext
 
 				CilLocalVariable intPtrSpanLocal = instructions.AddLocalVariable(intPtrSpan);
 				instructions.Add(CilOpCodes.Ldloca, intPtrBufferLocal);
-				instructions.Add(CilOpCodes.Ldc_I4, variadicParameterCount);
 				instructions.Add(CilOpCodes.Call, inlineArrayAsSpan.MakeGenericInstanceMethod(intPtrBuffer.ToTypeSignature(), intPtr));
 				instructions.Add(CilOpCodes.Stloc, intPtrSpanLocal);
 
@@ -132,7 +131,6 @@ internal sealed class CallInstructionContext : InstructionContext
 
 				CilLocalVariable typeSpanLocal = instructions.AddLocalVariable(typeSpan);
 				instructions.Add(CilOpCodes.Ldloca, systemTypeBufferLocal);
-				instructions.Add(CilOpCodes.Ldc_I4, variadicParameterCount);
 				instructions.Add(CilOpCodes.Call, inlineArrayAsSpan.MakeGenericInstanceMethod(systemTypeBuffer.ToTypeSignature(), systemType));
 				instructions.Add(CilOpCodes.Stloc, typeSpanLocal);
 

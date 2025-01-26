@@ -5,35 +5,41 @@ namespace AssetRipper.Translation.Cpp;
 
 internal static class InlineArrayHelper
 {
-	public static Span<TElement> InlineArrayAsSpan<TBuffer, TElement>(ref TBuffer buffer, int length)
+	public static Span<TElement> AsSpan<TBuffer, TElement>(this ref TBuffer buffer)
+		where TBuffer : struct, IInlineArray<TElement>
 	{
-		return MemoryMarshal.CreateSpan(ref Unsafe.As<TBuffer, TElement>(ref buffer), length);
+		return MemoryMarshal.CreateSpan(ref Unsafe.As<TBuffer, TElement>(ref buffer), TBuffer.Length);
 	}
 
-	public static ReadOnlySpan<TElement> InlineArrayAsReadOnlySpan<TBuffer, TElement>(ref TBuffer buffer, int length)
+	public static ReadOnlySpan<TElement> AsReadOnlySpan<TBuffer, TElement>(this ref TBuffer buffer)
+		where TBuffer : struct, IInlineArray<TElement>
 	{
-		return MemoryMarshal.CreateReadOnlySpan(ref Unsafe.As<TBuffer, TElement>(ref buffer), length);
+		return MemoryMarshal.CreateReadOnlySpan(ref Unsafe.As<TBuffer, TElement>(ref buffer), TBuffer.Length);
 	}
 
-	public static void SetInlineArray<TBuffer, TElement>(ref TBuffer buffer, int length, ReadOnlySpan<TElement> span)
+	public static void Initialize<TBuffer, TElement>(this ref TBuffer buffer, ReadOnlySpan<TElement> span)
+		where TBuffer : struct, IInlineArray<TElement>
 	{
-		span.CopyTo(InlineArrayAsSpan<TBuffer, TElement>(ref buffer, length));
+		span.CopyTo(buffer.AsSpan<TBuffer, TElement>());
 	}
 
-	public static TBuffer Create<TBuffer, TElement>(ReadOnlySpan<TElement> contents) where TBuffer : struct
+	public static TBuffer Create<TBuffer, TElement>(ReadOnlySpan<TElement> contents)
+		where TBuffer : struct, IInlineArray<TElement>
 	{
 		TBuffer buffer = default;
-		SetInlineArray(ref buffer, contents.Length, contents);
+		buffer.Initialize(contents);
 		return buffer;
 	}
 
-	public static ReadOnlySpan<T> ToReadOnly<T>(this Span<T> span)
+	public static TElement GetElement<TBuffer, TElement>(this ref TBuffer buffer, int index)
+		where TBuffer : struct, IInlineArray<TElement>
 	{
-		return span;
+		return buffer.AsReadOnlySpan<TBuffer, TElement>()[index];
 	}
 
-	public static ReadOnlySpan<char> ToCharacterSpan(this string str)
+	public static void SetElement<TBuffer, TElement>(this ref TBuffer buffer, int index, TElement value)
+		where TBuffer : struct, IInlineArray<TElement>
 	{
-		return str.AsSpan();
+		buffer.AsSpan<TBuffer, TElement>()[index] = value;
 	}
 }
