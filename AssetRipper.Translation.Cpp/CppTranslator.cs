@@ -139,11 +139,6 @@ public static unsafe class CppTranslator
 		// Structs are discovered dynamically, so we need to assign names after all methods are created.
 		moduleContext.AssignStructNames();
 
-		foreach (InlineArrayContext inlineArray in moduleContext.InlineArrayTypes.Values)
-		{
-			inlineArray.ImplementInterface();
-		}
-
 		return fixAssemblyReferences ? moduleDefinition.FixCorLibAssemblyReferences() : moduleDefinition;
 	}
 }

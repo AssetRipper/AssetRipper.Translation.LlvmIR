@@ -3,6 +3,7 @@ using AsmResolver.DotNet.Code.Cil;
 using AsmResolver.DotNet.Signatures;
 using AsmResolver.PE.DotNet.Cil;
 using AsmResolver.PE.DotNet.Metadata.Tables;
+using AssetRipper.Translation.Cpp.Extensions;
 using System.Runtime.CompilerServices;
 
 namespace AssetRipper.Translation.Cpp;
@@ -65,10 +66,14 @@ internal sealed class InlineArrayContext
 			arrayType.Fields.Add(field);
 		}
 
-		return new InlineArrayContext(module, arrayType, type, size);
+		InlineArrayContext result = new(module, arrayType, type, size);
+
+		result.ImplementInterface();
+
+		return result;
 	}
 
-	public void ImplementInterface()
+	private void ImplementInterface()
 	{
 		string propertyName = nameof(IInlineArray<>.Length);
 		string methodName = $"get_{propertyName}";
@@ -112,6 +117,35 @@ internal sealed class InlineArrayContext
 				? interfaceType.Namespace + "."
 				: string.Empty;
 			string prefix = $"{@namespace}{nameof(IInlineArray<>)}<{elementType.FullName}>.";
+
+			MethodDefinition method = new(prefix + methodName, MethodAttributes.Private | MethodAttributes.HideBySig | MethodAttributes.SpecialName | MethodAttributes.Static, methodSignature);
+			method.CilMethodBody = new(method);
+
+			CilInstructionCollection instructions = method.CilMethodBody.Instructions;
+			instructions.Add(CilOpCodes.Ldc_I4, length);
+			instructions.Add(CilOpCodes.Ret);
+			instructions.OptimizeMacros();
+
+			Type.Methods.Add(method);
+			Type.MethodImplementations.Add(new MethodImplementation(interfaceMethod, method));
+
+			PropertyDefinition property = new(prefix + propertyName, PropertyAttributes.None, propertySignature);
+			property.GetMethod = method;
+			Type.Properties.Add(property);
+		}
+
+		if (elementType.TryGetReverseSign(out TypeSignature? opposite))
+		{
+			GenericInstanceTypeSignature interfaceType = Module.InlineArrayInterface.MakeGenericInstanceType(opposite);
+
+			Type.Interfaces.Add(new InterfaceImplementation(interfaceType.ToTypeDefOrRef()));
+
+			MemberReference interfaceMethod = new(interfaceType.ToTypeDefOrRef(), methodName, methodSignature);
+
+			string @namespace = interfaceType.Namespace is { Length: > 0 }
+				? interfaceType.Namespace + "."
+				: string.Empty;
+			string prefix = $"{@namespace}{nameof(IInlineArray<>)}<{opposite.FullName}>.";
 
 			MethodDefinition method = new(prefix + methodName, MethodAttributes.Private | MethodAttributes.HideBySig | MethodAttributes.SpecialName | MethodAttributes.Static, methodSignature);
 			method.CilMethodBody = new(method);

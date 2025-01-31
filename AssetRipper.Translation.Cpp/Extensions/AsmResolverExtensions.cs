@@ -3,6 +3,7 @@ using AsmResolver.DotNet.Code.Cil;
 using AsmResolver.DotNet.Signatures;
 using AsmResolver.PE.DotNet.Cil;
 using AsmResolver.PE.DotNet.Metadata.Tables;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.Versioning;
 
 namespace AssetRipper.Translation.Cpp.Extensions;
@@ -166,5 +167,123 @@ internal static class AsmResolverExtensions
 	public static bool IsVoidPointer(this TypeSignature type)
 	{
 		return type is PointerTypeSignature { BaseType: CorLibTypeSignature { ElementType: ElementType.Void } };
+	}
+
+	public static bool IsNumericPrimitive(this TypeSignature type)
+	{
+		return type is CorLibTypeSignature { ElementType: ElementType.I1 or ElementType.U1 or ElementType.I2 or ElementType.U2 or ElementType.I4 or ElementType.U4 or ElementType.I8 or ElementType.U8 or ElementType.I or ElementType.U or ElementType.R4 or ElementType.R8 };
+	}
+
+	public static bool IsNumeric(this TypeSignature type)
+	{
+		if (type.IsNumericPrimitive())
+		{
+			return true;
+		}
+
+		if (type is not TypeDefOrRefSignature typeDefOrRefSignature || !typeDefOrRefSignature.IsValueType)
+		{
+			return false;
+		}
+
+		TypeDefinition? typeDefinition = typeDefOrRefSignature.Resolve();
+		if (typeDefinition is null)
+		{
+			return false;
+		}
+
+		// Look for INumberBase<T> interface
+		foreach (InterfaceImplementation interfaceImplementation in typeDefinition.Interfaces)
+		{
+			if (interfaceImplementation.Interface?.ToTypeSignature() is not GenericInstanceTypeSignature { TypeArguments.Count: 1 } genericInstanceTypeSignature)
+			{
+				continue;
+			}
+
+			if (genericInstanceTypeSignature.GenericType.Namespace == "System.Numerics" && genericInstanceTypeSignature.GenericType.Name == "INumberBase`1")
+			{
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	public static bool TryGetReverseSign(this TypeSignature type, [NotNullWhen(true)] out TypeSignature? opposite)
+	{
+		if (type is CorLibTypeSignature corLibTypeSignature)
+		{
+			opposite = corLibTypeSignature.ElementType switch
+			{
+				ElementType.I1 => corLibTypeSignature.Module?.CorLibTypeFactory.Byte,
+				ElementType.U1 => corLibTypeSignature.Module?.CorLibTypeFactory.SByte,
+				ElementType.I2 => corLibTypeSignature.Module?.CorLibTypeFactory.UInt16,
+				ElementType.U2 => corLibTypeSignature.Module?.CorLibTypeFactory.Int16,
+				ElementType.I4 => corLibTypeSignature.Module?.CorLibTypeFactory.UInt32,
+				ElementType.U4 => corLibTypeSignature.Module?.CorLibTypeFactory.Int32,
+				ElementType.I8 => corLibTypeSignature.Module?.CorLibTypeFactory.UInt64,
+				ElementType.U8 => corLibTypeSignature.Module?.CorLibTypeFactory.Int64,
+				ElementType.I => corLibTypeSignature.Module?.CorLibTypeFactory.UIntPtr,
+				ElementType.U => corLibTypeSignature.Module?.CorLibTypeFactory.IntPtr,
+				_ => null,
+			};
+			return opposite is not null;
+		}
+		// Could do Int128 and UInt128 here
+		else
+		{
+			opposite = null;
+			return false;
+		}
+	}
+
+	public static TypeSignature ToSignedNumeric(this TypeSignature type)
+	{
+		if (type is CorLibTypeSignature corLibTypeSignature)
+		{
+			return corLibTypeSignature.ElementType switch
+			{
+				ElementType.I1 => corLibTypeSignature,
+				ElementType.U1 => corLibTypeSignature.Module?.CorLibTypeFactory.SByte,
+				ElementType.I2 => corLibTypeSignature,
+				ElementType.U2 => corLibTypeSignature.Module?.CorLibTypeFactory.Int16,
+				ElementType.I4 => corLibTypeSignature,
+				ElementType.U4 => corLibTypeSignature.Module?.CorLibTypeFactory.Int32,
+				ElementType.I8 => corLibTypeSignature,
+				ElementType.U8 => corLibTypeSignature.Module?.CorLibTypeFactory.Int64,
+				ElementType.I => corLibTypeSignature,
+				ElementType.U => corLibTypeSignature.Module?.CorLibTypeFactory.IntPtr,
+				_ => null,
+			} ?? type;
+		}
+		else
+		{
+			return type;
+		}
+	}
+
+	public static TypeSignature ToUnsignedNumeric(this TypeSignature type)
+	{
+		if (type is CorLibTypeSignature corLibTypeSignature)
+		{
+			return corLibTypeSignature.ElementType switch
+			{
+				ElementType.I1 => corLibTypeSignature.Module?.CorLibTypeFactory.Byte,
+				ElementType.U1 => corLibTypeSignature,
+				ElementType.I2 => corLibTypeSignature.Module?.CorLibTypeFactory.UInt16,
+				ElementType.U2 => corLibTypeSignature,
+				ElementType.I4 => corLibTypeSignature.Module?.CorLibTypeFactory.UInt32,
+				ElementType.U4 => corLibTypeSignature,
+				ElementType.I8 => corLibTypeSignature.Module?.CorLibTypeFactory.UInt64,
+				ElementType.U8 => corLibTypeSignature,
+				ElementType.I => corLibTypeSignature.Module?.CorLibTypeFactory.UIntPtr,
+				ElementType.U => corLibTypeSignature,
+				_ => null,
+			} ?? type;
+		}
+		else
+		{
+			return type;
+		}
 	}
 }

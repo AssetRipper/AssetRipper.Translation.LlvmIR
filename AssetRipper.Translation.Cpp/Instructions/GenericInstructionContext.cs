@@ -24,8 +24,6 @@ internal class GenericInstructionContext : InstructionContext
 				break;
 			case LLVMOpcode.LLVMCallBr:
 				goto default;
-			case LLVMOpcode.LLVMBitCast:
-				goto default;
 			case LLVMOpcode.LLVMAddrSpaceCast:
 				goto default;
 			case LLVMOpcode.LLVMUserOp1:

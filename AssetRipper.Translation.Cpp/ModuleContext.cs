@@ -18,21 +18,34 @@ using System.Security.Cryptography;
 
 namespace AssetRipper.Translation.Cpp;
 
-internal sealed class ModuleContext
+internal sealed partial class ModuleContext
 {
 	public ModuleContext(LLVMModuleRef module, ModuleDefinition definition)
 	{
+		TypeInjector typeInjector = new TypeInjector(definition).Inject(
+		[
+			typeof(IntrinsicFunctions),
+			typeof(InlineArrayHelper),
+			typeof(IInlineArray<>),
+			typeof(SpanHelper),
+			typeof(InstructionHelper),
+			typeof(NumericHelper),
+			typeof(InlineArrayNumericHelper),
+		]);
+
 		Module = module;
 		Definition = definition;
 		GlobalFunctionsType = CreateStaticType(definition, "GlobalFunctions");
 		PointerCacheType = CreateStaticType(definition, "PointerCache", false);
 		GlobalVariablePointersType = CreateStaticType(definition, "GlobalVariablePointers", false);
 		GlobalVariablesType = CreateStaticType(definition, "GlobalVariables");
-		IntrinsicsType = InjectType(typeof(IntrinsicFunctions), definition);
-		InlineArrayHelperType = InjectType(typeof(InlineArrayHelper), definition);
-		InlineArrayInterface = InjectType(typeof(IInlineArray<>), definition);
-		SpanHelperType = InjectType(typeof(SpanHelper), definition);
-		InstructionHelperType = InjectType(typeof(InstructionHelper), definition);
+		IntrinsicsType = typeInjector[typeof(IntrinsicFunctions)];
+		InlineArrayHelperType = typeInjector[typeof(InlineArrayHelper)];
+		InlineArrayInterface = typeInjector[typeof(IInlineArray<>)];
+		SpanHelperType = typeInjector[typeof(SpanHelper)];
+		InstructionHelperType = typeInjector[typeof(InstructionHelper)];
+		NumericHelperType = typeInjector[typeof(NumericHelper)];
+		InlineArrayNumericHelperType = typeInjector[typeof(InlineArrayNumericHelper)];
 
 		CompilerGeneratedAttributeConstructor = (IMethodDefOrRef)definition.DefaultImporter.ImportMethod(typeof(CompilerGeneratedAttribute).GetConstructors()[0]);
 
@@ -52,6 +65,8 @@ internal sealed class ModuleContext
 	public TypeDefinition InlineArrayInterface { get; }
 	public TypeDefinition SpanHelperType { get; }
 	public TypeDefinition InstructionHelperType { get; }
+	public TypeDefinition NumericHelperType { get; }
+	public TypeDefinition InlineArrayNumericHelperType { get; }
 	public TypeDefinition PrivateImplementationDetails { get; }
 	private IMethodDefOrRef CompilerGeneratedAttributeConstructor { get; }
 	public Dictionary<LLVMValueRef, FunctionContext> Methods { get; } = new();

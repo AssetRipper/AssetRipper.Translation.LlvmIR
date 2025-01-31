@@ -1,4 +1,6 @@
-﻿using AsmResolver.DotNet.Code.Cil;
+﻿using AsmResolver.DotNet;
+using AsmResolver.DotNet.Code.Cil;
+using AsmResolver.DotNet.Signatures;
 using AsmResolver.PE.DotNet.Cil;
 using LLVMSharp.Interop;
 using System.Diagnostics;
@@ -19,12 +21,48 @@ internal sealed class UnaryMathInstructionContext : InstructionContext
 		_ => throw new NotSupportedException(),
 	};
 
+	public string Name => Opcode switch
+	{
+		LLVMOpcode.LLVMFNeg => "Negate",
+		_ => throw new NotSupportedException(),
+	};
+
 	public static bool Supported(LLVMOpcode opcode) => opcode is LLVMOpcode.LLVMFNeg;
 
 	public override void AddInstructions(CilInstructionCollection instructions)
 	{
 		Module.LoadValue(instructions, Operand);
-		instructions.Add(CilOpCode);
+		if (ResultTypeSignature is CorLibTypeSignature)
+		{
+			instructions.Add(CilOpCode);
+		}
+		else if (ResultTypeSignature is TypeDefOrRefSignature)
+		{
+			TypeDefinition type = ResultTypeSignature.Resolve() ?? throw new NullReferenceException(nameof(type));
+			string methodName = Name;
+			if (Module.InlineArrayTypes.TryGetValue(type, out InlineArrayContext? arrayType))
+			{
+				MethodDefinition method = Module.InlineArrayNumericHelperType.Methods.First(m => m.Name == methodName);
+
+				arrayType.GetUltimateElementType(out TypeSignature elementType, out _);
+
+				IMethodDescriptor methodDescriptor = method.MakeGenericInstanceMethod(ResultTypeSignature, elementType);
+
+				instructions.Add(CilOpCodes.Call, methodDescriptor);
+			}
+			else
+			{
+				MethodDefinition method = Module.NumericHelperType.Methods.First(m => m.Name == methodName);
+
+				IMethodDescriptor methodDescriptor = method.MakeGenericInstanceMethod(ResultTypeSignature);
+
+				instructions.Add(CilOpCodes.Call, methodDescriptor);
+			}
+		}
+		else
+		{
+			throw new NotSupportedException();
+		}
 		instructions.Add(CilOpCodes.Stloc, GetLocalVariable());
 	}
 }
