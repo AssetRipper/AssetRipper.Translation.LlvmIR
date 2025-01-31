@@ -32,6 +32,7 @@ internal sealed class ModuleContext
 		InlineArrayHelperType = InjectType(typeof(InlineArrayHelper), definition);
 		InlineArrayInterface = InjectType(typeof(IInlineArray<>), definition);
 		SpanHelperType = InjectType(typeof(SpanHelper), definition);
+		InstructionHelperType = InjectType(typeof(InstructionHelper), definition);
 
 		CompilerGeneratedAttributeConstructor = (IMethodDefOrRef)definition.DefaultImporter.ImportMethod(typeof(CompilerGeneratedAttribute).GetConstructors()[0]);
 
@@ -50,6 +51,7 @@ internal sealed class ModuleContext
 	public TypeDefinition InlineArrayHelperType { get; }
 	public TypeDefinition InlineArrayInterface { get; }
 	public TypeDefinition SpanHelperType { get; }
+	public TypeDefinition InstructionHelperType { get; }
 	public TypeDefinition PrivateImplementationDetails { get; }
 	private IMethodDefOrRef CompilerGeneratedAttributeConstructor { get; }
 	public Dictionary<LLVMValueRef, FunctionContext> Methods { get; } = new();
