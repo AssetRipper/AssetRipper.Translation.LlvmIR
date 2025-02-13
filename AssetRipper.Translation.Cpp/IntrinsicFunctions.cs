@@ -15,6 +15,22 @@ internal static partial class IntrinsicFunctions
 	{
 	}
 
+	public unsafe static void llvm_va_start(void** va_list)
+	{
+		// Handled elsewhere.
+		throw new NotSupportedException();
+	}
+
+	public unsafe static void llvm_va_copy(void** destination, void** source)
+	{
+		*destination = *source;
+	}
+
+	public unsafe static void llvm_va_end(void** va_list)
+	{
+		// Do nothing because it's freed automatically.
+	}
+
 	public unsafe static void llvm_memcpy_p0_p0_i32(void* destination, void* source, int length, bool isVolatile)
 	{
 		Unsafe.CopyBlock(destination, source, (uint)length);

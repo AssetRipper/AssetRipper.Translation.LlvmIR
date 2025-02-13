@@ -30,8 +30,6 @@ internal class GenericInstructionContext : InstructionContext
 				goto default;
 			case LLVMOpcode.LLVMUserOp2:
 				goto default;
-			case LLVMOpcode.LLVMVAArg:
-				goto default;
 			case LLVMOpcode.LLVMExtractElement:
 				goto default;
 			case LLVMOpcode.LLVMInsertElement:

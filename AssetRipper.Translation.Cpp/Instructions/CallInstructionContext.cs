@@ -46,6 +46,18 @@ internal sealed class CallInstructionContext : InstructionContext
 			Module.LoadValue(instructions, FunctionOperand);
 			instructions.Add(CilOpCodes.Calli, MakeStandaloneSignature());
 		}
+		else if (IsInvisibleFunction(functionCalled))
+		{
+			Debug.Assert(functionCalled.IsVoidReturn);
+		}
+		else if (functionCalled.MangledName is "llvm.va_start")
+		{
+			Debug.Assert(functionCalled.IsVoidReturn && functionCalled.Parameters.Length is 1);
+
+			Module.LoadValue(instructions, ArgumentOperands[0]);
+			instructions.Add(CilOpCodes.Ldarg, Function!.Definition.Parameters[^1]);// args
+			instructions.Add(CilOpCodes.Call, Module.InstructionHelperType.Methods.First(m => m.Name == nameof(InstructionHelper.VAStart)));
+		}
 		else
 		{
 			ReadOnlySpan<LLVMValueRef> arguments = ArgumentOperands;
@@ -70,25 +82,18 @@ internal sealed class CallInstructionContext : InstructionContext
 			else
 			{
 				CorLibTypeSignature intPtr = Module.Definition.CorLibTypeFactory.IntPtr;
-				TypeSignature systemType = Module.Definition.DefaultImporter.ImportType(typeof(Type)).ToTypeSignature();
 
 				TypeDefinition intPtrBuffer = Module.GetOrCreateInlineArray(intPtr, variadicParameterCount).Type;
-				TypeDefinition systemTypeBuffer = Module.GetOrCreateInlineArray(systemType, variadicParameterCount).Type;
 
 				TypeSignature intPtrSpan = Module.Definition.DefaultImporter
 					.ImportType(typeof(Span<>))
 					.MakeGenericInstanceType(intPtr);
-				TypeSignature typeSpan = Module.Definition.DefaultImporter
-					.ImportType(typeof(Span<>))
-					.MakeGenericInstanceType(systemType);
 
 				IMethodDescriptor getTypeFromHandle = Module.Definition.DefaultImporter.ImportMethod(typeof(Type).GetMethod(nameof(Type.GetTypeFromHandle))!);
 
 				MethodSignature getItemSignature = MethodSignature.CreateInstance(new GenericParameterSignature(GenericParameterType.Type, 0).MakeByReferenceType(), Module.Definition.CorLibTypeFactory.Int32);
 
 				IMethodDescriptor intPtrSpanGetItem = new MemberReference(intPtrSpan.ToTypeDefOrRef(), "get_Item", getItemSignature);
-
-				IMethodDescriptor typeSpanGetItem = new MemberReference(typeSpan.ToTypeDefOrRef(), "get_Item", getItemSignature);
 
 				MethodDefinition inlineArrayAsSpan = Module.InlineArrayHelperType.Methods.Single(m => m.Name == nameof(InlineArrayHelper.AsSpan));
 
@@ -125,26 +130,6 @@ internal sealed class CallInstructionContext : InstructionContext
 					instructions.Add(CilOpCodes.Stind_I);
 				}
 
-				CilLocalVariable systemTypeBufferLocal = instructions.AddLocalVariable(systemTypeBuffer.ToTypeSignature());
-				instructions.AddDefaultValue(systemTypeBuffer.ToTypeSignature());
-				instructions.Add(CilOpCodes.Stloc, systemTypeBufferLocal);
-
-				CilLocalVariable typeSpanLocal = instructions.AddLocalVariable(typeSpan);
-				instructions.Add(CilOpCodes.Ldloca, systemTypeBufferLocal);
-				instructions.Add(CilOpCodes.Call, inlineArrayAsSpan.MakeGenericInstanceMethod(systemTypeBuffer.ToTypeSignature(), systemType));
-				instructions.Add(CilOpCodes.Stloc, typeSpanLocal);
-
-				for (int i = functionCalled.Parameters.Length; i < arguments.Length; i++)
-				{
-					TypeSignature type = Module.GetTypeSignature(arguments[i]);
-					instructions.Add(CilOpCodes.Ldloca, typeSpanLocal);
-					instructions.Add(CilOpCodes.Ldc_I4, i - functionCalled.Parameters.Length);
-					instructions.Add(CilOpCodes.Call, typeSpanGetItem);
-					instructions.Add(CilOpCodes.Ldtoken, type.ToTypeDefOrRef());
-					instructions.Add(CilOpCodes.Call, getTypeFromHandle);
-					instructions.Add(CilOpCodes.Stind_Ref);
-				}
-
 				// Push the arguments
 				for (int i = 0; i < functionCalled.Parameters.Length; i++)
 				{
@@ -152,8 +137,6 @@ internal sealed class CallInstructionContext : InstructionContext
 				}
 				instructions.Add(CilOpCodes.Ldloc, intPtrSpanLocal);
 				instructions.Add(CilOpCodes.Call, spanToReadOnly.MakeGenericInstanceMethod(intPtr));
-				instructions.Add(CilOpCodes.Ldloc, typeSpanLocal);
-				instructions.Add(CilOpCodes.Call, spanToReadOnly.MakeGenericInstanceMethod(systemType));
 			}
 
 			instructions.Add(CilOpCodes.Call, functionCalled.Definition);
@@ -163,5 +146,10 @@ internal sealed class CallInstructionContext : InstructionContext
 		{
 			instructions.Add(CilOpCodes.Stloc, GetLocalVariable());
 		}
+	}
+
+	private static bool IsInvisibleFunction(FunctionContext functionCalled)
+	{
+		return functionCalled.MangledName is "llvm.va_end";
 	}
 }

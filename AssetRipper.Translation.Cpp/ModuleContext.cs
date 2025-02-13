@@ -207,12 +207,8 @@ internal sealed partial class ModuleContext
 				TypeSignature pointerSpan = Definition.DefaultImporter
 					.ImportType(typeof(ReadOnlySpan<>))
 					.MakeGenericInstanceType(Definition.CorLibTypeFactory.IntPtr);
-				TypeSignature typeSpan = Definition.DefaultImporter
-					.ImportType(typeof(ReadOnlySpan<>))
-					.MakeGenericInstanceType(Definition.DefaultImporter.ImportType(typeof(Type)).ToTypeSignature());
 
 				method.AddParameter(pointerSpan).GetOrCreateDefinition().Name = "args";
-				method.AddParameter(typeSpan).GetOrCreateDefinition().Name = "types";
 			}
 		}
 	}

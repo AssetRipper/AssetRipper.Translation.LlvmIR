@@ -68,6 +68,7 @@ internal sealed class FunctionContext : IHasName
 	public unsafe bool IsVariadic => LLVM.IsFunctionVarArg(FunctionType) != 0;
 	public LLVMTypeRef FunctionType => LibLLVMSharp.FunctionGetFunctionType(Function);
 	public LLVMTypeRef ReturnType => LibLLVMSharp.FunctionGetReturnType(Function);
+	public bool IsVoidReturn => ReturnType.Kind == LLVMTypeKind.LLVMVoidTypeKind;
 	public LLVMValueRef[] Parameters { get; }
 	public AttributeWrapper[] Attributes { get; }
 	public AttributeWrapper[] ReturnAttributes { get; }
@@ -132,7 +133,7 @@ internal sealed class FunctionContext : IHasName
 
 	public bool TryGetStructReturnType(out LLVMTypeRef type)
 	{
-		if (ReturnType.Kind != LLVMTypeKind.LLVMVoidTypeKind || Parameters.Length == 0 || Parameters[0].TypeOf.Kind != LLVMTypeKind.LLVMPointerTypeKind)
+		if (!IsVoidReturn || Parameters.Length == 0 || Parameters[0].TypeOf.Kind != LLVMTypeKind.LLVMPointerTypeKind)
 		{
 			type = default;
 			return false;
