@@ -369,7 +369,7 @@ $"?widen@?$ctype@D@std@@QEBADD@Z" = comdat any
 
 $"??1locale@std@@QEAA@XZ" = comdat any
 
-$"??Bid@locale@std@@QEAA_KXZ" = comdat any
+$"??$_Get_index@$0A@@id@locale@std@@QEAA_KXZ" = comdat any
 
 $"?_Getfacet@locale@std@@QEBAPEBVfacet@12@_K@Z" = comdat any
 
@@ -3781,7 +3781,7 @@ define linkonce_odr dso_local void @"??R<lambda_1>@?0??append@?$basic_string@DU?
 }
 
 ; Function Attrs: mustprogress noinline nounwind optnone uwtable
-define linkonce_odr dso_local void @"?_Deallocate_for_capacity@?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@CAXAEAV?$allocator@D@2@QEAD_K@Z"(ptr noundef nonnull align 1 dereferenceable(1) %0, ptr noundef %1, i64 noundef %2) #1 comdat align 2 personality ptr @__CxxFrameHandler3 {
+define linkonce_odr dso_local void @"?_Deallocate_for_capacity@?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@CAXAEAV?$allocator@D@2@QEAD_K@Z"(ptr noundef nonnull align 1 dereferenceable(1) %0, ptr noundef %1, i64 noundef %2) #1 comdat align 2 {
   %4 = alloca i64, align 8
   %5 = alloca ptr, align 8
   %6 = alloca ptr, align 8
@@ -3792,16 +3792,8 @@ define linkonce_odr dso_local void @"?_Deallocate_for_capacity@?$basic_string@DU
   %8 = load i64, ptr %4, align 8
   %9 = add i64 %8, 1
   %10 = load ptr, ptr %5, align 8
-  invoke void @"?deallocate@?$allocator@D@std@@QEAAXQEAD_K@Z"(ptr noundef nonnull align 1 dereferenceable(1) %7, ptr noundef %10, i64 noundef %9)
-          to label %11 unwind label %12
-
-11:                                               ; preds = %3
+  call void @"?deallocate@?$allocator@D@std@@QEAAXQEAD_K@Z"(ptr noundef nonnull align 1 dereferenceable(1) %7, ptr noundef %10, i64 noundef %9) #3
   ret void
-
-12:                                               ; preds = %3
-  %13 = cleanuppad within none []
-  call void @__std_terminate() #13 [ "funclet"(token %13) ]
-  unreachable
 }
 
 ; Function Attrs: mustprogress noinline nounwind optnone uwtable
@@ -4492,7 +4484,7 @@ define linkonce_odr dso_local noundef nonnull align 8 dereferenceable(48) ptr @"
   %9 = call noundef ptr @"??0_Lockit@std@@QEAA@H@Z"(ptr noundef nonnull align 4 dereferenceable(4) %3, i32 noundef 0) #3
   %10 = load ptr, ptr @"?_Psave@?$_Facetptr@V?$ctype@D@std@@@std@@2PEBVfacet@locale@2@EB", align 8
   store ptr %10, ptr %4, align 8
-  %11 = invoke noundef i64 @"??Bid@locale@std@@QEAA_KXZ"(ptr noundef nonnull align 8 dereferenceable(8) @"?id@?$ctype@D@std@@2V0locale@2@A")
+  %11 = invoke noundef i64 @"??$_Get_index@$0A@@id@locale@std@@QEAA_KXZ"(ptr noundef nonnull align 8 dereferenceable(8) @"?id@?$ctype@D@std@@2V0locale@2@A")
           to label %12 unwind label %50
 
 12:                                               ; preds = %1
@@ -4645,7 +4637,7 @@ define linkonce_odr dso_local void @"??1locale@std@@QEAA@XZ"(ptr noundef nonnull
 declare dso_local noundef ptr @"??0_Lockit@std@@QEAA@H@Z"(ptr noundef nonnull returned align 4 dereferenceable(4), i32 noundef) unnamed_addr #11
 
 ; Function Attrs: mustprogress noinline nounwind optnone uwtable
-define linkonce_odr dso_local noundef i64 @"??Bid@locale@std@@QEAA_KXZ"(ptr noundef nonnull align 8 dereferenceable(8) %0) #1 comdat align 2 {
+define linkonce_odr dso_local noundef i64 @"??$_Get_index@$0A@@id@locale@std@@QEAA_KXZ"(ptr noundef nonnull align 8 dereferenceable(8) %0) #1 comdat align 2 {
   %2 = alloca ptr, align 8
   %3 = alloca %"class.std::_Lockit", align 4
   store ptr %0, ptr %2, align 8
