@@ -31,6 +31,7 @@ internal sealed partial class ModuleContext
 			typeof(InstructionHelper),
 			typeof(NumericHelper),
 			typeof(InlineArrayNumericHelper),
+			typeof(InstructionNotSupportedException),
 		]);
 
 		Module = module;
@@ -46,6 +47,7 @@ internal sealed partial class ModuleContext
 		InstructionHelperType = typeInjector[typeof(InstructionHelper)];
 		NumericHelperType = typeInjector[typeof(NumericHelper)];
 		InlineArrayNumericHelperType = typeInjector[typeof(InlineArrayNumericHelper)];
+		InstructionNotSupportedExceptionType = typeInjector[typeof(InstructionNotSupportedException)];
 
 		CompilerGeneratedAttributeConstructor = (IMethodDefOrRef)definition.DefaultImporter.ImportMethod(typeof(CompilerGeneratedAttribute).GetConstructors()[0]);
 
@@ -67,6 +69,7 @@ internal sealed partial class ModuleContext
 	public TypeDefinition InstructionHelperType { get; }
 	public TypeDefinition NumericHelperType { get; }
 	public TypeDefinition InlineArrayNumericHelperType { get; }
+	public TypeDefinition InstructionNotSupportedExceptionType { get; }
 	public TypeDefinition PrivateImplementationDetails { get; }
 	private IMethodDefOrRef CompilerGeneratedAttributeConstructor { get; }
 	public Dictionary<LLVMValueRef, FunctionContext> Methods { get; } = new();

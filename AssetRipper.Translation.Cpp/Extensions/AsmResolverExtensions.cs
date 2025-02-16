@@ -286,4 +286,9 @@ internal static class AsmResolverExtensions
 			return type;
 		}
 	}
+
+	public static MethodDefinition GetMethodByName(this TypeDefinition type, string name)
+	{
+		return type.Methods.Single(m => m.Name == name);
+	}
 }
