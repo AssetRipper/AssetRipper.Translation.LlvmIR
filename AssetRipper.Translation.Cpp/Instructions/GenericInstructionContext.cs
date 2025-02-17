@@ -1,5 +1,8 @@
-﻿using AsmResolver.DotNet.Code.Cil;
+﻿using AsmResolver.DotNet;
+using AsmResolver.DotNet.Code.Cil;
+using AsmResolver.DotNet.Signatures;
 using AsmResolver.PE.DotNet.Cil;
+using AssetRipper.Translation.Cpp.Extensions;
 using LLVMSharp.Interop;
 
 namespace AssetRipper.Translation.Cpp.Instructions;
@@ -63,7 +66,28 @@ internal class GenericInstructionContext : InstructionContext
 			case LLVMOpcode.LLVMCatchSwitch:
 				goto default;
 			default:
-				throw new NotSupportedException();
+				{
+					instructions.Add(CilOpCodes.Ldstr, Opcode.ToString());
+					instructions.Add(CilOpCodes.Ldstr, Instruction.ToString());
+					if (!HasResult)
+					{
+						MethodDefinition method = Module.InstructionNotSupportedExceptionType.GetMethodByName(nameof(InstructionNotSupportedException.Throw));
+						instructions.Add(CilOpCodes.Call, method);
+					}
+					else if (ResultTypeSignature is PointerTypeSignature)
+					{
+						MethodDefinition method = Module.InstructionNotSupportedExceptionType.GetMethodByName(nameof(InstructionNotSupportedException.ThrowPointer));
+						instructions.Add(CilOpCodes.Call, method);
+						instructions.Add(CilOpCodes.Stloc, GetLocalVariable());
+					}
+					else
+					{
+						MethodDefinition method = Module.InstructionNotSupportedExceptionType.GetMethodByName(nameof(InstructionNotSupportedException.ThrowStruct));
+						instructions.Add(CilOpCodes.Call, method.MakeGenericInstanceMethod(ResultTypeSignature));
+						instructions.Add(CilOpCodes.Stloc, GetLocalVariable());
+					}
+				}
+				break;
 		}
 	}
 }
