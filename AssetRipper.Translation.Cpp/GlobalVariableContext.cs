@@ -8,12 +8,11 @@ using LLVMSharp.Interop;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
-using System.Text.RegularExpressions;
 
 namespace AssetRipper.Translation.Cpp;
 
 [DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
-internal sealed partial class GlobalVariableContext : IHasName
+internal sealed class GlobalVariableContext : IHasName
 {
 	public GlobalVariableContext(LLVMValueRef globalVariable, ModuleContext module)
 	{
@@ -148,17 +147,7 @@ internal sealed partial class GlobalVariableContext : IHasName
 			result = demangledName ?? "";
 		}
 
-		result = NotAlphanumericRegex.Replace(result, "_").Trim('_');
-		if (result.Length == 0)
-		{
-			result = "Variable";
-		}
-		else if (char.IsDigit(result[0]))
-		{
-			result = '_' + result;
-		}
-
-		return result;
+		return NameGenerator.CleanName(result, "Variable");
 
 		static bool TryGetNameFromBeginning(string mangledName, [NotNullWhen(true)] out string? result)
 		{
@@ -191,9 +180,6 @@ internal sealed partial class GlobalVariableContext : IHasName
 			}
 		}
 	}
-
-	[GeneratedRegex(@"[^a-zA-Z0-9]")]
-	private static partial Regex NotAlphanumericRegex { get; }
 
 	private string GetDebuggerDisplay()
 	{

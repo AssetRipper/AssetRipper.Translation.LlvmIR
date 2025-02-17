@@ -160,14 +160,17 @@ internal sealed partial class ModuleContext
 			}
 		}
 
+		static string RemovePrefix(string name, string prefix)
+		{
+			return name.StartsWith(prefix, StringComparison.Ordinal) ? name[prefix.Length..] : name;
+		}
+
 		static string ExtractCleanName(string name)
 		{
-			const string StructPrefix = "struct.";
-			if (name.StartsWith(StructPrefix, StringComparison.Ordinal))
-			{
-				name = name[StructPrefix.Length..];
-			}
-			return name.Length > 0 ? name : "Struct";
+			name = RemovePrefix(name, "class.");
+			name = RemovePrefix(name, "struct.");
+			name = RemovePrefix(name, "union.");
+			return NameGenerator.CleanName(name, "Struct");
 		}
 	}
 

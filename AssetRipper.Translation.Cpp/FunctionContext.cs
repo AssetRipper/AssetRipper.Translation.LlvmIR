@@ -29,7 +29,7 @@ internal sealed class FunctionContext : IHasName
 		}
 
 		DemangledName = LibLLVMSharp.ValueGetDemangledName(function);
-		CleanName = ExtractCleanName(MangledName).Replace('.', '_');
+		CleanName = NameGenerator.CleanName(TryGetSimpleName(MangledName), "Function");
 	}
 
 	public static FunctionContext Create(LLVMValueRef function, MethodDefinition definition, ModuleContext module)
@@ -194,7 +194,7 @@ internal sealed class FunctionContext : IHasName
 		return Name;
 	}
 
-	private static string ExtractCleanName(string name)
+	private static string TryGetSimpleName(string name)
 	{
 		if (name.StartsWith('?'))
 		{
