@@ -1,12 +1,14 @@
 ﻿using AsmResolver.DotNet;
 using AsmResolver.DotNet.Cloning;
+using System.Collections;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 
 namespace AssetRipper.Translation.Cpp;
 
 internal sealed partial class ModuleContext
 {
-	private sealed class TypeInjector
+	private sealed class TypeInjector : IReadOnlyDictionary<Type, TypeDefinition>
 	{
 		public TypeInjector(ModuleDefinition targetModule, string? targetNamespace = null)
 		{
@@ -51,5 +53,33 @@ internal sealed partial class ModuleContext
 			}
 			return module;
 		}
+
+		#region IReadOnlyDictionary
+		IEnumerable<Type> IReadOnlyDictionary<Type, TypeDefinition>.Keys => InjectedTypes.Keys;
+
+		IEnumerable<TypeDefinition> IReadOnlyDictionary<Type, TypeDefinition>.Values => InjectedTypes.Values;
+
+		int IReadOnlyCollection<KeyValuePair<Type, TypeDefinition>>.Count => InjectedTypes.Count;
+
+		bool IReadOnlyDictionary<Type, TypeDefinition>.ContainsKey(Type key)
+		{
+			return InjectedTypes.ContainsKey(key);
+		}
+
+		bool IReadOnlyDictionary<Type, TypeDefinition>.TryGetValue(Type key, [MaybeNullWhen(false)] out TypeDefinition value)
+		{
+			return InjectedTypes.TryGetValue(key, out value);
+		}
+
+		IEnumerator<KeyValuePair<Type, TypeDefinition>> IEnumerable<KeyValuePair<Type, TypeDefinition>>.GetEnumerator()
+		{
+			return InjectedTypes.GetEnumerator();
+		}
+
+		IEnumerator IEnumerable.GetEnumerator()
+		{
+			return InjectedTypes.GetEnumerator();
+		}
+		#endregion
 	}
 }

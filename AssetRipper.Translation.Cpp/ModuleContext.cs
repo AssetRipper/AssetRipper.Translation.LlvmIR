@@ -22,7 +22,7 @@ internal sealed partial class ModuleContext
 {
 	public ModuleContext(LLVMModuleRef module, ModuleDefinition definition)
 	{
-		TypeInjector typeInjector = new TypeInjector(definition).Inject(
+		InjectedTypes = new TypeInjector(definition).Inject(
 		[
 			typeof(IntrinsicFunctions),
 			typeof(InlineArrayHelper),
@@ -40,14 +40,6 @@ internal sealed partial class ModuleContext
 		PointerCacheType = CreateStaticType(definition, "PointerCache", false);
 		GlobalVariablePointersType = CreateStaticType(definition, "GlobalVariablePointers", false);
 		GlobalVariablesType = CreateStaticType(definition, "GlobalVariables");
-		IntrinsicsType = typeInjector[typeof(IntrinsicFunctions)];
-		InlineArrayHelperType = typeInjector[typeof(InlineArrayHelper)];
-		InlineArrayInterface = typeInjector[typeof(IInlineArray<>)];
-		SpanHelperType = typeInjector[typeof(SpanHelper)];
-		InstructionHelperType = typeInjector[typeof(InstructionHelper)];
-		NumericHelperType = typeInjector[typeof(NumericHelper)];
-		InlineArrayNumericHelperType = typeInjector[typeof(InlineArrayNumericHelper)];
-		InstructionNotSupportedExceptionType = typeInjector[typeof(InstructionNotSupportedException)];
 
 		CompilerGeneratedAttributeConstructor = (IMethodDefOrRef)definition.DefaultImporter.ImportMethod(typeof(CompilerGeneratedAttribute).GetConstructors()[0]);
 
@@ -56,20 +48,22 @@ internal sealed partial class ModuleContext
 		Definition.TopLevelTypes.Add(PrivateImplementationDetails);
 	}
 
+	public IReadOnlyDictionary<Type, TypeDefinition> InjectedTypes { get; }
+	public TypeDefinition IntrinsicsType => InjectedTypes[typeof(IntrinsicFunctions)];
+	public TypeDefinition InlineArrayHelperType => InjectedTypes[typeof(InlineArrayHelper)];
+	public TypeDefinition InlineArrayInterface => InjectedTypes[typeof(IInlineArray<>)];
+	public TypeDefinition SpanHelperType => InjectedTypes[typeof(SpanHelper)];
+	public TypeDefinition InstructionHelperType => InjectedTypes[typeof(InstructionHelper)];
+	public TypeDefinition NumericHelperType => InjectedTypes[typeof(NumericHelper)];
+	public TypeDefinition InlineArrayNumericHelperType => InjectedTypes[typeof(InlineArrayNumericHelper)];
+	public TypeDefinition InstructionNotSupportedExceptionType => InjectedTypes[typeof(InstructionNotSupportedException)];
+
 	public LLVMModuleRef Module { get; }
 	public ModuleDefinition Definition { get; }
 	public TypeDefinition GlobalFunctionsType { get; }
 	public TypeDefinition PointerCacheType { get; }
 	public TypeDefinition GlobalVariablePointersType { get; }
 	public TypeDefinition GlobalVariablesType { get; }
-	public TypeDefinition IntrinsicsType { get; }
-	public TypeDefinition InlineArrayHelperType { get; }
-	public TypeDefinition InlineArrayInterface { get; }
-	public TypeDefinition SpanHelperType { get; }
-	public TypeDefinition InstructionHelperType { get; }
-	public TypeDefinition NumericHelperType { get; }
-	public TypeDefinition InlineArrayNumericHelperType { get; }
-	public TypeDefinition InstructionNotSupportedExceptionType { get; }
 	public TypeDefinition PrivateImplementationDetails { get; }
 	private IMethodDefOrRef CompilerGeneratedAttributeConstructor { get; }
 	public Dictionary<LLVMValueRef, FunctionContext> Methods { get; } = new();
