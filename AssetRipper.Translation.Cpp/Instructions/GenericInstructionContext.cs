@@ -19,8 +19,6 @@ internal class GenericInstructionContext : InstructionContext
 		{
 			case LLVMOpcode.LLVMIndirectBr:
 				goto default;
-			case LLVMOpcode.LLVMInvoke:
-				goto default;
 			case LLVMOpcode.LLVMUnreachable:
 				instructions.Add(CilOpCodes.Ldnull);
 				instructions.Add(CilOpCodes.Throw);

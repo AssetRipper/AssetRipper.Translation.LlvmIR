@@ -40,6 +40,7 @@ internal abstract class InstructionContext
 			LLVMOpcode.LLVMSelect => new SelectInstructionContext(instruction, module),
 			LLVMOpcode.LLVMBitCast => new BitCastInstructionContext(instruction, module),
 			LLVMOpcode.LLVMVAArg => new VAArgInstructionContext(instruction, module),
+			LLVMOpcode.LLVMInvoke => new InvokeInstructionContext(instruction, module),
 			_ when UnaryMathInstructionContext.Supported(instruction.GetOpcode()) => new UnaryMathInstructionContext(instruction, module),
 			_ when BinaryMathInstructionContext.Supported(instruction.GetOpcode()) => new BinaryMathInstructionContext(instruction, module),
 			_ when NumericConversionInstructionContext.Supported(instruction.GetOpcode()) => new NumericConversionInstructionContext(instruction, module),
