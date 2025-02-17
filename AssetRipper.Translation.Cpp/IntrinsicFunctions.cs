@@ -15,6 +15,25 @@ internal static partial class IntrinsicFunctions
 	{
 	}
 
+	public unsafe static int puts(sbyte* P_0)
+	{
+		try
+		{
+			string? s = Marshal.PtrToStringAnsi((IntPtr)P_0); // Maybe UTF-8?
+			Console.WriteLine(s);
+			return 0;
+		}
+		catch
+		{
+			return -1;
+		}
+	}
+
+	public static void std_terminate()
+	{
+		throw new InvalidOperationException(nameof(std_terminate));
+	}
+
 	public unsafe static void llvm_va_start(void** va_list)
 	{
 		// Handled elsewhere.
@@ -71,9 +90,25 @@ internal static partial class IntrinsicFunctions
 		return (void*)Marshal.AllocHGlobal((int)size);
 	}
 
+	public unsafe static void* realloc(void* ptr, long size)
+	{
+		return (void*)Marshal.ReAllocHGlobal((nint)ptr, (nint)size);
+	}
+
 	public unsafe static void free(void* ptr)
 	{
 		Marshal.FreeHGlobal((IntPtr)ptr);
+	}
+
+	public unsafe static void* expand(void* ptr, long size)
+	{
+		// _expand is a non-standard function available in some C++ implementations, particularly in Microsoft C Runtime Library (CRT).
+		// It is used to resize a previously allocated memory block without moving it, meaning it tries to expand or shrink the allocated memory in place.
+		// _expand is mainly useful for optimizing performance in memory management when using Microsoft CRT.
+		// If the block cannot be resized in place, _expand returns NULL, but the original block remains valid.
+
+		// We take advantage of the fact that it's just an optimization and return null, signaling that we can't expand the memory in place.
+		return null;
 	}
 
 	public static int llvm_abs_i32(int value, bool throwIfMinValue) => llvm_abs(value, throwIfMinValue);
