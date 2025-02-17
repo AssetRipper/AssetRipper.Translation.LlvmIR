@@ -20,8 +20,7 @@ internal class GenericInstructionContext : InstructionContext
 			case LLVMOpcode.LLVMIndirectBr:
 				goto default;
 			case LLVMOpcode.LLVMUnreachable:
-				instructions.Add(CilOpCodes.Ldnull);
-				instructions.Add(CilOpCodes.Throw);
+				AddThrowNull(instructions);
 				break;
 			case LLVMOpcode.LLVMCallBr:
 				goto default;
@@ -54,9 +53,13 @@ internal class GenericInstructionContext : InstructionContext
 			case LLVMOpcode.LLVMLandingPad:
 				goto default;
 			case LLVMOpcode.LLVMCleanupRet:
-				goto default;
+				AddInstructionNotSupported(instructions);
+				AddThrowNull(instructions); // To prevent stack imbalance
+				break;
 			case LLVMOpcode.LLVMCatchRet:
-				goto default;
+				AddInstructionNotSupported(instructions);
+				AddThrowNull(instructions); // To prevent stack imbalance
+				break;
 			case LLVMOpcode.LLVMCatchPad:
 				goto default;
 			case LLVMOpcode.LLVMCleanupPad:
@@ -64,28 +67,37 @@ internal class GenericInstructionContext : InstructionContext
 			case LLVMOpcode.LLVMCatchSwitch:
 				goto default;
 			default:
-				{
-					instructions.Add(CilOpCodes.Ldstr, Opcode.ToString());
-					instructions.Add(CilOpCodes.Ldstr, Instruction.ToString());
-					if (!HasResult)
-					{
-						MethodDefinition method = Module.InstructionNotSupportedExceptionType.GetMethodByName(nameof(InstructionNotSupportedException.Throw));
-						instructions.Add(CilOpCodes.Call, method);
-					}
-					else if (ResultTypeSignature is PointerTypeSignature)
-					{
-						MethodDefinition method = Module.InstructionNotSupportedExceptionType.GetMethodByName(nameof(InstructionNotSupportedException.ThrowPointer));
-						instructions.Add(CilOpCodes.Call, method);
-						instructions.Add(CilOpCodes.Stloc, GetLocalVariable());
-					}
-					else
-					{
-						MethodDefinition method = Module.InstructionNotSupportedExceptionType.GetMethodByName(nameof(InstructionNotSupportedException.ThrowStruct));
-						instructions.Add(CilOpCodes.Call, method.MakeGenericInstanceMethod(ResultTypeSignature));
-						instructions.Add(CilOpCodes.Stloc, GetLocalVariable());
-					}
-				}
+				AddInstructionNotSupported(instructions);
 				break;
+		}
+	}
+
+	private static void AddThrowNull(CilInstructionCollection instructions)
+	{
+		instructions.Add(CilOpCodes.Ldnull);
+		instructions.Add(CilOpCodes.Throw);
+	}
+
+	private void AddInstructionNotSupported(CilInstructionCollection instructions)
+	{
+		instructions.Add(CilOpCodes.Ldstr, Opcode.ToString());
+		instructions.Add(CilOpCodes.Ldstr, Instruction.ToString());
+		if (!HasResult)
+		{
+			MethodDefinition method = Module.InstructionNotSupportedExceptionType.GetMethodByName(nameof(InstructionNotSupportedException.Throw));
+			instructions.Add(CilOpCodes.Call, method);
+		}
+		else if (ResultTypeSignature is PointerTypeSignature)
+		{
+			MethodDefinition method = Module.InstructionNotSupportedExceptionType.GetMethodByName(nameof(InstructionNotSupportedException.ThrowPointer));
+			instructions.Add(CilOpCodes.Call, method);
+			instructions.Add(CilOpCodes.Stloc, GetLocalVariable());
+		}
+		else
+		{
+			MethodDefinition method = Module.InstructionNotSupportedExceptionType.GetMethodByName(nameof(InstructionNotSupportedException.ThrowStruct));
+			instructions.Add(CilOpCodes.Call, method.MakeGenericInstanceMethod(ResultTypeSignature));
+			instructions.Add(CilOpCodes.Stloc, GetLocalVariable());
 		}
 	}
 }

@@ -24,10 +24,27 @@ internal sealed class InvokeInstructionContext : BaseCallInstructionContext
 
 	public override void AddInstructions(CilInstructionCollection instructions)
 	{
-		base.AddInstructions(instructions);
-
 		Debug.Assert(Function is not null);
 		Debug.Assert(DefaultBlock is not null);
-		instructions.Add(CilOpCodes.Br, Function.Labels[DefaultBlockRef]);
+		Debug.Assert(CatchBlock is not null);
+
+		// try
+		ICilLabel tryStart = instructions.Add(CilOpCodes.Nop).CreateLabel();
+		base.AddInstructions(instructions);
+		ICilLabel tryEnd = instructions.Add(CilOpCodes.Leave, Function.Labels[DefaultBlockRef]).CreateLabel();
+
+		// catch
+		ICilLabel handlerStart = instructions.Add(CilOpCodes.Pop).CreateLabel();
+		ICilLabel handlerEnd = instructions.Add(CilOpCodes.Leave, Function.Labels[CatchBlockRef]).CreateLabel();
+
+		instructions.Owner.ExceptionHandlers.Add(new CilExceptionHandler
+		{
+			TryStart = tryStart,
+			TryEnd = tryEnd,
+			HandlerStart = handlerStart,
+			HandlerEnd = handlerEnd,
+			HandlerType = CilExceptionHandlerType.Exception,
+			ExceptionType = Module.Definition.CorLibTypeFactory.Object.ToTypeDefOrRef(),
+		});
 	}
 }
