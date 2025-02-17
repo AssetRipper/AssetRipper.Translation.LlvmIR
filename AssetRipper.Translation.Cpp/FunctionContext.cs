@@ -4,6 +4,7 @@ using AsmResolver.DotNet.Collections;
 using AsmResolver.DotNet.Signatures;
 using AsmResolver.PE.DotNet.Cil;
 using AssetRipper.CIL;
+using AssetRipper.Translation.Cpp.Extensions;
 using AssetRipper.Translation.Cpp.Instructions;
 using LLVMSharp.Interop;
 using System.Diagnostics;
@@ -187,6 +188,35 @@ internal sealed class FunctionContext : IHasName
 
 		// Annotate the original return parameter
 		method.Parameters[0].GetOrCreateDefinition().Name = "result";
+	}
+
+	public void AddNameAttributes()
+	{
+		if (!string.IsNullOrEmpty(MangledName) && MangledName != Name)
+		{
+			MethodDefinition constructor = Module.InjectedTypes[typeof(MangledNameAttribute)].GetMethodByName(".ctor");
+			AddAttribute(constructor, MangledName);
+		}
+
+		if (!string.IsNullOrEmpty(DemangledName) && DemangledName != Name)
+		{
+			MethodDefinition constructor = Module.InjectedTypes[typeof(DemangledNameAttribute)].GetMethodByName(".ctor");
+			AddAttribute(constructor, DemangledName);
+		}
+
+		if (CleanName != Name)
+		{
+			MethodDefinition constructor = Module.InjectedTypes[typeof(CleanNameAttribute)].GetMethodByName(".ctor");
+			AddAttribute(constructor, CleanName);
+		}
+
+		void AddAttribute(MethodDefinition constructor, string name)
+		{
+			CustomAttributeSignature signature = new();
+			signature.FixedArguments.Add(new(Module.Definition.CorLibTypeFactory.String, name));
+			CustomAttribute attribute = new(constructor, signature);
+			Definition.CustomAttributes.Add(attribute);
+		}
 	}
 
 	private string GetDebuggerDisplay()

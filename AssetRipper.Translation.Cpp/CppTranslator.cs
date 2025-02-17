@@ -104,6 +104,8 @@ public static unsafe class CppTranslator
 
 		foreach (FunctionContext functionContext in moduleContext.Methods.Values)
 		{
+			functionContext.AddNameAttributes();
+
 			if (IntrinsicFunctionImplementer.TryHandleIntrinsicFunction(functionContext))
 			{
 				continue;

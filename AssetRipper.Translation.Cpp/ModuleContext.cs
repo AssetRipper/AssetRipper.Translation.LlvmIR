@@ -32,6 +32,10 @@ internal sealed partial class ModuleContext
 			typeof(NumericHelper),
 			typeof(InlineArrayNumericHelper),
 			typeof(InstructionNotSupportedException),
+			typeof(NameAttribute),
+			typeof(MangledNameAttribute),
+			typeof(DemangledNameAttribute),
+			typeof(CleanNameAttribute),
 		]);
 
 		Module = module;
