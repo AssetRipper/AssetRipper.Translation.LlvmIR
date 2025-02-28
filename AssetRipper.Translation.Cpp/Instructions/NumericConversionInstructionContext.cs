@@ -13,7 +13,6 @@ internal sealed class NumericConversionInstructionContext : InstructionContext
 	internal NumericConversionInstructionContext(LLVMValueRef instruction, ModuleContext module) : base(instruction, module)
 	{
 		Debug.Assert(Operands.Length == 1);
-		ResultTypeSignature = (CorLibTypeSignature)module.GetTypeSignature(Instruction.TypeOf);
 	}
 	public LLVMValueRef Operand => Operands[0];
 	public static bool Supported(LLVMOpcode opcode) => opcode switch
@@ -102,6 +101,10 @@ internal sealed class NumericConversionInstructionContext : InstructionContext
 							default:
 								throw new NotSupportedException();
 						}
+					}
+					else if (ResultTypeSignature is PointerTypeSignature)
+					{
+						cilInstructions.Add(CilOpCodes.Conv_U);
 					}
 					else
 					{
