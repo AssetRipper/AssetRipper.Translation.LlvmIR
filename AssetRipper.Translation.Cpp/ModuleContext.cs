@@ -379,6 +379,19 @@ internal sealed partial class ModuleContext
 					typeSignature = pointerGetMethod.Signature!.ReturnType;
 				}
 				break;
+			case LLVMValueKind.LLVMGlobalAliasValueKind:
+				{
+					LLVMValueRef[] operands = value.GetOperands();
+					if (operands.Length == 1)
+					{
+						LoadValue(instructions, operands[0], out typeSignature);
+					}
+					else
+					{
+						throw new NotSupportedException();
+					}
+				}
+				break;
 			case LLVMValueKind.LLVMConstantFPValueKind:
 				{
 					double floatingPoint = value.GetFloatingPointValue();
