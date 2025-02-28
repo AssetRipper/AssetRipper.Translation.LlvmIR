@@ -99,7 +99,12 @@ public static unsafe class CppTranslator
 
 		foreach (GlobalVariableContext globalVariableContext in moduleContext.GlobalVariables.Values)
 		{
-			globalVariableContext.CreateFields();
+			globalVariableContext.CreateProperties();
+		}
+
+		foreach (GlobalVariableContext globalVariableContext in moduleContext.GlobalVariables.Values)
+		{
+			globalVariableContext.InitializeData();
 		}
 
 		foreach (FunctionContext functionContext in moduleContext.Methods.Values)

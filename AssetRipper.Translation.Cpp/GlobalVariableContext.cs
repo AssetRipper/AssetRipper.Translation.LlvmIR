@@ -39,7 +39,7 @@ internal sealed class GlobalVariableContext : IHasName
 	public MethodDefinition DataGetMethod { get; set; } = null!;
 	public MethodDefinition DataSetMethod { get; set; } = null!;
 
-	public void CreateFields()
+	public void CreateProperties()
 	{
 		TypeSignature underlyingType = Module.GetTypeSignature(Type);
 		TypeSignature pointerType = underlyingType.MakePointerType();
@@ -110,22 +110,22 @@ internal sealed class GlobalVariableContext : IHasName
 			}
 
 			property.SetSemanticMethods(DataGetMethod, DataSetMethod);
+		}
+	}
 
-			// Field initialization
-			if (HasSingleOperand)
-			{
-				MethodDefinition staticConstructor = Module.GlobalVariablesType.GetOrCreateStaticConstructor();
+	public void InitializeData()
+	{
+		if (HasSingleOperand)
+		{
+			MethodDefinition staticConstructor = Module.GlobalVariablesType.GetOrCreateStaticConstructor();
 
-				CilInstructionCollection instructions = staticConstructor.CilMethodBody!.Instructions;
-				instructions.Pop();
+			CilInstructionCollection instructions = staticConstructor.CilMethodBody!.Instructions;
+			instructions.Pop();
 
-				Module.LoadValue(instructions, Operand);
-				instructions.Add(CilOpCodes.Call, DataSetMethod);
+			Module.LoadValue(instructions, Operand);
+			instructions.Add(CilOpCodes.Call, DataSetMethod);
 
-				instructions.Add(CilOpCodes.Ret); // Undo the pop
-
-				instructions.OptimizeMacros();
-			}
+			instructions.Add(CilOpCodes.Ret); // Undo the pop
 		}
 	}
 
