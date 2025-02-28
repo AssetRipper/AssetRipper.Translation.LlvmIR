@@ -542,6 +542,7 @@ internal sealed partial class ModuleContext
 				break;
 			case LLVMValueKind.LLVMConstantPointerNullValueKind:
 			case LLVMValueKind.LLVMConstantAggregateZeroValueKind:
+			case LLVMValueKind.LLVMUndefValueValueKind:
 				{
 					typeSignature = GetTypeSignature(value.TypeOf);
 					instructions.AddDefaultValue(typeSignature);
