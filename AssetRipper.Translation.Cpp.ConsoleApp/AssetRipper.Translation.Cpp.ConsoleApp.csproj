@@ -9,6 +9,10 @@
 	</PropertyGroup>
 
 	<ItemGroup>
+		<PackageReference Include="Ookii.CommandLine" Version="5.0.0" />
+	</ItemGroup>
+
+	<ItemGroup>
 		<ProjectReference Include="..\AssetRipper.Translation.Cpp\AssetRipper.Translation.Cpp.csproj" />
 	</ItemGroup>
 
