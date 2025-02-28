@@ -65,6 +65,8 @@ internal sealed class GlobalVariableContext : IHasName
 			PointerGetMethod.CilMethodBody = new(PointerGetMethod);
 			CilInstructionCollection instructions = PointerGetMethod.CilMethodBody.Instructions;
 
+			CilLocalVariable variable = instructions.AddLocalVariable(pointerType);
+
 			CilInstructionLabel label = new();
 
 			instructions.Add(CilOpCodes.Ldsfld, pointerField);
@@ -73,6 +75,13 @@ internal sealed class GlobalVariableContext : IHasName
 
 			instructions.Add(CilOpCodes.Sizeof, underlyingType.ToTypeDefOrRef());
 			instructions.Add(CilOpCodes.Call, Module.Definition.DefaultImporter.ImportMethod(typeof(Marshal).GetMethod(nameof(Marshal.AllocHGlobal), [typeof(int)])!));
+			instructions.Add(CilOpCodes.Stloc, variable);
+
+			instructions.Add(CilOpCodes.Ldloc, variable);
+			instructions.AddDefaultValue(underlyingType);
+			instructions.AddStoreIndirect(underlyingType);
+
+			instructions.Add(CilOpCodes.Ldloc, variable);
 			instructions.Add(CilOpCodes.Stsfld, pointerField);
 
 			label.Instruction = instructions.Add(CilOpCodes.Ldsfld, pointerField);
