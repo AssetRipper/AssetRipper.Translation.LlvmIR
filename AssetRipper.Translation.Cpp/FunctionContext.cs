@@ -190,35 +190,6 @@ internal sealed class FunctionContext : IHasName
 		method.Parameters[0].GetOrCreateDefinition().Name = "result";
 	}
 
-	public void AddNameAttributes()
-	{
-		if (!string.IsNullOrEmpty(MangledName) && MangledName != Name)
-		{
-			MethodDefinition constructor = Module.InjectedTypes[typeof(MangledNameAttribute)].GetMethodByName(".ctor");
-			AddAttribute(constructor, MangledName);
-		}
-
-		if (!string.IsNullOrEmpty(DemangledName) && DemangledName != Name)
-		{
-			MethodDefinition constructor = Module.InjectedTypes[typeof(DemangledNameAttribute)].GetMethodByName(".ctor");
-			AddAttribute(constructor, DemangledName);
-		}
-
-		if (CleanName != Name)
-		{
-			MethodDefinition constructor = Module.InjectedTypes[typeof(CleanNameAttribute)].GetMethodByName(".ctor");
-			AddAttribute(constructor, CleanName);
-		}
-
-		void AddAttribute(MethodDefinition constructor, string name)
-		{
-			CustomAttributeSignature signature = new();
-			signature.FixedArguments.Add(new(Module.Definition.CorLibTypeFactory.String, name));
-			CustomAttribute attribute = new(constructor, signature);
-			Definition.CustomAttributes.Add(attribute);
-		}
-	}
-
 	private string GetDebuggerDisplay()
 	{
 		return Name;

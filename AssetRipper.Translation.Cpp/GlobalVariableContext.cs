@@ -79,6 +79,8 @@ internal sealed class GlobalVariableContext : IHasName
 			instructions.Add(CilOpCodes.Ret);
 
 			instructions.OptimizeMacros();
+
+			this.AddNameAttributes(property);
 		}
 
 		// Data property
@@ -110,6 +112,8 @@ internal sealed class GlobalVariableContext : IHasName
 			}
 
 			property.SetSemanticMethods(DataGetMethod, DataSetMethod);
+
+			this.AddNameAttributes(property);
 		}
 	}
 
