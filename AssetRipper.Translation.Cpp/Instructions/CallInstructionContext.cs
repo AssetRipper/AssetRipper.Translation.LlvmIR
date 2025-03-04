@@ -10,7 +10,4 @@ internal sealed class CallInstructionContext : BaseCallInstructionContext
 		Debug.Assert(Opcode == LLVMOpcode.LLVMCall);
 		Debug.Assert(Operands.Length >= 1);
 	}
-
-	public override LLVMValueRef FunctionOperand => Operands[^1];
-	public override ReadOnlySpan<LLVMValueRef> ArgumentOperands => Operands.AsSpan()[..^1];
 }

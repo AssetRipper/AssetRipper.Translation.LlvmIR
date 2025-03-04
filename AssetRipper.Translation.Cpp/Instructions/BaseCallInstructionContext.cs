@@ -12,11 +12,14 @@ internal abstract class BaseCallInstructionContext : InstructionContext
 {
 	protected BaseCallInstructionContext(LLVMValueRef instruction, ModuleContext module) : base(instruction, module)
 	{
+		ArgumentCount = (int)CalledFunctionTypeRef.ParamTypesCount;
 	}
 
-	public abstract LLVMValueRef FunctionOperand { get; }
-	public abstract ReadOnlySpan<LLVMValueRef> ArgumentOperands { get; }
-	public FunctionContext? FunctionCalled => Module.Methods.TryGetValue(FunctionOperand);
+	public LLVMValueRef FunctionOperand => Operands[^1];
+	public ReadOnlySpan<LLVMValueRef> ArgumentOperands => Operands.AsSpan(0, ArgumentCount);
+	private int ArgumentCount { get; }
+	public unsafe LLVMTypeRef CalledFunctionTypeRef => LLVM.GetCalledFunctionType(Instruction);
+	public FunctionContext? CalledFunction => Module.Methods.TryGetValue(FunctionOperand);
 
 	public StandAloneSignature MakeStandaloneSignature()
 	{
@@ -32,7 +35,7 @@ internal abstract class BaseCallInstructionContext : InstructionContext
 
 	public override void AddInstructions(CilInstructionCollection instructions)
 	{
-		FunctionContext? functionCalled = FunctionCalled;
+		FunctionContext? functionCalled = CalledFunction;
 		if (functionCalled is null)
 		{
 			ReadOnlySpan<LLVMValueRef> arguments = ArgumentOperands;

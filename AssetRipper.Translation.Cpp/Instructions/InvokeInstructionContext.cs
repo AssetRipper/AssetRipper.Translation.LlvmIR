@@ -15,8 +15,6 @@ internal sealed class InvokeInstructionContext : BaseCallInstructionContext
 		Debug.Assert(Operands[^2].IsBasicBlock);
 	}
 
-	public override LLVMValueRef FunctionOperand => Operands[^1];
-	public override ReadOnlySpan<LLVMValueRef> ArgumentOperands => Operands.AsSpan()[..^3];
 	public LLVMBasicBlockRef DefaultBlockRef => Operands[^3].AsBasicBlock();
 	public LLVMBasicBlockRef CatchBlockRef => Operands[^2].AsBasicBlock();
 	public BasicBlockContext? DefaultBlock => Function?.BasicBlockLookup[DefaultBlockRef];
