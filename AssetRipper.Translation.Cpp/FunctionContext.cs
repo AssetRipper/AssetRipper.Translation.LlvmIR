@@ -48,9 +48,15 @@ internal sealed class FunctionContext : IHasName
 		{
 			context.InstructionLookup.Add(instruction.Instruction, instruction);
 		}
-		foreach (LLVMBasicBlockRef basicBlock in context.Function.GetBasicBlocks())
+		foreach (BasicBlockContext basicBlock in context.BasicBlocks)
 		{
-			context.Labels[basicBlock] = new();
+			context.Labels[basicBlock.Block] = new();
+			foreach (LLVMBasicBlockRef successor in basicBlock.Block.GetSuccessors())
+			{
+				BasicBlockContext successorBlock = context.BasicBlockLookup[successor];
+				basicBlock.Successors.Add(successorBlock);
+				successorBlock.Predecessors.Add(basicBlock);
+			}
 		}
 		return context;
 	}

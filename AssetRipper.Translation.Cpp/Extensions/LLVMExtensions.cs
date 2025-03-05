@@ -99,7 +99,7 @@ internal static class LLVMExtensions
 		int numOperands = value.OperandCount;
 		if (numOperands == 0)
 		{
-			return Array.Empty<LLVMValueRef>();
+			return [];
 		}
 		LLVMValueRef[] operands = new LLVMValueRef[numOperands];
 		for (int i = 0; i < numOperands; i++)
@@ -107,6 +107,37 @@ internal static class LLVMExtensions
 			operands[i] = value.GetOperand((uint)i);
 		}
 		return operands;
+	}
+
+	public static unsafe LLVMBasicBlockRef[] GetSuccessors(this LLVMValueRef value)
+	{
+		if (value.IsABasicBlock != null)
+		{
+			return value.AsBasicBlock().GetSuccessors();
+		}
+
+		if (value.IsAInstruction == null)
+		{
+			return [];
+		}
+
+		int numSuccessors = (int)LLVM.GetNumSuccessors(value);
+		if (numSuccessors == 0)
+		{
+			return [];
+		}
+
+		LLVMBasicBlockRef[] successors = new LLVMBasicBlockRef[numSuccessors];
+		for (int i = 0; i < numSuccessors; i++)
+		{
+			successors[i] = LLVM.GetSuccessor(value, (uint)i);
+		}
+		return successors;
+	}
+
+	public static unsafe LLVMBasicBlockRef[] GetSuccessors(this LLVMBasicBlockRef value)
+	{
+		return value.LastInstruction.GetSuccessors();
 	}
 
 	private static unsafe LLVMValueRef GetUser(this LLVMUseRef use) => LLVM.GetUser(use);
