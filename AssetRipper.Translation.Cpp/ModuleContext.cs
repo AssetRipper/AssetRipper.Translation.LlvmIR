@@ -71,7 +71,7 @@ internal sealed partial class ModuleContext
 	public TypeDefinition PrivateImplementationDetails { get; }
 	private IMethodDefOrRef CompilerGeneratedAttributeConstructor { get; }
 	public Dictionary<LLVMValueRef, FunctionContext> Methods { get; } = new();
-	public Dictionary<string, TypeDefinition> Structs { get; } = new();
+	public Dictionary<string, StructContext> Structs { get; } = new();
 	public Dictionary<LLVMValueRef, GlobalVariableContext> GlobalVariables { get; } = new();
 	private readonly Dictionary<(TypeSignature, int), InlineArrayContext> inlineArrayCache = new(TypeSignatureIntPairComparer);
 	public Dictionary<TypeDefinition, InlineArrayContext> InlineArrayTypes { get; } = new(SignatureComparer.Default);
@@ -106,6 +106,8 @@ internal sealed partial class ModuleContext
 
 	public void AssignGlobalVariableNames() => AssignNames(GlobalVariables.Values);
 
+	public void AssignStructNames() => AssignNames(Structs.Values);
+
 	private static void AssignNames<T>(IEnumerable<T> items) where T : IHasName
 	{
 		Dictionary<string, List<T>> demangledNames = new();
@@ -132,49 +134,6 @@ internal sealed partial class ModuleContext
 					item.Name = NameGenerator.GenerateName(cleanName, item.MangledName);
 				}
 			}
-		}
-	}
-
-	public void AssignStructNames()
-	{
-		Dictionary<string, List<(string UniqueName, TypeDefinition Type)>> cleanNames = new();
-		foreach ((string name, TypeDefinition type) in Structs)
-		{
-			string cleanName = ExtractCleanName(name);
-			if (!cleanNames.TryGetValue(cleanName, out List<(string UniqueName, TypeDefinition Type)>? list))
-			{
-				list = new();
-				cleanNames.Add(cleanName, list);
-			}
-			list.Add((name, type));
-		}
-
-		foreach ((string cleanName, List<(string UniqueName, TypeDefinition Type)> list) in cleanNames)
-		{
-			if (list.Count == 1)
-			{
-				list[0].Type.Name = cleanName;
-			}
-			else
-			{
-				foreach ((string uniqueName, TypeDefinition type) in list)
-				{
-					type.Name = NameGenerator.GenerateName(cleanName, uniqueName);
-				}
-			}
-		}
-
-		static string RemovePrefix(string name, string prefix)
-		{
-			return name.StartsWith(prefix, StringComparison.Ordinal) ? name[prefix.Length..] : name;
-		}
-
-		static string ExtractCleanName(string name)
-		{
-			name = RemovePrefix(name, "class.");
-			name = RemovePrefix(name, "struct.");
-			name = RemovePrefix(name, "union.");
-			return NameGenerator.CleanName(name, "Struct");
 		}
 	}
 
@@ -268,15 +227,16 @@ internal sealed partial class ModuleContext
 			case LLVMTypeKind.LLVMStructTypeKind:
 				{
 					string name = type.StructName;
-					if (!Structs.TryGetValue(name, out TypeDefinition? typeDefinition))
+					if (!Structs.TryGetValue(name, out StructContext? structContext))
 					{
-						typeDefinition = new(
+						TypeDefinition typeDefinition = new(
 							"Structures",
 							name,
 							TypeAttributes.Public | TypeAttributes.SequentialLayout | TypeAttributes.BeforeFieldInit,
 							Definition.DefaultImporter.ImportType(typeof(ValueType)));
 						Definition.TopLevelTypes.Add(typeDefinition);
-						Structs.Add(name, typeDefinition);
+						structContext = new(this, typeDefinition, type);
+						Structs.Add(name, structContext);
 
 						LLVMTypeRef[] array = type.GetSubtypes();
 						for (int i = 0; i < array.Length; i++)
@@ -288,7 +248,7 @@ internal sealed partial class ModuleContext
 							typeDefinition.Fields.Add(field);
 						}
 					}
-					return typeDefinition.ToTypeSignature();
+					return structContext.Definition.ToTypeSignature();
 				}
 
 			case LLVMTypeKind.LLVMArrayTypeKind:
