@@ -106,7 +106,14 @@ internal sealed partial class ModuleContext
 
 	public void AssignGlobalVariableNames() => AssignNames(GlobalVariables.Values);
 
-	public void AssignStructNames() => AssignNames(Structs.Values);
+	public void AssignStructNames()
+	{
+		AssignNames(Structs.Values);
+		foreach (StructContext structContext in Structs.Values)
+		{
+			structContext.AddNameAttributes();
+		}
+	}
 
 	private static void AssignNames<T>(IEnumerable<T> items) where T : IHasName
 	{

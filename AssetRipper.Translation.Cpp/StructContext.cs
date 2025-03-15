@@ -33,6 +33,8 @@ internal sealed class StructContext : IHasName
 		CleanName = ExtractCleanName(MangledName);
 	}
 
+	public void AddNameAttributes() => this.AddNameAttributes(Definition);
+
 	private static string RemovePrefix(string name, string prefix)
 	{
 		return name.StartsWith(prefix, StringComparison.Ordinal) ? name[prefix.Length..] : name;

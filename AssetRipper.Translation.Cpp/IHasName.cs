@@ -28,7 +28,7 @@ internal static class IHasNameExtensions
 {
 	public static void AddNameAttributes(this IHasName hasName, IHasCustomAttribute definition)
 	{
-		if (!string.IsNullOrEmpty(hasName.MangledName) && hasName.MangledName != hasName.Name)
+		if (hasName.MangledName != hasName.Name)
 		{
 			MethodDefinition constructor = hasName.Module.InjectedTypes[typeof(MangledNameAttribute)].GetMethodByName(".ctor");
 			AddAttribute(constructor, hasName.MangledName);
