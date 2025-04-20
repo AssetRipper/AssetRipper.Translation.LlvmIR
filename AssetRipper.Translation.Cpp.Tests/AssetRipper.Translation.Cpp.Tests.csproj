@@ -9,6 +9,7 @@
 	</PropertyGroup>
 
 	<ItemGroup>
+		<PackageReference Include="AssetRipper.ICSharpCode.Decompiler" Version="9.0.0.7986" />
 		<PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
 		<PackageReference Include="NUnit" Version="4.3.2" />
 		<PackageReference Include="NUnit.Analyzers" Version="4.6.0">
@@ -19,7 +20,8 @@
 	</ItemGroup>
 
 	<ItemGroup>
-	  <ProjectReference Include="..\AssetRipper.Translation.Cpp\AssetRipper.Translation.Cpp.csproj" />
+		<ProjectReference Include="..\AssetRipper.Translation.Cpp.Tests.SourceGenerator\AssetRipper.Translation.Cpp.Tests.SourceGenerator.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+		<ProjectReference Include="..\AssetRipper.Translation.Cpp\AssetRipper.Translation.Cpp.csproj" />
 	</ItemGroup>
 
 </Project>

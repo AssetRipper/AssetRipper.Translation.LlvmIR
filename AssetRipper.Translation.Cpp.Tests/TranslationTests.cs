@@ -32,7 +32,8 @@ public class TranslationTests
 			Assert.That(method.Signature?.ParameterTypes[0] is CorLibTypeSignature { ElementType: ElementType.I4 });
 		});
 
-		AssertionHelpers.AssertSuccessfullySaves(module);
+		AssertionHelpers.AssertSavesSuccessfully(module);
+		AssertionHelpers.AssertDecompilesSuccessfully(module);
 	}
 
 	[Test]
@@ -48,6 +49,6 @@ public class TranslationTests
 		AssertionHelpers.AssertPublicMethodCount(module.GetGlobalFunctionsType(), 0);
 		AssertionHelpers.AssertPublicFieldCount(module.GetPointerCacheType(), 3);
 
-		AssertionHelpers.AssertSuccessfullySaves(module);
+		AssertionHelpers.AssertSavesSuccessfully(module);
 	}
 }

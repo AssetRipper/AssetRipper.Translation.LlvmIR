@@ -1,0 +1,12 @@
+<Project>
+	<PropertyGroup>
+		<Nullable>enable</Nullable>
+		<LangVersion>Latest</LangVersion>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<CheckForOverflowUnderflow>true</CheckForOverflowUnderflow>
+
+		<Version>1.0.0</Version>
+		<Copyright>Copyright © ds5678</Copyright>
+		<Authors>ds5678</Authors>
+	</PropertyGroup>
+</Project>
