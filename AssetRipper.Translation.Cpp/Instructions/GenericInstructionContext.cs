@@ -49,22 +49,15 @@ internal class GenericInstructionContext : InstructionContext
 			case LLVMOpcode.LLVMAtomicRMW:
 				goto default;
 			case LLVMOpcode.LLVMResume:
-				goto default;
+				instructions.Add(CilOpCodes.Rethrow);
+				break;
 			case LLVMOpcode.LLVMLandingPad:
 				goto default;
 			case LLVMOpcode.LLVMCleanupRet:
 				AddInstructionNotSupported(instructions);
 				AddThrowNull(instructions); // To prevent stack imbalance
 				break;
-			case LLVMOpcode.LLVMCatchRet:
-				AddInstructionNotSupported(instructions);
-				AddThrowNull(instructions); // To prevent stack imbalance
-				break;
-			case LLVMOpcode.LLVMCatchPad:
-				goto default;
 			case LLVMOpcode.LLVMCleanupPad:
-				goto default;
-			case LLVMOpcode.LLVMCatchSwitch:
 				goto default;
 			default:
 				AddInstructionNotSupported(instructions);
@@ -81,7 +74,7 @@ internal class GenericInstructionContext : InstructionContext
 	private void AddInstructionNotSupported(CilInstructionCollection instructions)
 	{
 		instructions.Add(CilOpCodes.Ldstr, Opcode.ToString());
-		instructions.Add(CilOpCodes.Ldstr, Instruction.ToString());
+		instructions.Add(CilOpCodes.Ldstr, Instruction.ToString().Trim());
 		if (!HasResult)
 		{
 			MethodDefinition method = Module.InstructionNotSupportedExceptionType.GetMethodByName(nameof(InstructionNotSupportedException.Throw));

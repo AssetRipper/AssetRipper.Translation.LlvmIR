@@ -140,6 +140,21 @@ internal static class LLVMExtensions
 		return value.LastInstruction.GetSuccessors();
 	}
 
+	public static bool TryGetSingleInstruction(this LLVMBasicBlockRef basicBlock, out LLVMValueRef instruction)
+	{
+		LLVMValueRef firstInstruction = basicBlock.FirstInstruction;
+		if (firstInstruction == default || firstInstruction != basicBlock.LastInstruction)
+		{
+			instruction = default;
+			return false;
+		}
+		else
+		{
+			instruction = firstInstruction;
+			return true;
+		}
+	}
+
 	private static unsafe LLVMValueRef GetUser(this LLVMUseRef use) => LLVM.GetUser(use);
 
 	private static unsafe LLVMUseRef GetNextUse(this LLVMUseRef use) => LLVM.GetNextUse(use);

@@ -15,34 +15,31 @@ internal sealed class InvokeInstructionContext : BaseCallInstructionContext
 		Debug.Assert(Operands[^2].IsBasicBlock);
 	}
 
+	public BasicBlockContext? TryBlockTarget => CatchSwitch?.UltimateTarget;
+	public CilInstructionLabel? TryStartLabel => CatchSwitch?.TryStartLabel;
+	public CilInstructionLabel? TryEndLabel => CatchSwitch?.TryEndLabel;
 	public LLVMBasicBlockRef DefaultBlockRef => Operands[^3].AsBasicBlock();
 	public LLVMBasicBlockRef CatchBlockRef => Operands[^2].AsBasicBlock();
 	public BasicBlockContext? DefaultBlock => Function?.BasicBlockLookup[DefaultBlockRef];
 	public BasicBlockContext? CatchBlock => Function?.BasicBlockLookup[CatchBlockRef];
+	public CatchSwitchInstructionContext? CatchSwitch => CatchBlock?.Instructions.FirstOrDefault() as CatchSwitchInstructionContext;
 
 	public override void AddInstructions(CilInstructionCollection instructions)
 	{
 		Debug.Assert(Function is not null);
 		Debug.Assert(DefaultBlock is not null);
 		Debug.Assert(CatchBlock is not null);
+		Debug.Assert(TryBlockTarget is not null);
+		Debug.Assert(TryEndLabel is not null);
 
-		// try
-		ICilLabel tryStart = instructions.Add(CilOpCodes.Nop).CreateLabel();
 		base.AddInstructions(instructions);
-		ICilLabel tryEnd = instructions.Add(CilOpCodes.Leave, Function.Labels[DefaultBlockRef]).CreateLabel();
-
-		// catch
-		ICilLabel handlerStart = instructions.Add(CilOpCodes.Pop).CreateLabel();
-		ICilLabel handlerEnd = instructions.Add(CilOpCodes.Leave, Function.Labels[CatchBlockRef]).CreateLabel();
-
-		instructions.Owner.ExceptionHandlers.Add(new CilExceptionHandler
+		if (TryBlockTarget == DefaultBlock)
 		{
-			TryStart = tryStart,
-			TryEnd = tryEnd,
-			HandlerStart = handlerStart,
-			HandlerEnd = handlerEnd,
-			HandlerType = CilExceptionHandlerType.Exception,
-			ExceptionType = Module.Definition.CorLibTypeFactory.Object.ToTypeDefOrRef(),
-		});
+			instructions.Add(CilOpCodes.Br, TryEndLabel);
+		}
+		else
+		{
+			instructions.Add(CilOpCodes.Br, Function.Labels[DefaultBlockRef]);
+		}
 	}
 }

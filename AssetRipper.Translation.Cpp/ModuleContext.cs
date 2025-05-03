@@ -97,8 +97,7 @@ internal sealed partial class ModuleContext
 		foreach (LLVMValueRef function in Module.GetFunctions())
 		{
 			MethodDefinition method = CreateNewMethod(GlobalFunctionsType);
-			FunctionContext functionContext = FunctionContext.Create(function, method, this);
-			Methods.Add(function, functionContext);
+			FunctionContext.Create(function, method, this);
 		}
 	}
 

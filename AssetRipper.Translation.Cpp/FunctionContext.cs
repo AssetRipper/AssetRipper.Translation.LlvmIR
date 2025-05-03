@@ -36,6 +36,7 @@ internal sealed class FunctionContext : IHasName
 	public static FunctionContext Create(LLVMValueRef function, MethodDefinition definition, ModuleContext module)
 	{
 		FunctionContext context = new(function, definition, module);
+		module.Methods.Add(function, context);
 		foreach (LLVMBasicBlockRef block in function.GetBasicBlocks())
 		{
 			BasicBlockContext blockContext = BasicBlockContext.Create(block, context);
@@ -56,6 +57,31 @@ internal sealed class FunctionContext : IHasName
 				BasicBlockContext successorBlock = context.BasicBlockLookup[successor];
 				basicBlock.Successors.Add(successorBlock);
 				successorBlock.Predecessors.Add(basicBlock);
+			}
+			if (basicBlock.EndsWithInvoke)
+			{
+				InvokeInstructionContext instruction = (InvokeInstructionContext)basicBlock.Instructions[^1];
+				BasicBlockContext? defaultBlock = instruction.DefaultBlock;
+				if (defaultBlock is not null)
+				{
+					basicBlock.NormalSuccessors.Add(defaultBlock);
+					defaultBlock.NormalPredecessors.Add(basicBlock);
+				}
+			}
+			else if (basicBlock.StartsWithCatchSwitch)
+			{
+				Debug.Assert(basicBlock.Instructions.Count is 1);
+			}
+			else if (basicBlock.EndsWithCatchReturn)
+			{
+			}
+			else
+			{
+				foreach (BasicBlockContext successor in basicBlock.Successors)
+				{
+					basicBlock.NormalSuccessors.Add(successor);
+					successor.NormalPredecessors.Add(basicBlock);
+				}
 			}
 		}
 		return context;
