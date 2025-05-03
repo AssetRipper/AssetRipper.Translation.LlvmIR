@@ -17,16 +17,7 @@ internal static class IntrinsicFunctionImplementer
 		CilInstructionCollection instructions = context.Definition.CilMethodBody!.Instructions;
 
 		MethodDefinition? implementation = GetInjectedIntrinsic(context.Module, context.Name);
-		if (implementation == null || implementation.Parameters.Count != context.Definition.Parameters.Count)
-		{
-			TypeDefinition declaringType = context.Module.IntrinsicsType.NestedTypes.First(t => t.Name == "Unimplemented");
-			context.Definition.DeclaringType!.Methods.Remove(context.Definition);
-			declaringType.Methods.Add(context.Definition);
-
-			instructions.Add(CilOpCodes.Ldnull);
-			instructions.Add(CilOpCodes.Throw);
-		}
-		else
+		if (implementation != null && implementation.Parameters.Count == context.Definition.Parameters.Count)
 		{
 			TypeDefinition declaringType = context.Module.IntrinsicsType.NestedTypes.First(t => t.Name == "Implemented");
 			context.Definition.DeclaringType!.Methods.Remove(context.Definition);
@@ -40,6 +31,15 @@ internal static class IntrinsicFunctionImplementer
 			instructions.Add(CilOpCodes.Call, implementation);
 
 			instructions.Add(CilOpCodes.Ret);
+		}
+		else
+		{
+			TypeDefinition declaringType = context.Module.IntrinsicsType.NestedTypes.First(t => t.Name == "Unimplemented");
+			context.Definition.DeclaringType!.Methods.Remove(context.Definition);
+			declaringType.Methods.Add(context.Definition);
+
+			instructions.Add(CilOpCodes.Ldnull);
+			instructions.Add(CilOpCodes.Throw);
 		}
 
 		return true;
