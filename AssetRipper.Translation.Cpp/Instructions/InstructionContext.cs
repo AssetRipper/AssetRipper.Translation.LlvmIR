@@ -44,6 +44,8 @@ internal abstract class InstructionContext
 			LLVMOpcode.LLVMCatchSwitch => new CatchSwitchInstructionContext(instruction, module),
 			LLVMOpcode.LLVMCatchPad => new CatchPadInstructionContext(instruction, module),
 			LLVMOpcode.LLVMCatchRet => new CatchReturnInstructionContext(instruction, module),
+			LLVMOpcode.LLVMCleanupPad => new CleanupPadInstructionContext(instruction, module),
+			LLVMOpcode.LLVMCleanupRet => new CleanupReturnInstructionContext(instruction, module),
 			_ when UnaryMathInstructionContext.Supported(instruction.GetOpcode()) => new UnaryMathInstructionContext(instruction, module),
 			_ when BinaryMathInstructionContext.Supported(instruction.GetOpcode()) => new BinaryMathInstructionContext(instruction, module),
 			_ when NumericConversionInstructionContext.Supported(instruction.GetOpcode()) => new NumericConversionInstructionContext(instruction, module),

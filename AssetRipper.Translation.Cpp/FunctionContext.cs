@@ -67,13 +67,40 @@ internal sealed class FunctionContext : IHasName
 					basicBlock.NormalSuccessors.Add(defaultBlock);
 					defaultBlock.NormalPredecessors.Add(basicBlock);
 				}
+				BasicBlockContext? catchBlock = instruction.CatchBlock;
+				if (catchBlock is not null)
+				{
+					basicBlock.InvokeSuccessors.Add(catchBlock);
+					catchBlock.InvokePredecessors.Add(basicBlock);
+				}
 			}
-			else if (basicBlock.StartsWithCatchSwitch)
+			else if (basicBlock.IsCatchSwitch)
 			{
-				Debug.Assert(basicBlock.Instructions.Count is 1);
+				foreach (BasicBlockContext successor in basicBlock.Successors)
+				{
+					basicBlock.HandlerSuccessors.Add(successor);
+					successor.HandlerPredecessors.Add(basicBlock);
+				}
 			}
 			else if (basicBlock.EndsWithCatchReturn)
 			{
+				CatchReturnInstructionContext instruction = (CatchReturnInstructionContext)basicBlock.Instructions[^1];
+				BasicBlockContext? catchBlock = instruction.TargetBlock;
+				if (catchBlock is not null)
+				{
+					basicBlock.HandlerSuccessors.Add(catchBlock);
+					catchBlock.HandlerPredecessors.Add(basicBlock);
+				}
+			}
+			else if (basicBlock.EndsWithCleanupReturn)
+			{
+				CleanupReturnInstructionContext instruction = (CleanupReturnInstructionContext)basicBlock.Instructions[^1];
+				BasicBlockContext? cleanupBlock = instruction.TargetBlock;
+				if (cleanupBlock is not null)
+				{
+					basicBlock.HandlerSuccessors.Add(cleanupBlock);
+					cleanupBlock.HandlerPredecessors.Add(basicBlock);
+				}
 			}
 			else
 			{

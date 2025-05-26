@@ -5,7 +5,7 @@ namespace AssetRipper.Translation.Cpp.ExceptionHandling;
 
 public static class BlockLifter
 {
-	public static ISeseRegion LiftBasicBlocks(IBasicBlock entrypoint)
+	public static IReadOnlyList<ISeseRegion> LiftBasicBlocks(IBasicBlock entrypoint)
 	{
 		if (!entrypoint.IsFunctionEntrypoint)
 		{
@@ -13,7 +13,7 @@ public static class BlockLifter
 		}
 		if (entrypoint.AllSuccessors.Count == 0)
 		{
-			return entrypoint; // No need to lift a single block.
+			return [entrypoint]; // No need to lift a single block.
 		}
 
 		IReadOnlyList<ISeseRegion> currentRegions = entrypoint.GetThisAndAllSuccessorsRecursively();
@@ -22,13 +22,18 @@ public static class BlockLifter
 			currentRegions = liftedRegions;
 		}
 
-		if (currentRegions.Count == 1)
+		return currentRegions;
+	}
+
+	public static ISeseRegion AsSingleRegion(this IReadOnlyList<ISeseRegion> regions)
+	{
+		if (regions.Count == 1)
 		{
-			return currentRegions[0]; // No need to lift a single block.
+			return regions[0];
 		}
 		else
 		{
-			return new CompositeSeseRegion(currentRegions);
+			return new CompositeSeseRegion(regions);
 		}
 	}
 
@@ -50,29 +55,80 @@ public static class BlockLifter
 	{
 		foreach (ISeseRegion region in regions)
 		{
-			if (region.TryMatchSequential(out IReadOnlyList<ISeseRegion>? blocks))
+			if (region.TryMatchSequential(out IReadOnlyList<ISeseRegion>? children))
 			{
-				composite = new CompositeSeseRegion(blocks, region.IsExceptionHandlerEntrypoint, blocks.Any(b => b.IsExceptionHandlerExitpoint), false);
+				composite = new CompositeSeseRegion(
+					children,
+					region.IsExceptionHandlerEntrypoint,
+					children.Any(c => c.IsExceptionHandlerExitpoint),
+					false,
+					region.IsCleanupEntrypoint,
+					children.Any(c => c.IsCleanupExitpoint));
 				return true;
 			}
-			else if (region.TryMatchSwitchBlock(out blocks))
+			else if (region.TryMatchSwitchBlock(out children))
 			{
-				composite = new CompositeSeseRegion(blocks, region.IsExceptionHandlerEntrypoint, false, false);
+				composite = new CompositeSeseRegion(
+					children,
+					region.IsExceptionHandlerEntrypoint,
+					false,
+					false,
+					region.IsCleanupEntrypoint,
+					false);
 				return true;
 			}
-			else if (region.TryMatchProtectedRegionWithExceptionHandlers(out blocks))
+			else if (region.TryMatchDoWhileLoop(out children))
 			{
-				composite = new CompositeSeseRegion(blocks, region.IsExceptionHandlerEntrypoint, region.IsExceptionHandlerExitpoint, false);
+				composite = new CompositeSeseRegion(
+					children,
+					region.IsExceptionHandlerEntrypoint,
+					children.Any(c => c.IsExceptionHandlerExitpoint),
+					false,
+					region.IsCleanupEntrypoint,
+					children.Any(c => c.IsCleanupExitpoint));
 				return true;
 			}
-			else if (region.TryMatchExceptionHandlerBlocks(out blocks))
+			else if (region.TryMatchWhileLoop(out children))
 			{
-				composite = new CompositeSeseRegion(blocks, true, true, false);
+				composite = new CompositeSeseRegion(
+					children,
+					region.IsExceptionHandlerEntrypoint,
+					children.Any(c => c.IsExceptionHandlerExitpoint),
+					false,
+					region.IsCleanupEntrypoint,
+					children.Any(c => c.IsCleanupExitpoint));
 				return true;
 			}
-			else if (region.TryMatchProtectedCode(out blocks))
+			else if (region.TryMatchReverseSequential(out children))
 			{
-				composite = new CompositeSeseRegion(blocks, region.IsExceptionHandlerEntrypoint, blocks.Any(b => b.IsExceptionHandlerExitpoint), false);
+				composite = new CompositeSeseRegion(
+					children,
+					region.IsExceptionHandlerEntrypoint,
+					children.Any(c => c.IsExceptionHandlerExitpoint),
+					false,
+					region.IsCleanupEntrypoint,
+					children.Any(c => c.IsCleanupExitpoint));
+				return true;
+			}
+			else if (region.TryMatchProtectedRegionWithExceptionHandlers(out children))
+			{
+				composite = new ProtectedRegionWithExceptionHandlers(region, children);
+				return true;
+			}
+			else if (region.TryMatchSelfContainedExceptionHandler(out children))
+			{
+				composite = new CompositeSeseRegion(children, true, true, false, false, false);
+				return true;
+			}
+			else if (region.TryMatchExceptionHandlerSwitch(out children))
+			{
+				// This is no longer an exception handler switch, but instead a self-contained exception handler.
+				composite = new CompositeSeseRegion(children, true, true, false, false, false);
+				return true;
+			}
+			else if (region.TryMatchSelfContainedCleanup(out children))
+			{
+				composite = new CompositeSeseRegion(children, false, false, false, true, true);
 				return true;
 			}
 		}
@@ -112,38 +168,56 @@ public static class BlockLifter
 
 		foreach ((ISeseRegion original, ModifiableSeseRegion replacement) in oldToNew)
 		{
-			foreach (ISeseRegion originalPredecessor in original.AllPredecessors)
-			{
-				ModifiableSeseRegion newPredecessor = oldToNew[originalPredecessor];
-				if (replacement != newPredecessor)
-				{
-					replacement.AllPredecessors.TryAdd(newPredecessor);
-				}
-			}
-			foreach (ISeseRegion originalPredecessor in original.NormalPredecessors)
-			{
-				ModifiableSeseRegion newPredecessor = oldToNew[originalPredecessor];
-				if (replacement != newPredecessor)
-				{
-					replacement.NormalPredecessors.TryAdd(newPredecessor);
-				}
-			}
-			foreach (ISeseRegion originalSuccessor in original.AllSuccessors)
-			{
-				ModifiableSeseRegion newSuccessor = oldToNew[originalSuccessor];
-				if (replacement != newSuccessor)
-				{
-					replacement.AllSuccessors.TryAdd(newSuccessor);
-				}
-			}
+			// This assumes that:
+			// * Invoke and handlers will never intersect.
+			// * Normal is preferred over invoke and handlers.
+
 			foreach (ISeseRegion originalSuccessor in original.NormalSuccessors)
 			{
 				ModifiableSeseRegion newSuccessor = oldToNew[originalSuccessor];
 				if (replacement != newSuccessor)
 				{
 					replacement.NormalSuccessors.TryAdd(newSuccessor);
+					newSuccessor.NormalPredecessors.TryAdd(replacement);
 				}
 			}
+			foreach (ISeseRegion originalInvokeSuccessor in original.InvokeSuccessors)
+			{
+				ModifiableSeseRegion newSuccessor = oldToNew[originalInvokeSuccessor];
+				if (replacement != newSuccessor)
+				{
+					replacement.InvokeSuccessors.TryAdd(newSuccessor);
+					newSuccessor.InvokePredecessors.TryAdd(replacement);
+				}
+			}
+			if (replacement is ProtectedRegionWithExceptionHandlers composite && composite.ProtectedRegion != original)
+			{
+				// In this case, exception handling is contained within this composite region,
+				// so we treat handler successors as normal successors.
+				foreach (ISeseRegion originalHandlerSuccessor in original.HandlerSuccessors)
+				{
+					ModifiableSeseRegion newSuccessor = oldToNew[originalHandlerSuccessor];
+					if (replacement != newSuccessor)
+					{
+						replacement.NormalSuccessors.TryAdd(newSuccessor);
+						newSuccessor.NormalPredecessors.TryAdd(replacement);
+					}
+				}
+			}
+			else
+			{
+				foreach (ISeseRegion originalHandlerSuccessor in original.HandlerSuccessors)
+				{
+					ModifiableSeseRegion newSuccessor = oldToNew[originalHandlerSuccessor];
+					if (replacement != newSuccessor)
+					{
+						replacement.HandlerSuccessors.TryAdd(newSuccessor);
+						newSuccessor.HandlerPredecessors.TryAdd(replacement);
+					}
+				}
+			}
+
+			Debug.Assert(replacement.InvokeSuccessors.Count is 0 or 1);
 		}
 
 		int finalCount = nonLiftedCount + compositeCount;

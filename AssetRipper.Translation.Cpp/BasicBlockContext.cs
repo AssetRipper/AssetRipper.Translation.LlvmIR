@@ -2,6 +2,7 @@
 using AssetRipper.Translation.Cpp.Extensions;
 using AssetRipper.Translation.Cpp.Instructions;
 using LLVMSharp.Interop;
+using System.Diagnostics;
 
 namespace AssetRipper.Translation.Cpp;
 
@@ -14,10 +15,19 @@ internal sealed class BasicBlockContext : IBasicBlock
 	public List<BasicBlockContext> Successors { get; } = new();
 	public List<BasicBlockContext> NormalPredecessors { get; } = new();
 	public List<BasicBlockContext> NormalSuccessors { get; } = new();
+	public List<BasicBlockContext> InvokePredecessors { get; } = new();
+	public List<BasicBlockContext> InvokeSuccessors { get; } = new();
+	public List<BasicBlockContext> HandlerPredecessors { get; } = new();
+	public List<BasicBlockContext> HandlerSuccessors { get; } = new();
 	public bool StartsWithCatchSwitch => StartsWith(LLVMOpcode.LLVMCatchSwitch);
+	public bool EndsWithCatchSwitch => EndsWith(LLVMOpcode.LLVMCatchSwitch);
+	public bool IsCatchSwitch => StartsWithCatchSwitch && EndsWithCatchSwitch;
 	public bool StartsWithCatchPad => StartsWith(LLVMOpcode.LLVMCatchPad);
 	public bool EndsWithCatchReturn => EndsWith(LLVMOpcode.LLVMCatchRet);
+	public bool StartsWithCleanupPad => StartsWith(LLVMOpcode.LLVMCleanupPad);
+	public bool EndsWithCleanupReturn => EndsWith(LLVMOpcode.LLVMCleanupRet);
 	public bool EndsWithInvoke => EndsWith(LLVMOpcode.LLVMInvoke);
+	public bool EndsWithUnreachable => EndsWith(LLVMOpcode.LLVMUnreachable);
 	public bool IsFunctionEntrypoint => Function.BasicBlocks[0] == this;
 
 	private BasicBlockContext(LLVMBasicBlockRef block, FunctionContext function)
@@ -28,11 +38,24 @@ internal sealed class BasicBlockContext : IBasicBlock
 
 	public bool StartsWith(LLVMOpcode opcode)
 	{
-		if (Instructions.Count == 0)
+		for (int i = 0; i < Instructions.Count; i++)
 		{
-			return false;
+			LLVMOpcode instructionOpcode = Instructions[i].Opcode;
+			if (instructionOpcode == opcode)
+			{
+				return true;
+			}
+			else if (instructionOpcode == LLVMOpcode.LLVMPHI)
+			{
+				// Ignore phi instructions at the beginning of the block
+				continue;
+			}
+			else
+			{
+				break;
+			}
 		}
-		return Instructions[0].Opcode == opcode;
+		return false;
 	}
 
 	public bool EndsWith(LLVMOpcode opcode)
@@ -61,17 +84,56 @@ internal sealed class BasicBlockContext : IBasicBlock
 		return $"Block {index}";
 	}
 
+	[DebuggerBrowsable(DebuggerBrowsableState.Never)]
 	IReadOnlyList<ISeseRegion> ISeseRegion.AllPredecessors => Predecessors;
 
+	[DebuggerBrowsable(DebuggerBrowsableState.Never)]
 	IReadOnlyList<ISeseRegion> ISeseRegion.AllSuccessors => Successors;
 
+	[DebuggerBrowsable(DebuggerBrowsableState.Never)]
 	IReadOnlyList<ISeseRegion> ISeseRegion.NormalPredecessors => NormalPredecessors;
 
+	[DebuggerBrowsable(DebuggerBrowsableState.Never)]
 	IReadOnlyList<ISeseRegion> ISeseRegion.NormalSuccessors => NormalSuccessors;
 
-	bool ISeseRegion.IsExceptionHandlerEntrypoint => StartsWithCatchPad;
+	[DebuggerBrowsable(DebuggerBrowsableState.Never)]
+	IReadOnlyList<ISeseRegion> ISeseRegion.InvokePredecessors => InvokePredecessors;
 
-	bool ISeseRegion.IsExceptionHandlerExitpoint => EndsWithCatchReturn;
+	[DebuggerBrowsable(DebuggerBrowsableState.Never)]
+	IReadOnlyList<ISeseRegion> ISeseRegion.InvokeSuccessors => InvokeSuccessors;
 
-	bool ISeseRegion.IsExceptionHandlerSwitch => StartsWithCatchSwitch;
+	[DebuggerBrowsable(DebuggerBrowsableState.Never)]
+	IReadOnlyList<ISeseRegion> ISeseRegion.HandlerPredecessors => HandlerPredecessors;
+
+	[DebuggerBrowsable(DebuggerBrowsableState.Never)]
+	IReadOnlyList<ISeseRegion> ISeseRegion.HandlerSuccessors => HandlerSuccessors;
+
+	SeseRegionType ISeseRegion.Type
+	{
+		get
+		{
+			SeseRegionType type = SeseRegionType.None;
+			if (StartsWithCatchPad)
+			{
+				type |= SeseRegionType.ExceptionHandlerEntrypoint;
+			}
+			if (EndsWithCatchReturn)
+			{
+				type |= SeseRegionType.ExceptionHandlerExitpoint;
+			}
+			if (IsCatchSwitch)
+			{
+				type |= SeseRegionType.ExceptionHandlerSwitch;
+			}
+			if (StartsWithCleanupPad)
+			{
+				type |= SeseRegionType.CleanupEntrypoint;
+			}
+			if (EndsWithCleanupReturn || EndsWithUnreachable)
+			{
+				type |= SeseRegionType.CleanupExitpoint;
+			}
+			return type;
+		}
+	}
 }

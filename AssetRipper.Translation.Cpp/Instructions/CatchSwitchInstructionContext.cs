@@ -36,6 +36,7 @@ internal sealed class CatchSwitchInstructionContext : InstructionContext
 	public BasicBlockContext? UltimateTarget => CatchPads[0]?.CatchReturn.TargetBlock;
 	public override void AddInstructions(CilInstructionCollection instructions)
 	{
+		throw new NotImplementedException();
 		foreach (CatchPadInstructionContext catchPad in CatchPads)
 		{
 			if (catchPad.HasFilter)

@@ -5,7 +5,7 @@ using AssetRipper.Translation.Cpp.ExceptionHandling;
 using AssetRipper.Translation.Cpp.Extensions;
 using AssetRipper.Translation.Cpp.Instructions;
 using LLVMSharp.Interop;
-using System.Diagnostics.CodeAnalysis;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text;
 
@@ -56,8 +56,6 @@ public static unsafe class CppTranslator
 
 	private static ModuleDefinition Translate(LLVMModuleRef module, bool fixAssemblyReferences)
 	{
-		RemoveBasicBlocksWithSingleBranch(module);
-
 		{
 			var globals = module.GetGlobals().ToList();
 			var aliases = module.GetGlobalAliases().ToList();
@@ -114,7 +112,12 @@ public static unsafe class CppTranslator
 				instruction.CreateLocal(instructions);
 			}
 
-			ISeseRegion liftedRegion = BlockLifter.LiftBasicBlocks(functionContext.BasicBlocks[0]);
+			IReadOnlyList<ISeseRegion> liftedRegions = BlockLifter.LiftBasicBlocks(functionContext.BasicBlocks[0]);
+			if (liftedRegions.Count != 1)
+			{
+				Debugger.Break();
+			}
+			ISeseRegion liftedRegion = liftedRegions.AsSingleRegion();
 
 			// Add instructions to the method bodies
 			AddInstructions(instructions, functionContext, liftedRegion);
@@ -130,47 +133,6 @@ public static unsafe class CppTranslator
 		return fixAssemblyReferences ? moduleDefinition.FixCorLibAssemblyReferences() : moduleDefinition;
 	}
 
-	private static void RemoveBasicBlocksWithSingleBranch(LLVMModuleRef module)
-	{
-		foreach (LLVMValueRef function in module.GetFunctions())
-		{
-			bool changed;
-			do
-			{
-				changed = false;
-				foreach (LLVMBasicBlockRef block in function.GetBasicBlocks())
-				{
-					if (!block.TryGetSingleInstruction(out LLVMValueRef instruction) || instruction.InstructionOpcode != LLVMOpcode.LLVMBr || instruction.IsConditional)
-					{
-						continue;
-					}
-					LLVMValueRef[] operands = instruction.GetOperands();
-					if (operands.Length != 1)
-					{
-						continue;
-					}
-					LLVMValueRef operand = operands[0];
-					if (operand.Kind != LLVMValueKind.LLVMBasicBlockValueKind)
-					{
-						continue;
-					}
-					LLVMBasicBlockRef targetBlock = operand.AsBasicBlock();
-					if (targetBlock == block)
-					{
-						// Just to be safe
-						continue;
-					}
-
-					block.AsValue().ReplaceAllUsesWith(operand);
-					block.RemoveFromParent();
-					//LLVM.DeleteBasicBlock(block);
-					changed = true;
-					break;
-				}
-			} while (changed);
-		}
-	}
-
 	private static void AddInstructions(CilInstructionCollection instructions, FunctionContext functionContext, ISeseRegion liftedRegion)
 	{
 		switch (liftedRegion)
@@ -179,38 +141,51 @@ public static unsafe class CppTranslator
 				AddInstructions(instructions, functionContext, alias.Original);
 				break;
 			case ICompositeSeseRegion composite:
-				if (TryMatchExceptionHandler(composite, out ISeseRegion? protectedRegion, out ISeseRegion? exceptionHandlerSwitch, out IReadOnlyList<ISeseRegion>? exceptionHandlers))
+				if (composite is ProtectedRegionWithExceptionHandlers composite2)
 				{
-					CatchSwitchInstructionContext catchSwitch = GetInstructions<CatchSwitchInstructionContext>(exceptionHandlerSwitch).First();
-
-					// try
+					HashSet<BasicBlockContext> containedBlocks = GetBasicBlocks(composite2.ProtectedRegion).ToHashSet();
+					foreach (InstructionContext instruction in GetInstructions(composite2.ProtectedRegion))
 					{
-						catchSwitch.TryStartLabel.Instruction = instructions.Add(CilOpCodes.Nop);
-						AddInstructions(instructions, functionContext, protectedRegion);
-
-						if (protectedRegion.NormalSuccessors.Count is 1)
+						if (instruction is UnconditionalBranchInstructionContext unconditionalBranch)
 						{
-							ISeseRegion defaultRegion = protectedRegion.NormalSuccessors[0];
-							BasicBlockContext defaultBlock = GetBasicBlocks(defaultRegion).First();
-							CilInstructionLabel defaultLabel = functionContext.Labels[defaultBlock.Block];
-							catchSwitch.TryEndLabel.Instruction = instructions.Add(CilOpCodes.Leave, defaultLabel);
+							Debug.Assert(unconditionalBranch.TargetBlock is not null);
+							if (!containedBlocks.Contains(unconditionalBranch.TargetBlock))
+							{
+								unconditionalBranch.IsLeave = true;
+							}
 						}
-						else
+						else if (instruction is InvokeInstructionContext invoke)
 						{
-							CilInstructionLabel defaultLabel = new();
-							catchSwitch.TryEndLabel.Instruction = instructions.Add(CilOpCodes.Leave, defaultLabel);
-							defaultLabel.Instruction = instructions.Add(CilOpCodes.Ldnull);
-							instructions.Add(CilOpCodes.Throw);
+							Debug.Assert(invoke.DefaultBlock is not null);
+							if (!containedBlocks.Contains(invoke.DefaultBlock))
+							{
+								invoke.IsLeave = true;
+							}
 						}
 					}
 
-					AddInstructions(instructions, functionContext, exceptionHandlerSwitch);
+					int tryStartIndex = instructions.Count;
+					AddInstructions(instructions, functionContext, composite2.ProtectedRegion);
+					CilInstructionLabel tryStartLabel = new(instructions[tryStartIndex]);
+					CilInstructionLabel tryEndLabel = new(instructions[^1]);
 
-					// catch
-					foreach (ISeseRegion exceptionHandler in exceptionHandlers)
+					int handlerStartIndex = instructions.Count;
+					foreach (ISeseRegion exceptionHandler in composite2.ExceptionHandlingRegions)
 					{
 						AddInstructions(instructions, functionContext, exceptionHandler);
 					}
+					CilInstructionLabel handlerStartLabel = new(instructions[handlerStartIndex]);
+					CilInstructionLabel handlerEndLabel = new(instructions[^1]);
+
+					instructions.Owner.ExceptionHandlers.Add(new CilExceptionHandler
+					{
+						TryStart = tryStartLabel,
+						TryEnd = tryEndLabel,
+						HandlerStart = handlerStartLabel,
+						HandlerEnd = handlerEndLabel,
+						HandlerType = CilExceptionHandlerType.Exception,
+						ExceptionType = functionContext.Module.Definition.CorLibTypeFactory.Object.ToTypeDefOrRef(),
+					});
 				}
 				else
 				{
@@ -234,45 +209,6 @@ public static unsafe class CppTranslator
 				break;
 			default:
 				throw new NotSupportedException($"Unsupported lifted region type: {liftedRegion.GetType()}");
-		}
-
-		static bool TryMatchExceptionHandler(ICompositeSeseRegion composite, [NotNullWhen(true)] out ISeseRegion? protectedRegion, [NotNullWhen(true)] out ISeseRegion? exceptionHandlerSwitch, [NotNullWhen(true)] out IReadOnlyList<ISeseRegion>? exceptionHandlers)
-		{
-			if (composite.Children.Count < 3)
-			{
-				return False(out protectedRegion, out exceptionHandlerSwitch, out exceptionHandlers);
-			}
-
-			exceptionHandlerSwitch = composite.Children.FirstOrDefault(x => x.IsExceptionHandlerSwitch);
-			if (exceptionHandlerSwitch is null or { AllPredecessors.Count: not 1 })
-			{
-				return False(out protectedRegion, out exceptionHandlerSwitch, out exceptionHandlers);
-			}
-
-			protectedRegion = exceptionHandlerSwitch.AllPredecessors[0];
-			if (protectedRegion.NormalSuccessors.Count is not 0 and not 1 || !composite.Children.Contains(protectedRegion))
-			{
-				return False(out protectedRegion, out exceptionHandlerSwitch, out exceptionHandlers);
-			}
-
-			exceptionHandlers = composite.Children.Except([protectedRegion, exceptionHandlerSwitch]).ToList();
-			foreach (ISeseRegion exceptionHandler in exceptionHandlers)
-			{
-				if (!exceptionHandler.IsSelfContainedExceptionHandler || exceptionHandler.AllPredecessors.Count != 1 || exceptionHandler.AllPredecessors[0] != exceptionHandlerSwitch)
-				{
-					return False(out protectedRegion, out exceptionHandlerSwitch, out exceptionHandlers);
-				}
-			}
-
-			return true;
-
-			static bool False([NotNullWhen(true)] out ISeseRegion? protectedRegion, [NotNullWhen(true)] out ISeseRegion? exceptionHandlerSwitch, [NotNullWhen(true)] out IReadOnlyList<ISeseRegion>? exceptionHandlers)
-			{
-				protectedRegion = null;
-				exceptionHandlerSwitch = null;
-				exceptionHandlers = null;
-				return false;
-			}
 		}
 	}
 

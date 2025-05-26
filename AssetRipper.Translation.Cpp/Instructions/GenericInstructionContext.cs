@@ -7,12 +7,8 @@ using LLVMSharp.Interop;
 
 namespace AssetRipper.Translation.Cpp.Instructions;
 
-internal class GenericInstructionContext : InstructionContext
+internal class GenericInstructionContext(LLVMValueRef instruction, ModuleContext module) : InstructionContext(instruction, module)
 {
-	public GenericInstructionContext(LLVMValueRef instruction, ModuleContext module) : base(instruction, module)
-	{
-	}
-
 	public override void AddInstructions(CilInstructionCollection instructions)
 	{
 		switch (Opcode)
@@ -52,12 +48,6 @@ internal class GenericInstructionContext : InstructionContext
 				instructions.Add(CilOpCodes.Rethrow);
 				break;
 			case LLVMOpcode.LLVMLandingPad:
-				goto default;
-			case LLVMOpcode.LLVMCleanupRet:
-				AddInstructionNotSupported(instructions);
-				AddThrowNull(instructions); // To prevent stack imbalance
-				break;
-			case LLVMOpcode.LLVMCleanupPad:
 				goto default;
 			default:
 				AddInstructionNotSupported(instructions);

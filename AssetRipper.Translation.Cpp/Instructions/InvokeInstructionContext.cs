@@ -15,31 +15,21 @@ internal sealed class InvokeInstructionContext : BaseCallInstructionContext
 		Debug.Assert(Operands[^2].IsBasicBlock);
 	}
 
-	public BasicBlockContext? TryBlockTarget => CatchSwitch?.UltimateTarget;
-	public CilInstructionLabel? TryStartLabel => CatchSwitch?.TryStartLabel;
-	public CilInstructionLabel? TryEndLabel => CatchSwitch?.TryEndLabel;
 	public LLVMBasicBlockRef DefaultBlockRef => Operands[^3].AsBasicBlock();
 	public LLVMBasicBlockRef CatchBlockRef => Operands[^2].AsBasicBlock();
 	public BasicBlockContext? DefaultBlock => Function?.BasicBlockLookup[DefaultBlockRef];
 	public BasicBlockContext? CatchBlock => Function?.BasicBlockLookup[CatchBlockRef];
-	public CatchSwitchInstructionContext? CatchSwitch => CatchBlock?.Instructions.FirstOrDefault() as CatchSwitchInstructionContext;
+	public bool IsLeave { get; set; } = false;
 
 	public override void AddInstructions(CilInstructionCollection instructions)
 	{
 		Debug.Assert(Function is not null);
 		Debug.Assert(DefaultBlock is not null);
 		Debug.Assert(CatchBlock is not null);
-		Debug.Assert(TryBlockTarget is not null);
-		Debug.Assert(TryEndLabel is not null);
 
 		base.AddInstructions(instructions);
-		if (TryBlockTarget == DefaultBlock)
-		{
-			instructions.Add(CilOpCodes.Br, TryEndLabel);
-		}
-		else
-		{
-			instructions.Add(CilOpCodes.Br, Function.Labels[DefaultBlockRef]);
-		}
+
+		instructions.Add(IsLeave ? CilOpCodes.Leave : CilOpCodes.Br, Function.Labels[DefaultBlockRef]);
+		// Do we need to account for phi here?
 	}
 }
