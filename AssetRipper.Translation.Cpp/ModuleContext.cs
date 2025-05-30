@@ -275,9 +275,6 @@ internal sealed partial class ModuleContext
 			case LLVMTypeKind.LLVMMetadataTypeKind:
 				goto default;
 
-			case LLVMTypeKind.LLVMX86_MMXTypeKind:
-				goto default;
-
 			case LLVMTypeKind.LLVMTokenTypeKind:
 				return Definition.CorLibTypeFactory.Void;
 

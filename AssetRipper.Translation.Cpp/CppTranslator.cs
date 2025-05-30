@@ -39,7 +39,8 @@ public static unsafe class CppTranslator
 				}
 				finally
 				{
-					context.Dispose();
+					// Todo: write a libLLVMSharp wrapper with a try-catch around Dispose
+					//context.Dispose();
 				}
 			}
 			finally
