@@ -5,7 +5,6 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using SGF;
 using System.CodeDom.Compiler;
 using System.Collections.Immutable;
-using System.Diagnostics;
 
 namespace AssetRipper.Translation.Cpp.Tests.SourceGenerator;
 
@@ -15,10 +14,8 @@ public partial class TestGenerator() : IncrementalGenerator(nameof(TestGenerator
 	private const string Namespace = "AssetRipper.Translation.Cpp.Tests";
 	private const string SavesSuccessfullyAttribute = "SavesSuccessfullyAttribute";
 	private const string DecompilesSuccessfullyAttribute = "DecompilesSuccessfullyAttribute";
-	private const string RecompilesSuccessfullyAttribute = "RecompilesSuccessfullyAttribute";
 	private const string SavesSuccessfullyAttributeFullName = Namespace + "." + SavesSuccessfullyAttribute;
 	private const string DecompilesSuccessfullyAttributeFullName = Namespace + "." + DecompilesSuccessfullyAttribute;
-	private const string RecompilesSuccessfullyAttributeFullName = Namespace + "." + RecompilesSuccessfullyAttribute;
 
 	private readonly record struct FieldInfo(string? TypeNamespace, string TypeName, string FieldName);
 
@@ -28,7 +25,6 @@ public partial class TestGenerator() : IncrementalGenerator(nameof(TestGenerator
 
 		context.RegisterSourceOutput(GetFields(context, SavesSuccessfullyAttributeFullName).Collect(), AddSavesSuccessfullyTests);
 		context.RegisterSourceOutput(GetFields(context, DecompilesSuccessfullyAttributeFullName).Collect(), AddDecompilesSuccessfullyTests);
-		context.RegisterSourceOutput(GetFields(context, RecompilesSuccessfullyAttributeFullName).Collect(), AddRecompilesSuccessfullyTests);
 	}
 
 	private static void AddSavesSuccessfullyTests(SgfSourceProductionContext context, ImmutableArray<FieldInfo> array)
@@ -39,10 +35,6 @@ public partial class TestGenerator() : IncrementalGenerator(nameof(TestGenerator
 	private static void AddDecompilesSuccessfullyTests(SgfSourceProductionContext context, ImmutableArray<FieldInfo> array)
 	{
 		AddTests(context, array, "DecompilesSuccessfullyTests.g.cs", "DecompilesSuccessfully");
-	}
-
-	private static void AddRecompilesSuccessfullyTests(SgfSourceProductionContext context, ImmutableArray<FieldInfo> array)
-	{
 	}
 
 	private static void AddTests(SgfSourceProductionContext context, ImmutableArray<FieldInfo> array, string fileName, string methodName)
@@ -115,7 +107,6 @@ public partial class TestGenerator() : IncrementalGenerator(nameof(TestGenerator
 	{
 		context.AddSource(SavesSuccessfullyAttribute + ".g.cs", GetFieldAttributeText(Namespace, SavesSuccessfullyAttribute));
 		context.AddSource(DecompilesSuccessfullyAttribute + ".g.cs", GetFieldAttributeText(Namespace, DecompilesSuccessfullyAttribute));
-		context.AddSource(RecompilesSuccessfullyAttribute + ".g.cs", GetFieldAttributeText(Namespace, RecompilesSuccessfullyAttribute));
 	}
 
 	private static string GetFieldAttributeText(string @namespace, string name)

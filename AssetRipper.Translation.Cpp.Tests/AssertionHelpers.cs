@@ -1,8 +1,12 @@
 ﻿using AsmResolver.DotNet;
 using ICSharpCode.Decompiler.CSharp.ProjectDecompiler;
 using ICSharpCode.Decompiler.Metadata;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.Emit;
 using NUnit.Framework;
-using System.Diagnostics;
+using System.Numerics.Tensors;
+using System.Text;
 
 namespace AssetRipper.Translation.Cpp.Tests;
 
@@ -33,34 +37,14 @@ internal static class AssertionHelpers
 			UniversalAssemblyResolver assemblyResolver = new(null, true, ".NETCoreApp,Version=v9.0");
 			assemblyResolver.AddSearchDirectory(AppContext.BaseDirectory); // for any NuGet references
 			WholeProjectDecompiler projectDecompiler = new(assemblyResolver);
+			projectDecompiler.Settings.CheckForOverflowUnderflow = true;
 			projectDecompiler.DecompileProject(moduleFile, directory);
 
-			Assert.That(Directory.GetFiles(directory, "*.cs", SearchOption.AllDirectories), Has.Length.GreaterThan(0));
-
-			ProcessStartInfo startInfo = new ProcessStartInfo("dotnet", $"build \"{directory}\"")
+			using (Assert.EnterMultipleScope())
 			{
-				RedirectStandardOutput = true,
-				RedirectStandardError = true,
-				UseShellExecute = false,
-				CreateNoWindow = true
-			};
-
-			/*using Process? process = Process.Start(startInfo);
-			if (process is null)
-			{
-				Assert.Fail("Failed to start dotnet build process");
-				return;
+				Assert.That(Directory.GetFiles(directory, "*.cs", SearchOption.AllDirectories), Has.Length.GreaterThan(0));
+				Assert.That(SuccessfullyCompiles(directory));
 			}
-
-			process.WaitForExit();
-			string output = process.StandardOutput.ReadToEnd();
-			string error = process.StandardError.ReadToEnd();
-			Assert.Multiple(() =>
-			{
-				Assert.That(output, Is.Empty, $"Output: {output}");
-				Assert.That(error, Is.Empty, $"Error: {error}");
-				Assert.That(process.ExitCode, Is.Zero);
-			});*/
 		}
 		finally
 		{
@@ -77,5 +61,58 @@ internal static class AssertionHelpers
 	public static void AssertPublicFieldCount(TypeDefinition type, int count)
 	{
 		Assert.That(type.Fields.Count(f => f.IsPublic), Is.EqualTo(count));
+	}
+
+	private static bool SuccessfullyCompiles(string directory)
+	{
+		List<SyntaxTree> syntaxTrees = [];
+
+		foreach (string path in Directory.GetFiles(directory, "*.cs", SearchOption.AllDirectories))
+		{
+			AddCode(syntaxTrees, File.ReadAllText(path));
+		}
+
+		IEnumerable<MetadataReference> references =
+		[
+			MetadataReference.CreateFromFile(typeof(object).Assembly.Location),
+			MetadataReference.CreateFromFile(typeof(Console).Assembly.Location),
+			MetadataReference.CreateFromFile(GetAssemblyPath("System.Runtime.dll")),
+			MetadataReference.CreateFromFile(typeof(TensorPrimitives).Assembly.Location),
+		];
+
+		using MemoryStream polyfillOutputStream = new();
+
+		// Emit compiled assembly into MemoryStream
+		CSharpCompilation compilation = CreateCompilation(syntaxTrees, references);
+		EmitResult result = compilation.Emit(polyfillOutputStream);
+		return result.Success;
+
+		static void AddCode(List<SyntaxTree> syntaxTrees, string code)
+		{
+			SyntaxTree syntaxTree = CSharpSyntaxTree.ParseText(code, encoding: Encoding.UTF8);
+			syntaxTrees.Add(syntaxTree);
+		}
+
+		static CSharpCompilation CreateCompilation(IEnumerable<SyntaxTree> syntaxTrees, IEnumerable<MetadataReference> references)
+		{
+			// Define compilation options
+			CSharpCompilationOptions compilationOptions = new(OutputKind.DynamicallyLinkedLibrary, checkOverflow: true, allowUnsafe: true);
+
+			// Create the compilation
+			CSharpCompilation compilation = CSharpCompilation.Create(
+				"ConvertedCode",
+				syntaxTrees,
+				references,
+				compilationOptions
+			);
+			return compilation;
+		}
+
+		static string GetAssemblyPath(string fileName)
+		{
+			string coreLibPath = typeof(object).Assembly.Location;
+			string directory = Path.GetDirectoryName(coreLibPath) ?? throw new InvalidOperationException("Could not determine directory of core library.");
+			return Path.Combine(directory, fileName);
+		}
 	}
 }

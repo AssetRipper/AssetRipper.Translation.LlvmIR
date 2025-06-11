@@ -14,8 +14,8 @@
 		<PackageReference Include="AssetRipper.CIL" Version="1.1.6" />
 		<PackageReference Include="HarmonyX" Version="2.14.0" />
 		<PackageReference Include="LLVMSharp" Version="20.1.2" />
-		<PackageReference Include="System.IO.Hashing" Version="9.0.5" />
-		<PackageReference Include="System.Numerics.Tensors" Version="9.0.5" />
+		<PackageReference Include="System.IO.Hashing" Version="9.0.6" />
+		<PackageReference Include="System.Numerics.Tensors" Version="9.0.6" />
 	</ItemGroup>
 
 	<ItemGroup>
