@@ -1,4 +1,7 @@
-﻿namespace AssetRipper.Translation.Cpp.Tests;
+﻿using NUnit.Framework;
+using System.Reflection;
+
+namespace AssetRipper.Translation.Cpp.Tests;
 
 public partial class SimpleTests
 {
@@ -12,6 +15,20 @@ public partial class SimpleTests
 		  ret i32 %3
 		}
 		""";
+
+	[Test]
+	public void Noop_ExecutesCorrectly()
+	{
+		ExecutionHelpers.RunTest(Noop.TranslateToCIL(), assembly =>
+		{
+			Type? type = assembly.GetType("GlobalFunctions");
+			Assert.That(type, Is.Not.Null);
+			MethodInfo? method = type.GetMethod("do_nothing", BindingFlags.Public | BindingFlags.Static);
+			Assert.That(method, Is.Not.Null);
+			int result = (int)method.Invoke(null, [42])!;
+			Assert.That(result, Is.EqualTo(42));
+		});
+	}
 
 	[SavesSuccessfully]
 	[DecompilesSuccessfully]

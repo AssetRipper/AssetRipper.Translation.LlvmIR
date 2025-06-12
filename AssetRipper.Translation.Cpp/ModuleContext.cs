@@ -571,7 +571,7 @@ internal sealed partial class ModuleContext
 
 	private static TypeDefinition CreateStaticType(ModuleDefinition moduleDefinition, string name, bool @public = true)
 	{
-		TypeDefinition typeDefinition = new(null, name, (@public ? TypeAttributes.Public : TypeAttributes.NotPublic) | TypeAttributes.Abstract | TypeAttributes.Sealed);
+		TypeDefinition typeDefinition = new(null, name, (@public ? TypeAttributes.Public : TypeAttributes.NotPublic) | TypeAttributes.Abstract | TypeAttributes.Sealed, moduleDefinition.CorLibTypeFactory.Object.ToTypeDefOrRef());
 		moduleDefinition.TopLevelTypes.Add(typeDefinition);
 		return typeDefinition;
 	}
