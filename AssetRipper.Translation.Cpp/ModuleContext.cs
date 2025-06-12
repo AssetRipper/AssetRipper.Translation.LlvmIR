@@ -222,7 +222,7 @@ internal sealed partial class ModuleContext
 					16 => Definition.CorLibTypeFactory.Int16,
 					32 => Definition.CorLibTypeFactory.Int32,
 					64 => Definition.CorLibTypeFactory.Int64,
-					//128
+					128 => Definition.DefaultImporter.ImportTypeSignature(typeof(Int128)),
 					_ => throw new NotSupportedException(),
 				};
 
@@ -270,16 +270,25 @@ internal sealed partial class ModuleContext
 				return Definition.CorLibTypeFactory.Void.MakePointerType();
 
 			case LLVMTypeKind.LLVMVectorTypeKind:
-				goto default;
+			case LLVMTypeKind.LLVMScalableVectorTypeKind:
+				unsafe
+				{
+					// Since we control the target platform, we can set vscale to 1.
+
+					// https://github.com/dotnet/LLVMSharp/pull/235
+					//TypeSignature elementType = GetTypeSignature(type.ElementType);
+					//int count = (int)type.VectorSize;
+					TypeSignature elementType = GetTypeSignature(LLVM.GetElementType(type));
+					int count = (int)LLVM.GetVectorSize(type);
+					TypeDefinition arrayType = GetOrCreateInlineArray(elementType, count).Type;
+					return arrayType.ToTypeSignature();
+				}
 
 			case LLVMTypeKind.LLVMMetadataTypeKind:
 				goto default;
 
 			case LLVMTypeKind.LLVMTokenTypeKind:
 				return Definition.CorLibTypeFactory.Void;
-
-			case LLVMTypeKind.LLVMScalableVectorTypeKind:
-				goto default;
 
 			case LLVMTypeKind.LLVMBFloatTypeKind:
 				//Half is just an approximation of BFloat16, which is not yet supported in .NET

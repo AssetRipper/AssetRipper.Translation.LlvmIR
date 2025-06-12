@@ -161,4 +161,40 @@ public partial class SimpleTests
 		  ret i32 %23
 		}
 		""";
+
+	[SavesSuccessfully]
+	[DecompilesSuccessfully]
+	private const string HalfAdd = """
+		define dso_local half @add(half noundef %0, half noundef %1) {
+		  %3 = fadd half %0, %1
+		  ret half %3
+		}
+		""";
+
+	[SavesSuccessfully]
+	[DecompilesSuccessfully]
+	private const string Int128Add = """
+		define dso_local i128 @add(i128 noundef %0, i128 noundef %1) {
+		  %3 = add i128 %0, %1
+		  ret i128 %3
+		}
+		""";
+
+	[SavesSuccessfully]
+	[DecompilesSuccessfully]
+	private const string VectorAdd = """
+		define linkonce_odr dso_local noundef <4 x i32> @add(<4 x i32> noundef %0, <4 x i32> noundef %1) {
+		  %3 = add <4 x i32> %0, %1
+		  ret <4 x i32> %3
+		}
+		""";
+
+	[SavesSuccessfully]
+	[DecompilesSuccessfully]
+	private const string VectorVariableSizeAdd = """
+		define linkonce_odr dso_local noundef <vscale x 4 x i32> @add(<vscale x 4 x i32> noundef %0, <vscale x 4 x i32> noundef %1) {
+		  %3 = add <vscale x 4 x i32> %0, %1
+		  ret <vscale x 4 x i32> %3
+		}
+		""";
 }
