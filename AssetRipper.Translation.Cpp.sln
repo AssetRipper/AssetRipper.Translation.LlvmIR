@@ -10,8 +10,10 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		.editorconfig = .editorconfig
 		.gitignore = .gitignore
 		Directory.Build.props = Directory.Build.props
+		LICENSE.txt = LICENSE.txt
 		Notes.md = Notes.md
 		nuget.config = nuget.config
+		README.md = README.md
 	EndProjectSection
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AssetRipper.Translation.Cpp.SampleGenerator", "AssetRipper.Translation.Cpp.SampleGenerator\AssetRipper.Translation.Cpp.SampleGenerator.csproj", "{257D34DF-E09A-44B9-A611-C0A0FBBFBA20}"

@@ -3,6 +3,8 @@ using LLVMSharp.Interop;
 
 namespace AssetRipper.Translation.Cpp;
 
+// Todo: remove this class after next LLVMSharp release
+// https://github.com/dotnet/LLVMSharp/pull/233
 [HarmonyPatch]
 internal static class Patches
 {

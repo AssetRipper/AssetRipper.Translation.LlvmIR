@@ -39,7 +39,7 @@ public static unsafe class CppTranslator
 				}
 				finally
 				{
-					// Todo: write a libLLVMSharp wrapper with a try-catch around Dispose
+					// https://github.com/dotnet/LLVMSharp/issues/234
 					//context.Dispose();
 				}
 			}
@@ -48,6 +48,7 @@ public static unsafe class CppTranslator
 				// This fails randomly with no real explanation.
 				// I'm fairly certain that the IR text data is only referenced (not copied),
 				// so the memory leak of not disposing the buffer is probably not a big deal.
+				// https://github.com/dotnet/LLVMSharp/issues/234
 				//LLVM.DisposeMemoryBuffer(buffer);
 
 				Marshal.FreeHGlobal(namePtr);

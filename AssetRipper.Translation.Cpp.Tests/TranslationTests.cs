@@ -5,6 +5,7 @@ using NUnit.Framework;
 
 namespace AssetRipper.Translation.Cpp.Tests;
 
+[NonParallelizable]
 public class TranslationTests
 {
 	[Test]

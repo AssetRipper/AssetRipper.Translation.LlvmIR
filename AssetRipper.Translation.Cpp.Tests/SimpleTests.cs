@@ -3,6 +3,7 @@ using System.Reflection;
 
 namespace AssetRipper.Translation.Cpp.Tests;
 
+[NonParallelizable]
 public partial class SimpleTests
 {
 	[SavesSuccessfully]
