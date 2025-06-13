@@ -52,31 +52,35 @@ internal sealed class BinaryMathInstructionContext : InstructionContext
 	public string Name => Opcode switch
 	{
 		LLVMOpcode.LLVMAdd => NoSignedWrap
-			? "AddSigned"
+			? nameof(NumericHelper.AddSigned)
 			: NoUnsignedWrap
-				? "AddUnsigned"
-				: "Add",
-		LLVMOpcode.LLVMFAdd => "Add",
+				? nameof(NumericHelper.AddUnsigned)
+				: nameof(NumericHelper.Add),
+		LLVMOpcode.LLVMFAdd => nameof(NumericHelper.Add),
 		LLVMOpcode.LLVMSub => NoSignedWrap
-			? "SubtractSigned"
+			? nameof(NumericHelper.SubtractSigned)
 			: NoUnsignedWrap
-				? "SubtractUnsigned"
-				: "Subtract",
-		LLVMOpcode.LLVMFSub => "Subtract",
+				? nameof(NumericHelper.SubtractUnsigned)
+				: nameof(NumericHelper.Subtract),
+		LLVMOpcode.LLVMFSub => nameof(NumericHelper.Subtract),
 		LLVMOpcode.LLVMMul => NoSignedWrap
-			? "MultiplySigned"
+			? nameof(NumericHelper.MultiplySigned)
 			: NoUnsignedWrap
-				? "MultiplyUnsigned"
-				: "Multiply",
-		LLVMOpcode.LLVMFMul => "Multiply",
-		LLVMOpcode.LLVMSDiv or LLVMOpcode.LLVMFDiv or LLVMOpcode.LLVMUDiv => "Divide", // Might need more specificity
-		LLVMOpcode.LLVMSRem or LLVMOpcode.LLVMFRem or LLVMOpcode.LLVMURem => "Remainder", // Might need more specificity
-		LLVMOpcode.LLVMShl => "LeftShift",
-		LLVMOpcode.LLVMLShr => "RightShiftLogical",
-		LLVMOpcode.LLVMAShr => "RightShiftArithmetic",
-		LLVMOpcode.LLVMAnd => "And",
-		LLVMOpcode.LLVMOr => "Or",
-		LLVMOpcode.LLVMXor => "Xor",
+				? nameof(NumericHelper.MultiplyUnsigned)
+				: nameof(NumericHelper.Multiply),
+		LLVMOpcode.LLVMFMul => nameof(NumericHelper.Multiply),
+		LLVMOpcode.LLVMFDiv => nameof(NumericHelper.Divide),
+		LLVMOpcode.LLVMSDiv => nameof(NumericHelper.DivideSigned),
+		LLVMOpcode.LLVMUDiv => nameof(NumericHelper.DivideUnsigned),
+		LLVMOpcode.LLVMFRem => nameof(NumericHelper.Remainder),
+		LLVMOpcode.LLVMSRem => nameof(NumericHelper.RemainderSigned),
+		LLVMOpcode.LLVMURem => nameof(NumericHelper.RemainderUnsigned),
+		LLVMOpcode.LLVMShl => nameof(NumericHelper.ShiftLeft),
+		LLVMOpcode.LLVMLShr => nameof(NumericHelper.ShiftRightLogical),
+		LLVMOpcode.LLVMAShr => nameof(NumericHelper.ShiftRightArithmetic),
+		LLVMOpcode.LLVMAnd => nameof(NumericHelper.And),
+		LLVMOpcode.LLVMOr => nameof(NumericHelper.Or),
+		LLVMOpcode.LLVMXor => nameof(NumericHelper.Xor),
 		_ => throw new NotSupportedException(),
 	};
 
