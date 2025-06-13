@@ -14,6 +14,14 @@ internal sealed class InlineArrayContext
 	public TypeDefinition Type { get; }
 	public TypeSignature ElementType { get; }
 	public int Length { get; }
+	public TypeSignature UltimateElementType
+	{
+		get
+		{
+			GetUltimateElementType(out TypeSignature elementType, out _);
+			return elementType;
+		}
+	}
 
 	private InlineArrayContext(ModuleContext module, TypeDefinition type, TypeSignature elementType, int length)
 	{
@@ -29,6 +37,12 @@ internal sealed class InlineArrayContext
 		length = Length;
 	}
 
+	/// <summary>
+	/// Determines the ultimate element type of the inline array, iterating through any nested inline arrays.
+	/// </summary>
+	/// <param name="elementType">The ultimate element type.</param>
+	/// <param name="length">The ultimate length.</param>
+	/// <returns>True if any nested inline arrays were encountered.</returns>
 	public bool GetUltimateElementType(out TypeSignature elementType, out int length)
 	{
 		elementType = ElementType;

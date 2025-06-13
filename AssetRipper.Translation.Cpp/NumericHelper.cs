@@ -1,5 +1,7 @@
 ﻿using System.Numerics;
+using System.Numerics.Tensors;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 
 namespace AssetRipper.Translation.Cpp;
 
@@ -52,5 +54,12 @@ internal static partial class NumericHelper
 		where T : IBitwiseOperators<T, T, T>
 	{
 		return x ^ y;
+	}
+
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	public static T CtPop<T>(T x) where T : unmanaged
+	{
+		long count = TensorPrimitives.PopCount(MemoryMarshal.AsBytes(new ReadOnlySpan<T>(ref x)));
+		return ConvertFromInt32<T>((int)count);
 	}
 }

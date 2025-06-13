@@ -1,11 +1,14 @@
 ﻿using AsmResolver.DotNet;
 using AsmResolver.DotNet.Code.Cil;
 using AsmResolver.DotNet.Collections;
+using AsmResolver.DotNet.Signatures;
 using AsmResolver.PE.DotNet.Cil;
+using System.Diagnostics.CodeAnalysis;
+using System.Text.RegularExpressions;
 
 namespace AssetRipper.Translation.Cpp;
 
-internal static class IntrinsicFunctionImplementer
+internal static partial class IntrinsicFunctionImplementer
 {
 	public static bool TryHandleIntrinsicFunction(FunctionContext context)
 	{
@@ -16,12 +19,9 @@ internal static class IntrinsicFunctionImplementer
 
 		CilInstructionCollection instructions = context.Definition.CilMethodBody!.Instructions;
 
-		MethodDefinition? implementation = GetInjectedIntrinsic(context.Module, context.Name);
-		if (implementation != null && implementation.Parameters.Count == context.Definition.Parameters.Count)
+		if (TryGetInjectedIntrinsic(context.Module, context.Name, out MethodDefinition? implementation) && implementation.Parameters.Count == context.Definition.Parameters.Count)
 		{
-			TypeDefinition declaringType = context.Module.IntrinsicsType.NestedTypes.First(t => t.Name == "Implemented");
-			context.Definition.DeclaringType!.Methods.Remove(context.Definition);
-			declaringType.Methods.Add(context.Definition);
+			MoveToImplementedType(context);
 
 			foreach (Parameter parameter in context.Definition.Parameters)
 			{
@@ -32,11 +32,13 @@ internal static class IntrinsicFunctionImplementer
 
 			instructions.Add(CilOpCodes.Ret);
 		}
+		else if (TryImplementNumericOperation(context))
+		{
+			MoveToImplementedType(context);
+		}
 		else
 		{
-			TypeDefinition declaringType = context.Module.IntrinsicsType.NestedTypes.First(t => t.Name == "Unimplemented");
-			context.Definition.DeclaringType!.Methods.Remove(context.Definition);
-			declaringType.Methods.Add(context.Definition);
+			MoveToUnimplementedType(context);
 
 			instructions.Add(CilOpCodes.Ldnull);
 			instructions.Add(CilOpCodes.Throw);
@@ -45,8 +47,89 @@ internal static class IntrinsicFunctionImplementer
 		return true;
 	}
 
-	private static MethodDefinition? GetInjectedIntrinsic(ModuleContext context, string name)
+	private static void MoveToImplementedType(FunctionContext context)
 	{
-		return context.IntrinsicsType.Methods.FirstOrDefault(t => t.Name == name && t.IsPublic && t.GenericParameters.Count is 0);
+		TypeDefinition declaringType = context.Module.IntrinsicsType.NestedTypes.First(t => t.Name == "Implemented");
+		context.Definition.DeclaringType!.Methods.Remove(context.Definition);
+		declaringType.Methods.Add(context.Definition);
 	}
+
+	private static void MoveToUnimplementedType(FunctionContext context)
+	{
+		TypeDefinition declaringType = context.Module.IntrinsicsType.NestedTypes.First(t => t.Name == "Unimplemented");
+		context.Definition.DeclaringType!.Methods.Remove(context.Definition);
+		declaringType.Methods.Add(context.Definition);
+	}
+
+	private static bool TryGetInjectedIntrinsic(ModuleContext context, string name, [NotNullWhen(true)] out MethodDefinition? result)
+	{
+		result = context.IntrinsicsType.Methods.FirstOrDefault(m => m.Name == name && m.IsPublic && m.GenericParameters.Count is 0);
+		return result is not null;
+	}
+
+	private static bool TryImplementNumericOperation(FunctionContext context)
+	{
+		if (context.Parameters.Length == 0 || context.IsVoidReturn)
+		{
+			return false;
+		}
+
+		if (!TryGetOperationName(context.MangledName, out string? operationName))
+		{
+			return false;
+		}
+
+		TypeSignature returnTypeSignature = context.Definition.Signature!.ReturnType;
+		TypeDefinition returnTypeDefinition = returnTypeSignature.Resolve() ?? throw new NullReferenceException(nameof(returnTypeDefinition));
+
+		MethodSpecification? implementation;
+		if (context.Module.InlineArrayTypes.TryGetValue(returnTypeDefinition, out InlineArrayContext? arrayType))
+		{
+			implementation = context.Module.InlineArrayNumericHelperType.Methods
+				.FirstOrDefault(m => StringComparer.OrdinalIgnoreCase.Equals(m.Name, operationName) && m.IsPublic)
+				?.MakeGenericInstanceMethod(returnTypeSignature, arrayType.UltimateElementType);
+		}
+		else
+		{
+			implementation = context.Module.NumericHelperType.Methods
+				.FirstOrDefault(m => StringComparer.OrdinalIgnoreCase.Equals(m.Name, operationName) && m.IsPublic)
+				?.MakeGenericInstanceMethod(returnTypeSignature);
+		}
+		if (implementation is null)
+		{
+			return false;
+		}
+
+		CilInstructionCollection instructions = context.Definition.CilMethodBody!.Instructions;
+
+		instructions.Add(CilOpCodes.Ldarg_0);
+		if (implementation.Method!.Signature!.GetTotalParameterCount() == 2)
+		{
+			instructions.Add(CilOpCodes.Ldarg_1);
+		}
+		instructions.Add(CilOpCodes.Call, implementation);
+		instructions.Add(CilOpCodes.Ret);
+
+		return true;
+	}
+
+	private static bool TryMatch(this Regex regex, string input, out Match match)
+	{
+		match = regex.Match(input);
+		return match.Success;
+	}
+
+	private static bool TryGetOperationName(string name, [NotNullWhen(true)] out string? operationName)
+	{
+		if (SimpleOperationRegex.TryMatch(name, out Match match))
+		{
+			operationName = match.Groups[1].Value;
+			return true;
+		}
+		operationName = null;
+		return false;
+	}
+
+	[GeneratedRegex(@"^llvm\.([a-z0-9_]+)\.([a-z0-9_]+)$")]
+	private static partial Regex SimpleOperationRegex { get; }
 }
