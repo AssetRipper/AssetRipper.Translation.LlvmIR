@@ -187,7 +187,7 @@ internal static class InlineArrayNumericHelper
 
 	public static TBuffer ShiftLeft<TBuffer, TElement>(TBuffer x, TBuffer y)
 		where TBuffer : struct, IInlineArray<TElement>
-		where TElement : IShiftOperators<TElement, TElement, TElement>
+		where TElement : IShiftOperators<TElement, int, TElement>
 	{
 		TBuffer result = default;
 		for (int i = 0; i < TBuffer.Length; i++)
@@ -199,7 +199,7 @@ internal static class InlineArrayNumericHelper
 
 	public static TBuffer ShiftRightLogical<TBuffer, TElement>(TBuffer x, TBuffer y)
 		where TBuffer : struct, IInlineArray<TElement>
-		where TElement : IShiftOperators<TElement, TElement, TElement>
+		where TElement : IShiftOperators<TElement, int, TElement>
 	{
 		TBuffer result = default;
 		for (int i = 0; i < TBuffer.Length; i++)
@@ -211,7 +211,7 @@ internal static class InlineArrayNumericHelper
 
 	public static TBuffer ShiftRightArithmetic<TBuffer, TElement>(TBuffer x, TBuffer y)
 		where TBuffer : struct, IInlineArray<TElement>
-		where TElement : IShiftOperators<TElement, TElement, TElement>
+		where TElement : IShiftOperators<TElement, int, TElement>
 	{
 		TBuffer result = default;
 		for (int i = 0; i < TBuffer.Length; i++)

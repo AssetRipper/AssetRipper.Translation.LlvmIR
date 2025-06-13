@@ -3,7 +3,7 @@ using System.Runtime.CompilerServices;
 
 namespace AssetRipper.Translation.Cpp;
 
-internal static class NumericHelper
+internal static partial class NumericHelper
 {
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public static T Add<T>(T x, T y)
@@ -167,23 +167,23 @@ internal static class NumericHelper
 
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public static T ShiftLeft<T>(T x, T y)
-		where T : IShiftOperators<T, T, T>
+		where T : IShiftOperators<T, int, T>
 	{
-		return x << y;
+		return x << ConvertToInt32(y);
 	}
 
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public static T ShiftRightArithmetic<T>(T x, T y)
-		where T : IShiftOperators<T, T, T>
+		where T : IShiftOperators<T, int, T>
 	{
-		return x >> y;
+		return x >> ConvertToInt32(y);
 	}
 
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public static T ShiftRightLogical<T>(T x, T y)
-		where T : IShiftOperators<T, T, T>
+		where T : IShiftOperators<T, int, T>
 	{
-		return x >>> y;
+		return x >>> ConvertToInt32(y);
 	}
 
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]

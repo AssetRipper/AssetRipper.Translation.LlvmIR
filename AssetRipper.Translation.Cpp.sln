@@ -26,6 +26,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AssetRipper.Translation.Cpp
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AssetRipper.Translation.Cpp.Tests.SourceGenerator", "AssetRipper.Translation.Cpp.Tests.SourceGenerator\AssetRipper.Translation.Cpp.Tests.SourceGenerator.csproj", "{B235E51F-2833-4921-B2B3-9ADE63D9341B}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AssetRipper.Translation.Cpp.SourceGenerator", "AssetRipper.Translation.Cpp.SourceGenerator\AssetRipper.Translation.Cpp.SourceGenerator.csproj", "{065B4C6C-36BE-4552-88BF-86B502716FB4}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -56,6 +58,10 @@ Global
 		{B235E51F-2833-4921-B2B3-9ADE63D9341B}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{B235E51F-2833-4921-B2B3-9ADE63D9341B}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{B235E51F-2833-4921-B2B3-9ADE63D9341B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{065B4C6C-36BE-4552-88BF-86B502716FB4}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{065B4C6C-36BE-4552-88BF-86B502716FB4}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{065B4C6C-36BE-4552-88BF-86B502716FB4}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{065B4C6C-36BE-4552-88BF-86B502716FB4}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
