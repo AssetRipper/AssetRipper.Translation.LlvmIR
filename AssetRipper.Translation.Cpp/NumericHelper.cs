@@ -187,21 +187,21 @@ internal static partial class NumericHelper
 	}
 
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
-	public static T And<T>(T x, T y)
+	public static T BitwiseAnd<T>(T x, T y)
 		where T : IBitwiseOperators<T, T, T>
 	{
 		return x & y;
 	}
 
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
-	public static T Or<T>(T x, T y)
+	public static T BitwiseOr<T>(T x, T y)
 		where T : IBitwiseOperators<T, T, T>
 	{
 		return x | y;
 	}
 
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
-	public static T Xor<T>(T x, T y)
+	public static T BitwiseXor<T>(T x, T y)
 		where T : IBitwiseOperators<T, T, T>
 	{
 		return x ^ y;

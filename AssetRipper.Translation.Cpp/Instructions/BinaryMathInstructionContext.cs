@@ -78,9 +78,9 @@ internal sealed class BinaryMathInstructionContext : InstructionContext
 		LLVMOpcode.LLVMShl => nameof(NumericHelper.ShiftLeft),
 		LLVMOpcode.LLVMLShr => nameof(NumericHelper.ShiftRightLogical),
 		LLVMOpcode.LLVMAShr => nameof(NumericHelper.ShiftRightArithmetic),
-		LLVMOpcode.LLVMAnd => nameof(NumericHelper.And),
-		LLVMOpcode.LLVMOr => nameof(NumericHelper.Or),
-		LLVMOpcode.LLVMXor => nameof(NumericHelper.Xor),
+		LLVMOpcode.LLVMAnd => nameof(NumericHelper.BitwiseAnd),
+		LLVMOpcode.LLVMOr => nameof(NumericHelper.BitwiseOr),
+		LLVMOpcode.LLVMXor => nameof(NumericHelper.BitwiseXor),
 		_ => throw new NotSupportedException(),
 	};
 

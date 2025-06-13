@@ -221,7 +221,7 @@ internal static class InlineArrayNumericHelper
 		return result;
 	}
 
-	public static TBuffer And<TBuffer, TElement>(TBuffer x, TBuffer y)
+	public static TBuffer BitwiseAnd<TBuffer, TElement>(TBuffer x, TBuffer y)
 		where TBuffer : struct, IInlineArray<TElement>
 		where TElement : IBitwiseOperators<TElement, TElement, TElement>
 	{
@@ -230,7 +230,7 @@ internal static class InlineArrayNumericHelper
 		return result;
 	}
 
-	public static TBuffer Or<TBuffer, TElement>(TBuffer x, TBuffer y)
+	public static TBuffer BitwiseOr<TBuffer, TElement>(TBuffer x, TBuffer y)
 		where TBuffer : struct, IInlineArray<TElement>
 		where TElement : IBitwiseOperators<TElement, TElement, TElement>
 	{
@@ -239,14 +239,14 @@ internal static class InlineArrayNumericHelper
 		return result;
 	}
 
-	public static TBuffer Xor<TBuffer, TElement>(TBuffer x, TBuffer y)
+	public static TBuffer BitwiseXor<TBuffer, TElement>(TBuffer x, TBuffer y)
 		where TBuffer : struct, IInlineArray<TElement>
 		where TElement : IBitwiseOperators<TElement, TElement, TElement>
 	{
 		TBuffer result = default;
 		for (int i = 0; i < TBuffer.Length; i++)
 		{
-			result.SetElement(i, NumericHelper.Xor(x.GetElement<TBuffer, TElement>(i), y.GetElement<TBuffer, TElement>(i)));
+			result.SetElement(i, NumericHelper.BitwiseXor(x.GetElement<TBuffer, TElement>(i), y.GetElement<TBuffer, TElement>(i)));
 		}
 		return result;
 	}
