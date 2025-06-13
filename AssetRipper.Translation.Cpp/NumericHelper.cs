@@ -7,12 +7,9 @@ internal static partial class NumericHelper
 {
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public static T Negate<T>(T x)
-		where T : INumberBase<T>
+		where T : IUnaryNegationOperators<T, T>
 	{
-		unchecked
-		{
-			return -x;
-		}
+		return unchecked(-x);
 	}
 
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]

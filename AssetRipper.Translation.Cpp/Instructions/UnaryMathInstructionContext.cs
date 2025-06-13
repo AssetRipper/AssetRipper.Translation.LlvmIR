@@ -23,7 +23,7 @@ internal sealed class UnaryMathInstructionContext : InstructionContext
 
 	public string Name => Opcode switch
 	{
-		LLVMOpcode.LLVMFNeg => "Negate",
+		LLVMOpcode.LLVMFNeg => nameof(NumericHelper.Negate),
 		_ => throw new NotSupportedException(),
 	};
 
