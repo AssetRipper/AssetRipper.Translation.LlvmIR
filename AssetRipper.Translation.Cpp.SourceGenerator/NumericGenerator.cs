@@ -20,10 +20,11 @@ public partial class NumericGenerator() : IncrementalGenerator(nameof(NumericGen
 	private static IEnumerable<string> IntegerTypes => IntegerTypePairs.SelectMany(pair => (IEnumerable<string>)[pair.Signed, pair.Unsigned]);
 
 	private static IEnumerable<(string Operation, char Symbol, string RequiredInterface)> SimpleOperations =>
+	private static IEnumerable<(string Operation, char Symbol, string RequiredInterfaces)> SimpleOperations =>
 	[
-		("Add", '+', "IAdditionOperators<T, T, T>"),
+		("Add", '+', "IAdditionOperators<T, T, T>, IAdditiveIdentity<T, T>"),
 		("Subtract", '-', "ISubtractionOperators<T, T, T>"),
-		("Multiply", '*', "IMultiplyOperators<T, T, T>"),
+		("Multiply", '*', "IMultiplyOperators<T, T, T>, IMultiplicativeIdentity<T, T>"),
 		("Divide", '/', "IDivisionOperators<T, T, T>"),
 		("Remainder", '%', "IModulusOperators<T, T, T>"),
 	];
@@ -33,6 +34,7 @@ public partial class NumericGenerator() : IncrementalGenerator(nameof(NumericGen
 		context.RegisterPostInitializationOutput(static context =>
 		{
 			context.AddSource("NumericHelper.g.cs", GenerateNumericHelper());
+			context.AddSource("InlineArrayNumericHelper.g.cs", GenerateInlineArrayNumericHelper());
 		});
 	}
 
@@ -68,11 +70,11 @@ public partial class NumericGenerator() : IncrementalGenerator(nameof(NumericGen
 					writer.WriteLine("return default;");
 				}
 			}
-			foreach ((string operation, char symbol, string requiredInterface) in SimpleOperations)
+			foreach ((string operation, char symbol, string requiredInterfaces) in SimpleOperations)
 			{
 				writer.WriteLineNoTabs();
-				writer.WriteLine($"[MethodImpl(MethodImplOptions.AggressiveInlining)]");
-				writer.WriteLine($"public static T {operation}<T>(T x, T y) where T : {requiredInterface}");
+				writer.WriteLine("[MethodImpl(MethodImplOptions.AggressiveInlining)]");
+				writer.WriteLine($"public static T {operation}<T>(T x, T y) where T : {requiredInterfaces}");
 				using (new CurlyBrackets(writer))
 				{
 					writer.WriteLine($"return unchecked(x {symbol} y);");
@@ -82,7 +84,7 @@ public partial class NumericGenerator() : IncrementalGenerator(nameof(NumericGen
 					writer.WriteLineNoTabs();
 					writer.WriteLine("[MethodImpl(MethodImplOptions.AggressiveInlining)]");
 					string methodName = emittingSignedMethod ? $"{operation}Signed" : $"{operation}Unsigned";
-					writer.WriteLine($"public static T {methodName}<T>(T x, T y) where T : {requiredInterface}");
+					writer.WriteLine($"public static T {methodName}<T>(T x, T y) where T : {requiredInterfaces}");
 					using (new CurlyBrackets(writer))
 					{
 						using (new Checked(writer))
@@ -113,5 +115,75 @@ public partial class NumericGenerator() : IncrementalGenerator(nameof(NumericGen
 		}
 
 		return stringWriter.ToString();
+	}
+
+	private static string GenerateInlineArrayNumericHelper()
+	{
+		StringWriter stringWriter = new() { NewLine = "\n" };
+		IndentedTextWriter writer = IndentedTextWriterFactory.Create(stringWriter);
+
+		writer.WriteGeneratedCodeWarning();
+		writer.WriteLineNoTabs();
+		writer.WriteUsing("System.Numerics");
+		writer.WriteUsing("System.Numerics.Tensors");
+		writer.WriteUsing("System.Runtime.CompilerServices");
+		writer.WriteLineNoTabs();
+		writer.WriteFileScopedNamespace("AssetRipper.Translation.Cpp");
+		writer.WriteLineNoTabs();
+		writer.WriteLine("static partial class InlineArrayNumericHelper");
+		using (new CurlyBrackets(writer))
+		{
+			foreach ((string operation, char symbol, string requiredInterfaces) in SimpleOperations)
+			{
+				WriteBinaryTensorPrimitivesMethod(writer, operation, requiredInterfaces.Replace("T", "TElement"));
+				WriteBinaryNumericHelperMethod(writer, $"{operation}Signed", requiredInterfaces.Replace("T", "TElement"));
+				WriteBinaryNumericHelperMethod(writer, $"{operation}Unsigned", requiredInterfaces.Replace("T", "TElement"));
+			}
+			WriteBinaryNumericHelperMethod(writer, "ShiftLeft", "IShiftOperators<TElement, int, TElement>");
+			WriteBinaryNumericHelperMethod(writer, "ShiftRightLogical", "IShiftOperators<TElement, int, TElement>");
+			WriteBinaryNumericHelperMethod(writer, "ShiftRightArithmetic", "IShiftOperators<TElement, int, TElement>");
+			WriteBinaryTensorPrimitivesMethod(writer, "BitwiseAnd", "IBitwiseOperators<TElement, TElement, TElement>");
+			WriteBinaryTensorPrimitivesMethod(writer, "BitwiseOr", "IBitwiseOperators<TElement, TElement, TElement>");
+			WriteBinaryNumericHelperMethod(writer, "BitwiseXor", "IBitwiseOperators<TElement, TElement, TElement>");
+		}
+
+		return stringWriter.ToString();
+
+		static void WriteBinaryTensorPrimitivesMethod(IndentedTextWriter writer, string methodName, string requiredInterfaces)
+		{
+			writer.WriteLineNoTabs();
+			writer.WriteLine($"public static TBuffer {methodName}<TBuffer, TElement>(TBuffer x, TBuffer y)");
+			using (new Indented(writer))
+			{
+				writer.WriteLine("where TBuffer : struct, IInlineArray<TElement>");
+				writer.WriteLine($"where TElement : {requiredInterfaces}");
+			}
+			using (new CurlyBrackets(writer))
+			{
+				writer.WriteLine("TBuffer result = default;");
+				writer.WriteLine($"TensorPrimitives.{methodName}(x.AsReadOnlySpan<TBuffer, TElement>(), y.AsReadOnlySpan<TBuffer, TElement>(), result.AsSpan<TBuffer, TElement>());");
+				writer.WriteLine("return result;");
+			}
+		}
+
+		static void WriteBinaryNumericHelperMethod(IndentedTextWriter writer, string methodName, string requiredInterfaces)
+		{
+			writer.WriteLineNoTabs();
+			writer.WriteLine($"public static TBuffer {methodName}<TBuffer, TElement>(TBuffer x, TBuffer y)");
+			using (new Indented(writer))
+			{
+				writer.WriteLine("where TBuffer : struct, IInlineArray<TElement>");
+				writer.WriteLine($"where TElement : {requiredInterfaces}");
+			}
+			using (new CurlyBrackets(writer))
+			{
+				writer.WriteLine("TBuffer result = default;");
+				using (new For(writer, "int i = 0", "i < TBuffer.Length", "i++"))
+				{
+					writer.WriteLine($"result.SetElement(i, NumericHelper.{methodName}<TElement>(x.GetElement<TBuffer, TElement>(i), y.GetElement<TBuffer, TElement>(i)));");
+				}
+				writer.WriteLine("return result;");
+			}
+		}
 	}
 }
