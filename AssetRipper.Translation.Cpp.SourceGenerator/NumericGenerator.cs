@@ -256,12 +256,13 @@ public partial class NumericGenerator() : IncrementalGenerator(nameof(NumericGen
 				WriteBinaryNumericHelperMethod(writer, $"{operation}Signed", ReplaceTypeParameterName(requiredInterfaces));
 				WriteBinaryNumericHelperMethod(writer, $"{operation}Unsigned", ReplaceTypeParameterName(requiredInterfaces));
 			}
+			WriteUnaryTensorPrimitivesMethod(writer, "Negate", null, "IUnaryNegationOperators<TElement, TElement>");
 			WriteBinaryNumericHelperMethod(writer, "ShiftLeft", "IShiftOperators<TElement, int, TElement>");
 			WriteBinaryNumericHelperMethod(writer, "ShiftRightLogical", "IShiftOperators<TElement, int, TElement>");
 			WriteBinaryNumericHelperMethod(writer, "ShiftRightArithmetic", "IShiftOperators<TElement, int, TElement>");
 			WriteBinaryTensorPrimitivesMethod(writer, "BitwiseAnd", null, "IBitwiseOperators<TElement, TElement, TElement>");
 			WriteBinaryTensorPrimitivesMethod(writer, "BitwiseOr", null, "IBitwiseOperators<TElement, TElement, TElement>");
-			WriteBinaryNumericHelperMethod(writer, "BitwiseXor", "IBitwiseOperators<TElement, TElement, TElement>");
+			WriteBinaryTensorPrimitivesMethod(writer, "BitwiseXor", "Xor", "IBitwiseOperators<TElement, TElement, TElement>");
 			WriteUnaryNumericHelperMethod(writer, "CtPop", "unmanaged");
 
 			foreach ((string llvmName, string? dotNetName, string requiredInterfaces) in UnaryInterfaceOperations)
