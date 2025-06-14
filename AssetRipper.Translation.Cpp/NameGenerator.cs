@@ -1,4 +1,6 @@
-﻿using System.Diagnostics.CodeAnalysis;
+﻿using System.Buffers;
+using System.Buffers.Binary;
+using System.Diagnostics.CodeAnalysis;
 using System.IO.Hashing;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -40,12 +42,24 @@ internal static partial class NameGenerator
 		}
 	}
 
-	public static string GenerateName(string cleanName, string name)
+	public static string GenerateName(string cleanName, string name, int index = 0)
 	{
-		uint hash = Crc32.HashToUInt32(Encoding.UTF8.GetBytes(name));
+		uint hash = Hash(name, index);
 		Span<char> buffer = stackalloc char[7];
 		WriteBase32(hash, buffer);
 		return $"{cleanName}_{buffer}";
+
+		static uint Hash(string str, int integer)
+		{
+			int length = Encoding.UTF8.GetByteCount(str) + sizeof(int);
+			byte[] bytes = ArrayPool<byte>.Shared.Rent(length);
+			Span<byte> span = new(bytes, 0, length);
+			BinaryPrimitives.WriteInt32LittleEndian(span, integer);
+			Encoding.UTF8.GetBytes(str, span[sizeof(int)..]);
+			uint hash = Crc32.HashToUInt32(span);
+			ArrayPool<byte>.Shared.Return(bytes);
+			return hash;
+		}
 	}
 
 	private static void WriteBase32(uint value, Span<char> buffer)

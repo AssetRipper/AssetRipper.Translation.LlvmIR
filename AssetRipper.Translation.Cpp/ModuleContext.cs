@@ -74,7 +74,7 @@ internal sealed partial class ModuleContext
 	public TypeDefinition PrivateImplementationDetails { get; }
 	private IMethodDefOrRef CompilerGeneratedAttributeConstructor { get; }
 	public Dictionary<LLVMValueRef, FunctionContext> Methods { get; } = new();
-	public Dictionary<string, StructContext> Structs { get; } = new();
+	public Dictionary<LLVMTypeRef, StructContext> Structs { get; } = new();
 	public Dictionary<LLVMValueRef, GlobalVariableContext> GlobalVariables { get; } = new();
 	private readonly Dictionary<(TypeSignature, int), InlineArrayContext> inlineArrayCache = new(TypeSignatureIntPairComparer);
 	public Dictionary<TypeDefinition, InlineArrayContext> InlineArrayTypes { get; } = new(SignatureComparer.Default);
@@ -135,6 +135,16 @@ internal sealed partial class ModuleContext
 			if (list.Count == 1)
 			{
 				list[0].Name = cleanName;
+			}
+			else if (list.Select(x => x.MangledName).Distinct().Count() != list.Count)
+			{
+				// There is at least two items with the same mangled name,
+				// so we need to use the index when generating unique names.
+				for (int i = 0; i < list.Count; i++)
+				{
+					T item = list[i];
+					item.Name = NameGenerator.GenerateName(cleanName, item.MangledName, i);
+				}
 			}
 			else
 			{
@@ -235,17 +245,16 @@ internal sealed partial class ModuleContext
 
 			case LLVMTypeKind.LLVMStructTypeKind:
 				{
-					string name = type.StructName;
-					if (!Structs.TryGetValue(name, out StructContext? structContext))
+					if (!Structs.TryGetValue(type, out StructContext? structContext))
 					{
 						TypeDefinition typeDefinition = new(
 							"Structures",
-							name,
+							type.StructName,
 							TypeAttributes.Public | TypeAttributes.SequentialLayout | TypeAttributes.BeforeFieldInit,
 							Definition.DefaultImporter.ImportType(typeof(ValueType)));
 						Definition.TopLevelTypes.Add(typeDefinition);
 						structContext = new(this, typeDefinition, type);
-						Structs.Add(name, structContext);
+						Structs.Add(type, structContext);
 
 						LLVMTypeRef[] array = type.GetSubtypes();
 						for (int i = 0; i < array.Length; i++)
