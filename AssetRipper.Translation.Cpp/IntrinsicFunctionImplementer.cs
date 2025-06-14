@@ -44,6 +44,8 @@ internal static partial class IntrinsicFunctionImplementer
 			instructions.Add(CilOpCodes.Throw);
 		}
 
+		context.Definition.IsAggressiveInlining = true;
+
 		return true;
 	}
 
