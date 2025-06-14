@@ -1,5 +1,5 @@
 ﻿using System.Buffers;
-using System.Numerics;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
@@ -29,9 +29,38 @@ internal static partial class IntrinsicFunctions
 		}
 	}
 
+	[DoesNotReturn]
+	public unsafe static void wassert(char* message, char* file, uint line)
+	{
+		// This needs to be switched to an emulated exception because _wassert exceptions can be caught by C++ code.
+		throw new Exception($"Assertion failed: {Marshal.PtrToStringUni((IntPtr)message)} at {Marshal.PtrToStringUni((IntPtr)file)}:{line}");
+	}
+
+	/// <summary>
+	/// Triggers a fatal exception, indicating a critical assertion failure in the application.
+	/// </summary>
+	/// <remarks>
+	/// This aligns with the C++ behavior, which causes the application to crash and triggers the Windows Error Reporting (WER) system (aka "Watson").
+	/// </remarks>
+	/// <param name="expression">A pointer to the string representation of the failed assertion expression.</param>
+	/// <param name="function">A pointer to the string representation of the function name where the assertion failed.</param>
+	/// <param name="file">A pointer to the string representation of the file name where the assertion failed.</param>
+	/// <param name="line">The line number in the file where the assertion failed.</param>
+	/// <param name="reserved">Reserved for future use. Currently unused. C++ type is uintptr_t.</param>
+	/// <exception cref="FatalException">
+	/// Always thrown to indicate a fatal assertion failure. The exception message includes details about the failed
+	/// assertion, such as the expression, function, file, and line number.
+	/// </exception>
+	[DoesNotReturn]
+	public unsafe static void invoke_watson(char* expression, char* function, char* file, int line, long reserved)
+	{
+		throw new FatalException($"Fatal assertion failed: {Marshal.PtrToStringUni((IntPtr)expression)} in {Marshal.PtrToStringUni((IntPtr)function)} at {Marshal.PtrToStringUni((IntPtr)file)}:{line}");
+	}
+
+	[DoesNotReturn]
 	public static void std_terminate()
 	{
-		throw new InvalidOperationException(nameof(std_terminate));
+		throw new FatalException(nameof(std_terminate));
 	}
 
 	public unsafe static void llvm_va_start(void** va_list)
@@ -109,25 +138,6 @@ internal static partial class IntrinsicFunctions
 
 		// We take advantage of the fact that it's just an optimization and return null, signaling that we can't expand the memory in place.
 		return null;
-	}
-
-	public static int llvm_abs_i32(int value, bool throwIfMinValue) => llvm_abs(value, throwIfMinValue);
-
-	public static long llvm_abs_i64(long value, bool throwIfMinValue) => llvm_abs(value, throwIfMinValue);
-
-	private static T llvm_abs<T>(T value, bool throwIfMinValue) where T : unmanaged, INumber<T>, IMinMaxValue<T>
-	{
-		return T.Abs(value);
-	}
-
-	public static float llvm_fmuladd_f32(float P_0, float P_1, float P_2)
-	{
-		return P_0 * P_1 + P_2;
-	}
-
-	public static double llvm_fmuladd_f64(double P_0, double P_1, double P_2)
-	{
-		return P_0 * P_1 + P_2;
 	}
 }
 #pragma warning restore IDE0060 // Remove unused parameter
