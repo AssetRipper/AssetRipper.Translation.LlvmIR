@@ -188,7 +188,7 @@ public partial class NumericGenerator() : IncrementalGenerator(nameof(NumericGen
 			{
 				writer.WriteLineNoTabs();
 				writer.WriteLine("[MethodImpl(MethodImplOptions.AggressiveInlining)]");
-				writer.WriteLine($"public static T {name}<T>(T x, T y)");
+				writer.WriteLine($"public static T {name}<T>(T x)");
 				using (new CurlyBrackets(writer))
 				{
 					foreach (string type in GetTypes(support))
