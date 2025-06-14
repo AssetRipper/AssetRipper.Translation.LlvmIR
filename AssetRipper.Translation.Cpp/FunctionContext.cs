@@ -8,11 +8,12 @@ using AssetRipper.Translation.Cpp.Extensions;
 using AssetRipper.Translation.Cpp.Instructions;
 using LLVMSharp.Interop;
 using System.Diagnostics;
+using System.Text.RegularExpressions;
 
 namespace AssetRipper.Translation.Cpp;
 
 [DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
-internal sealed class FunctionContext : IHasName
+internal sealed partial class FunctionContext : IHasName
 {
 	private FunctionContext(LLVMValueRef function, MethodDefinition definition, ModuleContext module)
 	{
@@ -30,7 +31,7 @@ internal sealed class FunctionContext : IHasName
 		}
 
 		DemangledName = LibLLVMSharp.ValueGetDemangledName(function);
-		CleanName = ExtractCleanName(MangledName, module.Options.RenamedSymbols);
+		CleanName = ExtractCleanName(MangledName, DemangledName, module.Options.RenamedSymbols);
 	}
 
 	public static FunctionContext Create(LLVMValueRef function, MethodDefinition definition, ModuleContext module)
@@ -254,7 +255,7 @@ internal sealed class FunctionContext : IHasName
 		return Name;
 	}
 
-	private static string ExtractCleanName(string mangledName, Dictionary<string, string> renamedSymbols)
+	private static string ExtractCleanName(string mangledName, string? demangledName, Dictionary<string, string> renamedSymbols)
 	{
 		if (renamedSymbols.TryGetValue(mangledName, out string? result))
 		{
@@ -265,7 +266,18 @@ internal sealed class FunctionContext : IHasName
 			return result;
 		}
 
-		return NameGenerator.CleanName(TryGetSimpleName(mangledName), "Function");
+		if (ConstructorRegex.TryMatchAndGetFirstGroup(demangledName ?? "", out string? typeName))
+		{
+			return NameGenerator.CleanName(typeName, "Type") + "_Constructor";
+		}
+		else if (DestructorRegex.TryMatchAndGetFirstGroup(demangledName ?? "", out typeName))
+		{
+			return NameGenerator.CleanName(typeName, "Type") + "_Destructor";
+		}
+		else
+		{
+			return NameGenerator.CleanName(TryGetSimpleName(mangledName), "Function");
+		}
 
 		static string TryGetSimpleName(string name)
 		{
@@ -281,4 +293,10 @@ internal sealed class FunctionContext : IHasName
 			}
 		}
 	}
+
+	[GeneratedRegex(@"[: ](\w+)::\1\(")]
+	private static partial Regex ConstructorRegex { get; }
+
+	[GeneratedRegex(@"[: ](\w+)::\~\1\(")]
+	private static partial Regex DestructorRegex { get; }
 }

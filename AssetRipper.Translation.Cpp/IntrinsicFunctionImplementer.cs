@@ -125,15 +125,9 @@ internal static partial class IntrinsicFunctionImplementer
 		return true;
 	}
 
-	private static bool TryMatch(this Regex regex, string input, out Match match)
-	{
-		match = regex.Match(input);
-		return match.Success;
-	}
-
 	private static bool TryGetOperationName(string name, [NotNullWhen(true)] out string? operationName)
 	{
-		if (SimpleOperationRegex.TryMatch(name, out Match match))
+		if (SimpleOperationRegex.TryMatch(name, out Match? match))
 		{
 			operationName = match.Groups[1].Value;
 			return true;
