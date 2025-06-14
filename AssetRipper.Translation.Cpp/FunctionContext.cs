@@ -30,7 +30,7 @@ internal sealed class FunctionContext : IHasName
 		}
 
 		DemangledName = LibLLVMSharp.ValueGetDemangledName(function);
-		CleanName = NameGenerator.CleanName(TryGetSimpleName(MangledName), "Function");
+		CleanName = ExtractCleanName(MangledName, module.Options.RenamedSymbols);
 	}
 
 	public static FunctionContext Create(LLVMValueRef function, MethodDefinition definition, ModuleContext module)
@@ -254,17 +254,31 @@ internal sealed class FunctionContext : IHasName
 		return Name;
 	}
 
-	private static string TryGetSimpleName(string name)
+	private static string ExtractCleanName(string mangledName, Dictionary<string, string> renamedSymbols)
 	{
-		if (name.StartsWith('?'))
+		if (renamedSymbols.TryGetValue(mangledName, out string? result))
 		{
-			int start = name.StartsWith("??$") ? 3 : 1;
-			int end = name.IndexOf('@', start);
-			return name[start..end];
+			if (!NameGenerator.IsValidCSharpName(result))
+			{
+				throw new ArgumentException($"Renamed symbol '{mangledName}' has an invalid name '{result}'.", nameof(renamedSymbols));
+			}
+			return result;
 		}
-		else
+
+		return NameGenerator.CleanName(TryGetSimpleName(mangledName), "Function");
+
+		static string TryGetSimpleName(string name)
 		{
-			return name;
+			if (name.StartsWith('?'))
+			{
+				int start = name.StartsWith("??$") ? 3 : 1;
+				int end = name.IndexOf('@', start);
+				return name[start..end];
+			}
+			else
+			{
+				return name;
+			}
 		}
 	}
 }

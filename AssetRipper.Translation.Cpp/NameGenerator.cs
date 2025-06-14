@@ -17,6 +17,11 @@ internal static partial class NameGenerator
 	/// </summary>
 	private const string Base64Characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789ΣΩ";
 
+	public static bool IsValidCSharpName(string name)
+	{
+		return !string.IsNullOrEmpty(name) && !char.IsDigit(name[0]) && !NonWordRegex.IsMatch(name);
+	}
+
 	public static string CleanName(string input, [ConstantExpected] string defaultName)
 	{
 		string onlyWordCharacters = NonWordRegex.Replace(input, "_");

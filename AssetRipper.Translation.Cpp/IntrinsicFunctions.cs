@@ -15,7 +15,8 @@ internal static partial class IntrinsicFunctions
 	{
 	}
 
-	public unsafe static int puts(sbyte* P_0)
+	[MangledName("puts")]
+	public unsafe static int PutString(sbyte* P_0)
 	{
 		try
 		{
@@ -30,7 +31,8 @@ internal static partial class IntrinsicFunctions
 	}
 
 	[DoesNotReturn]
-	public unsafe static void wassert(char* message, char* file, uint line)
+	[MangledName("_wassert")]
+	public unsafe static void Assert(char* message, char* file, uint line)
 	{
 		// This needs to be switched to an emulated exception because _wassert exceptions can be caught by C++ code.
 		throw new Exception($"Assertion failed: {Marshal.PtrToStringUni((IntPtr)message)} at {Marshal.PtrToStringUni((IntPtr)file)}:{line}");
@@ -52,43 +54,51 @@ internal static partial class IntrinsicFunctions
 	/// assertion, such as the expression, function, file, and line number.
 	/// </exception>
 	[DoesNotReturn]
-	public unsafe static void invoke_watson(char* expression, char* function, char* file, int line, long reserved)
+	[MangledName("_invoke_watson")]
+	public unsafe static void InvokeWatson(char* expression, char* function, char* file, int line, long reserved)
 	{
 		throw new FatalException($"Fatal assertion failed: {Marshal.PtrToStringUni((IntPtr)expression)} in {Marshal.PtrToStringUni((IntPtr)function)} at {Marshal.PtrToStringUni((IntPtr)file)}:{line}");
 	}
 
 	[DoesNotReturn]
-	public static void std_terminate()
+	[MangledName("__std_terminate")]
+	public static void Terminate()
 	{
-		throw new FatalException(nameof(std_terminate));
+		throw new FatalException(nameof(Terminate));
 	}
 
+	[MangledName("llvm.va.start")]
 	public unsafe static void llvm_va_start(void** va_list)
 	{
 		// Handled elsewhere.
 		throw new NotSupportedException();
 	}
 
+	[MangledName("llvm.va.copy")]
 	public unsafe static void llvm_va_copy(void** destination, void** source)
 	{
 		*destination = *source;
 	}
 
+	[MangledName("llvm.va.end")]
 	public unsafe static void llvm_va_end(void** va_list)
 	{
 		// Do nothing because it's freed automatically.
 	}
 
+	[MangledName("llvm.memcpy.p0.p0.i32")]
 	public unsafe static void llvm_memcpy_p0_p0_i32(void* destination, void* source, int length, bool isVolatile)
 	{
 		Unsafe.CopyBlock(destination, source, (uint)length);
 	}
 
+	[MangledName("llvm.memcpy.p0.p0.i64")]
 	public unsafe static void llvm_memcpy_p0_p0_i64(void* destination, void* source, long length, bool isVolatile)
 	{
 		Unsafe.CopyBlock(destination, source, (uint)length);
 	}
 
+	[MangledName("llvm.memmove.p0.p0.i32")]
 	public unsafe static void llvm_memmove_p0_p0_i32(void* destination, void* source, int length, bool isVolatile)
 	{
 		// Same as memcpy, except that the source and destination are allowed to overlap.
@@ -99,37 +109,44 @@ internal static partial class IntrinsicFunctions
 		ArrayPool<byte>.Shared.Return(buffer);
 	}
 
+	[MangledName("llvm.memmove.p0.p0.i64")]
 	public unsafe static void llvm_memmove_p0_p0_i64(void* destination, void* source, long length, bool isVolatile)
 	{
 		llvm_memmove_p0_p0_i32(destination, source, (int)length, isVolatile);
 	}
 
+	[MangledName("llvm.memset.p0.i32")]
 	public unsafe static void llvm_memset_p0_i32(void* destination, sbyte value, int length, bool isVolatile)
 	{
 		new Span<byte>(destination, length).Fill(unchecked((byte)value));
 	}
 
+	[MangledName("llvm.memset.p0.i64")]
 	public unsafe static void llvm_memset_p0_i64(void* destination, sbyte value, long length, bool isVolatile)
 	{
 		llvm_memset_p0_i32(destination, value, (int)length, isVolatile);
 	}
 
-	public unsafe static void* malloc(long size)
+	[MangledName("malloc")]
+	public unsafe static void* Alloc(long size)
 	{
 		return (void*)Marshal.AllocHGlobal((int)size);
 	}
 
-	public unsafe static void* realloc(void* ptr, long size)
+	[MangledName("realloc")]
+	public unsafe static void* ReAlloc(void* ptr, long size)
 	{
 		return (void*)Marshal.ReAllocHGlobal((nint)ptr, (nint)size);
 	}
 
-	public unsafe static void free(void* ptr)
+	[MangledName("free")]
+	public unsafe static void Free(void* ptr)
 	{
 		Marshal.FreeHGlobal((IntPtr)ptr);
 	}
 
-	public unsafe static void* expand(void* ptr, long size)
+	[MangledName("expand")]
+	public unsafe static void* Expand(void* ptr, long size)
 	{
 		// _expand is a non-standard function available in some C++ implementations, particularly in Microsoft C Runtime Library (CRT).
 		// It is used to resize a previously allocated memory block without moving it, meaning it tries to expand or shrink the allocated memory in place.

@@ -19,7 +19,7 @@ internal sealed class GlobalVariableContext : IHasName
 		GlobalVariable = globalVariable;
 		Module = module;
 		DemangledName = LibLLVMSharp.ValueGetDemangledName(globalVariable);
-		CleanName = ExtractCleanName(MangledName, DemangledName);
+		CleanName = ExtractCleanName(MangledName, DemangledName, module.Options.RenamedSymbols);
 	}
 
 	/// <inheritdoc/>
@@ -142,14 +142,23 @@ internal sealed class GlobalVariableContext : IHasName
 		}
 	}
 
-	private static string ExtractCleanName(string mangledName, string? demangledName)
+	private static string ExtractCleanName(string mangledName, string? demangledName, Dictionary<string, string> renamedSymbols)
 	{
+		if (renamedSymbols.TryGetValue(mangledName, out string? result))
+		{
+			if (!NameGenerator.IsValidCSharpName(result))
+			{
+				throw new ArgumentException($"Renamed symbol '{mangledName}' has an invalid name '{result}'.", nameof(renamedSymbols));
+			}
+			return result;
+		}
+
 		if (mangledName.StartsWith("??_C@", StringComparison.Ordinal))
 		{
 			return "String"; // Not certain this is just strings
 		}
 
-		if (TryGetNameFromBeginning(mangledName, out string? result))
+		if (TryGetNameFromBeginning(mangledName, out result))
 		{
 		}
 		else if (TryGetNameFromEnd(mangledName, out result))

@@ -18,6 +18,6 @@ internal static class Extensions
 	public static ModuleDefinition TranslateToCIL(this string text, [CallerMemberName] string? caller = null)
 	{
 		string name = string.IsNullOrEmpty(caller) ? nameof(TranslateToCIL) : caller;
-		return CppTranslator.Translate(name, text);
+		return Translator.Translate(name, text);
 	}
 }

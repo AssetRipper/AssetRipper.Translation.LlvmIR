@@ -30,7 +30,7 @@ internal sealed class StructContext : IHasName
 		Module = module;
 		Definition = definition;
 		Type = type;
-		CleanName = ExtractCleanName(MangledName);
+		CleanName = ExtractCleanName(MangledName, module.Options.RenamedSymbols);
 	}
 
 	public void AddNameAttributes() => this.AddNameAttributes(Definition);
@@ -40,8 +40,17 @@ internal sealed class StructContext : IHasName
 		return name.StartsWith(prefix, StringComparison.Ordinal) ? name[prefix.Length..] : name;
 	}
 
-	private static string ExtractCleanName(string name)
+	private static string ExtractCleanName(string name, Dictionary<string, string> renamedSymbols)
 	{
+		if (renamedSymbols.TryGetValue(name, out string? result))
+		{
+			if (!NameGenerator.IsValidCSharpName(result))
+			{
+				throw new ArgumentException($"Renamed symbol '{name}' has an invalid name '{result}'.", nameof(renamedSymbols));
+			}
+			return result;
+		}
+
 		name = RemovePrefix(name, "class.");
 		name = RemovePrefix(name, "struct.");
 		name = RemovePrefix(name, "union.");

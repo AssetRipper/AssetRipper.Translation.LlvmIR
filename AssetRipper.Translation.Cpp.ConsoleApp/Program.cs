@@ -12,10 +12,24 @@ internal static class Program
 			return;
 		}
 
+		ReadOnlySpan<string> mangledNames = args.MangledNames;
+		ReadOnlySpan<string> newNames = args.NewNames;
+		if (mangledNames.Length != newNames.Length)
+		{
+			Console.WriteLine("The number of mangled names must be the same as the number of new names");
+			return;
+		}
+
 		string name = Path.GetFileNameWithoutExtension(args.Input);
 		byte[] data = File.ReadAllBytes(args.Input);
 
-		ModuleDefinition moduleDefinition = CppTranslator.Translate(name, data, true);
+		TranslatorOptions options = new() { FixAssemblyReferences = true };
+		for (int i = 0; i < mangledNames.Length; i++)
+		{
+			options.RenamedSymbols[mangledNames[i]] = newNames[i];
+		}
+
+		ModuleDefinition moduleDefinition = Translator.Translate(name, data, options);
 		moduleDefinition.Write("ConvertedCpp.dll");
 		Console.WriteLine("Done!");
 	}

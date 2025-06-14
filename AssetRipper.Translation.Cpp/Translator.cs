@@ -11,19 +11,19 @@ using System.Text;
 
 namespace AssetRipper.Translation.Cpp;
 
-public static unsafe class CppTranslator
+public static unsafe class Translator
 {
-	static CppTranslator()
+	static Translator()
 	{
 		Patches.Apply();
 	}
 
-	public static ModuleDefinition Translate(string name, string content, bool fixAssemblyReferences = false)
+	public static ModuleDefinition Translate(string name, string content, TranslatorOptions? options = null)
 	{
-		return Translate(name, Encoding.UTF8.GetBytes(content), fixAssemblyReferences);
+		return Translate(name, Encoding.UTF8.GetBytes(content), options);
 	}
 
-	public static ModuleDefinition Translate(string name, ReadOnlySpan<byte> content, bool fixAssemblyReferences = false)
+	public static ModuleDefinition Translate(string name, ReadOnlySpan<byte> content, TranslatorOptions? options = null)
 	{
 		fixed (byte* ptr = content)
 		{
@@ -35,7 +35,7 @@ public static unsafe class CppTranslator
 				try
 				{
 					LLVMModuleRef module = context.ParseIR(buffer);
-					return Translate(module, fixAssemblyReferences);
+					return Translate(module, options ?? new());
 				}
 				finally
 				{
@@ -56,7 +56,7 @@ public static unsafe class CppTranslator
 		}
 	}
 
-	private static ModuleDefinition Translate(LLVMModuleRef module, bool fixAssemblyReferences)
+	private static ModuleDefinition Translate(LLVMModuleRef module, TranslatorOptions options)
 	{
 		{
 			var globals = module.GetGlobals().ToList();
@@ -69,7 +69,7 @@ public static unsafe class CppTranslator
 
 		moduleDefinition.AddTargetFrameworkAttributeForDotNet9();
 
-		ModuleContext moduleContext = new(module, moduleDefinition);
+		ModuleContext moduleContext = new(module, moduleDefinition, options);
 
 		foreach (LLVMValueRef global in module.GetGlobals())
 		{
@@ -132,7 +132,7 @@ public static unsafe class CppTranslator
 		// Structs are discovered dynamically, so we need to assign names after all methods are created.
 		moduleContext.AssignStructNames();
 
-		return fixAssemblyReferences ? moduleDefinition.FixCorLibAssemblyReferences() : moduleDefinition;
+		return options.FixAssemblyReferences ? moduleDefinition.FixCorLibAssemblyReferences() : moduleDefinition;
 	}
 
 	private static void AddInstructions(CilInstructionCollection instructions, FunctionContext functionContext, ISeseRegion liftedRegion)

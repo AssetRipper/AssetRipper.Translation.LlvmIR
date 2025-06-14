@@ -20,7 +20,7 @@ namespace AssetRipper.Translation.Cpp;
 
 internal sealed partial class ModuleContext
 {
-	public ModuleContext(LLVMModuleRef module, ModuleDefinition definition)
+	public ModuleContext(LLVMModuleRef module, ModuleDefinition definition, TranslatorOptions options)
 	{
 		InjectedTypes = new TypeInjector(definition).Inject(
 		[
@@ -41,6 +41,7 @@ internal sealed partial class ModuleContext
 
 		Module = module;
 		Definition = definition;
+		Options = options;
 		GlobalFunctionsType = CreateStaticType(definition, "GlobalFunctions");
 		PointerCacheType = CreateStaticType(definition, "PointerCache", false);
 		GlobalVariablePointersType = CreateStaticType(definition, "GlobalVariablePointers", false);
@@ -65,6 +66,7 @@ internal sealed partial class ModuleContext
 
 	public LLVMModuleRef Module { get; }
 	public ModuleDefinition Definition { get; }
+	public TranslatorOptions Options { get; }
 	public TypeDefinition GlobalFunctionsType { get; }
 	public TypeDefinition PointerCacheType { get; }
 	public TypeDefinition GlobalVariablePointersType { get; }

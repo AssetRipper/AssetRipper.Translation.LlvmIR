@@ -19,7 +19,7 @@ internal static partial class IntrinsicFunctionImplementer
 
 		CilInstructionCollection instructions = context.Definition.CilMethodBody!.Instructions;
 
-		if (TryGetInjectedIntrinsic(context.Module, context.Name, out MethodDefinition? implementation) && implementation.Parameters.Count == context.Definition.Parameters.Count)
+		if (TryGetInjectedIntrinsic(context.Module, context.MangledName, out MethodDefinition? implementation) && implementation.Parameters.Count == context.Definition.Parameters.Count)
 		{
 			MoveToImplementedType(context);
 
@@ -61,9 +61,19 @@ internal static partial class IntrinsicFunctionImplementer
 		declaringType.Methods.Add(context.Definition);
 	}
 
-	private static bool TryGetInjectedIntrinsic(ModuleContext context, string name, [NotNullWhen(true)] out MethodDefinition? result)
+	private static bool TryGetInjectedIntrinsic(ModuleContext context, string mangledName, [NotNullWhen(true)] out MethodDefinition? result)
 	{
-		result = context.IntrinsicsType.Methods.FirstOrDefault(m => m.Name == name && m.IsPublic && m.GenericParameters.Count is 0);
+		result = context.IntrinsicsType.Methods.FirstOrDefault(m =>
+		{
+			if (!m.IsPublic || m.GenericParameters.Count != 0)
+			{
+				return false;
+			}
+
+			return m.FindCustomAttributes(null, nameof(MangledNameAttribute))
+				.Select(a => a.Signature?.FixedArguments[0].Element?.ToString())
+				.Contains(mangledName);
+		});
 		return result is not null;
 	}
 
