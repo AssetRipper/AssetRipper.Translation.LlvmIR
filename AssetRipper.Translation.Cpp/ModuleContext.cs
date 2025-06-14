@@ -44,6 +44,7 @@ internal sealed partial class ModuleContext
 		Options = options;
 		GlobalFunctionsType = CreateStaticType(definition, "GlobalFunctions");
 		PointerCacheType = CreateStaticType(definition, "PointerCache", false);
+		GlobalVariableInitializersType = CreateStaticType(definition, "GlobalVariableInitializers", false);
 		GlobalVariablePointersType = CreateStaticType(definition, "GlobalVariablePointers", false);
 		GlobalVariablesType = CreateStaticType(definition, "GlobalVariables");
 
@@ -69,6 +70,7 @@ internal sealed partial class ModuleContext
 	public TranslatorOptions Options { get; }
 	public TypeDefinition GlobalFunctionsType { get; }
 	public TypeDefinition PointerCacheType { get; }
+	public TypeDefinition GlobalVariableInitializersType { get; }
 	public TypeDefinition GlobalVariablePointersType { get; }
 	public TypeDefinition GlobalVariablesType { get; }
 	public TypeDefinition PrivateImplementationDetails { get; }

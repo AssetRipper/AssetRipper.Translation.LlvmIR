@@ -130,15 +130,37 @@ internal sealed class GlobalVariableContext : IHasName
 	{
 		if (HasSingleOperand)
 		{
+			// The separation between getter and initializer is primarily for aesthetics.
+
+			MethodDefinition getter = new MethodDefinition("Get_" + Name, MethodAttributes.Private | MethodAttributes.Static | MethodAttributes.HideBySig, MethodSignature.CreateStatic(DataGetMethod.Signature!.ReturnType));
+			Module.GlobalVariableInitializersType.Methods.Add(getter);
+			getter.CilMethodBody = new(getter);
+			{
+				CilInstructionCollection instructions = getter.CilMethodBody.Instructions;
+				Module.LoadValue(instructions, Operand);
+				instructions.Add(CilOpCodes.Ret);
+			}
+
+			MethodDefinition initializer = new MethodDefinition("Initialize_" + Name, MethodAttributes.Assembly | MethodAttributes.Static | MethodAttributes.HideBySig, MethodSignature.CreateStatic(Module.Definition.CorLibTypeFactory.Void));
+			Module.GlobalVariableInitializersType.Methods.Add(initializer);
+			initializer.CilMethodBody = new(initializer);
+			{
+				CilInstructionCollection instructions = initializer.CilMethodBody.Instructions;
+
+				instructions.Add(CilOpCodes.Call, getter);
+				instructions.Add(CilOpCodes.Call, DataSetMethod);
+				instructions.Add(CilOpCodes.Ret);
+			}
+
 			MethodDefinition staticConstructor = Module.GlobalVariablesType.GetOrCreateStaticConstructor();
+			{
+				CilInstructionCollection instructions = staticConstructor.CilMethodBody!.Instructions;
+				instructions.Pop();
 
-			CilInstructionCollection instructions = staticConstructor.CilMethodBody!.Instructions;
-			instructions.Pop();
+				instructions.Add(CilOpCodes.Call, initializer);
 
-			Module.LoadValue(instructions, Operand);
-			instructions.Add(CilOpCodes.Call, DataSetMethod);
-
-			instructions.Add(CilOpCodes.Ret); // Undo the pop
+				instructions.Add(CilOpCodes.Ret); // Undo the pop
+			}
 		}
 	}
 
