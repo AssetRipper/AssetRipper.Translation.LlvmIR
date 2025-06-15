@@ -128,9 +128,10 @@ internal static partial class IntrinsicFunctions
 	}
 
 	[MangledName("malloc")]
+	[MangledName("??2@YAPEAX_K@Z")] // new
 	public unsafe static void* Alloc(long size)
 	{
-		return (void*)Marshal.AllocHGlobal((int)size);
+		return (void*)Marshal.AllocHGlobal((nint)size);
 	}
 
 	[MangledName("realloc")]
@@ -141,6 +142,12 @@ internal static partial class IntrinsicFunctions
 
 	[MangledName("free")]
 	public unsafe static void Free(void* ptr)
+	{
+		Marshal.FreeHGlobal((IntPtr)ptr);
+	}
+
+	[MangledName("??3@YAXPEAX_K@Z")]
+	public unsafe static void Delete(void* ptr, long size)
 	{
 		Marshal.FreeHGlobal((IntPtr)ptr);
 	}
