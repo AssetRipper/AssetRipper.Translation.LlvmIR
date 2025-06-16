@@ -30,6 +30,6 @@ internal sealed class SelectInstructionContext : InstructionContext
 		Module.LoadValue(instructions, FalseOperand);
 
 		endLabel.Instruction = instructions.Add(CilOpCodes.Nop);
-		instructions.Add(CilOpCodes.Stloc, GetLocalVariable());
+		AddStore(instructions);
 	}
 }

@@ -1,7 +1,6 @@
 ﻿using AsmResolver.DotNet;
 using AsmResolver.DotNet.Code.Cil;
 using AsmResolver.PE.DotNet.Cil;
-using AssetRipper.Translation.Cpp.ExceptionHandling;
 using AssetRipper.Translation.Cpp.Extensions;
 using AssetRipper.Translation.Cpp.Instructions;
 using LLVMSharp.Interop;
@@ -85,6 +84,8 @@ public static unsafe class Translator
 
 		moduleContext.InitializeMethodSignatures();
 
+		moduleContext.IdentifyFunctionsThatMightThrow();
+
 		foreach (GlobalVariableContext globalVariableContext in moduleContext.GlobalVariables.Values)
 		{
 			globalVariableContext.CreateProperties();
@@ -108,146 +109,42 @@ public static unsafe class Translator
 
 			functionContext.AnalyzeDataFlow();
 
+			if (functionContext.MightThrowAnException)
+			{
+				Debug.Assert(functionContext.LocalVariablesType is not null);
+				Debug.Assert(functionContext.StackFrameVariable is not null);
+				TypeDefinition stackFrameListType = moduleContext.InjectedTypes[typeof(StackFrameList)];
+
+				instructions.Add(CilOpCodes.Ldsflda, stackFrameListType.GetFieldByName(nameof(StackFrameList.Current)));
+				instructions.Add(CilOpCodes.Call, stackFrameListType.GetMethodByName(nameof(StackFrameList.New)).MakeGenericInstanceMethod(functionContext.LocalVariablesType.ToTypeSignature()));
+				instructions.Add(CilOpCodes.Stloc, functionContext.StackFrameVariable);
+			}
+
 			// Create local variables for all instructions
 			foreach (InstructionContext instruction in functionContext.Instructions)
 			{
 				instruction.CreateLocal(instructions);
 			}
 
-			IReadOnlyList<ISeseRegion> liftedRegions = BlockLifter.LiftBasicBlocks(functionContext.BasicBlocks[0]);
-			if (liftedRegions.Count != 1)
-			{
-				Debugger.Break();
-			}
-			ISeseRegion liftedRegion = liftedRegions.AsSingleRegion();
-
 			// Add instructions to the method bodies
-			AddInstructions(instructions, functionContext, liftedRegion);
+			foreach (BasicBlockContext basicBlock in functionContext.BasicBlocks)
+			{
+				CilInstructionLabel blockLabel = functionContext.Labels[basicBlock.Block];
+				blockLabel.Instruction = instructions.Add(CilOpCodes.Nop);
+				foreach (InstructionContext instructionContext in basicBlock.Instructions)
+				{
+					instructionContext.AddInstructions(instructions);
+				}
+			}
 
 			instructions.OptimizeMacros();
 
-			functionContext.MaybeAddStructReturnMethod();
+			functionContext.AddPublicImplementation();
 		}
 
 		// Structs are discovered dynamically, so we need to assign names after all methods are created.
 		moduleContext.AssignStructNames();
 
 		return options.FixAssemblyReferences ? moduleDefinition.FixCorLibAssemblyReferences() : moduleDefinition;
-	}
-
-	private static void AddInstructions(CilInstructionCollection instructions, FunctionContext functionContext, ISeseRegion liftedRegion)
-	{
-		switch (liftedRegion)
-		{
-			case ISeseRegionAlias alias:
-				AddInstructions(instructions, functionContext, alias.Original);
-				break;
-			case ICompositeSeseRegion composite:
-				if (composite is ProtectedRegionWithExceptionHandlers composite2)
-				{
-					HashSet<BasicBlockContext> containedBlocks = GetBasicBlocks(composite2.ProtectedRegion).ToHashSet();
-					foreach (InstructionContext instruction in GetInstructions(composite2.ProtectedRegion))
-					{
-						if (instruction is UnconditionalBranchInstructionContext unconditionalBranch)
-						{
-							Debug.Assert(unconditionalBranch.TargetBlock is not null);
-							if (!containedBlocks.Contains(unconditionalBranch.TargetBlock))
-							{
-								unconditionalBranch.IsLeave = true;
-							}
-						}
-						else if (instruction is InvokeInstructionContext invoke)
-						{
-							Debug.Assert(invoke.DefaultBlock is not null);
-							if (!containedBlocks.Contains(invoke.DefaultBlock))
-							{
-								invoke.IsLeave = true;
-							}
-						}
-					}
-
-					int tryStartIndex = instructions.Count;
-					AddInstructions(instructions, functionContext, composite2.ProtectedRegion);
-					CilInstructionLabel tryStartLabel = new(instructions[tryStartIndex]);
-					CilInstructionLabel tryEndLabel = new(instructions[^1]);
-
-					int handlerStartIndex = instructions.Count;
-					foreach (ISeseRegion exceptionHandler in composite2.ExceptionHandlingRegions)
-					{
-						AddInstructions(instructions, functionContext, exceptionHandler);
-					}
-					CilInstructionLabel handlerStartLabel = new(instructions[handlerStartIndex]);
-					CilInstructionLabel handlerEndLabel = new(instructions[^1]);
-
-					instructions.Owner.ExceptionHandlers.Add(new CilExceptionHandler
-					{
-						TryStart = tryStartLabel,
-						TryEnd = tryEndLabel,
-						HandlerStart = handlerStartLabel,
-						HandlerEnd = handlerEndLabel,
-						HandlerType = CilExceptionHandlerType.Exception,
-						ExceptionType = functionContext.Module.Definition.CorLibTypeFactory.Object.ToTypeDefOrRef(),
-					});
-				}
-				else
-				{
-					foreach (ISeseRegion region in composite.Children)
-					{
-						AddInstructions(instructions, functionContext, region);
-					}
-				}
-
-				break;
-			case BasicBlockContext basicBlock:
-				{
-					CilInstructionLabel blockLabel = functionContext.Labels[basicBlock.Block];
-					blockLabel.Instruction = instructions.Add(CilOpCodes.Nop);
-
-					foreach (InstructionContext instructionContext in basicBlock.Instructions)
-					{
-						instructionContext.AddInstructions(instructions);
-					}
-				}
-				break;
-			default:
-				throw new NotSupportedException($"Unsupported lifted region type: {liftedRegion.GetType()}");
-		}
-	}
-
-	private static IEnumerable<BasicBlockContext> GetBasicBlocks(ISeseRegion liftedRegion)
-	{
-		Stack<ISeseRegion> stack = new();
-		stack.Push(liftedRegion);
-		while (stack.Count > 0)
-		{
-			liftedRegion = stack.Pop();
-			switch (liftedRegion)
-			{
-				case ISeseRegionAlias alias:
-					stack.Push(alias.Original);
-					break;
-				case ICompositeSeseRegion composite:
-					for (int i = composite.Children.Count - 1; i >= 0; i--)
-					{
-						stack.Push(composite.Children[i]);
-					}
-					break;
-				case BasicBlockContext basicBlock:
-					yield return basicBlock;
-					break;
-				default:
-					throw new NotSupportedException($"Unsupported lifted region type: {liftedRegion.GetType()}");
-			}
-		}
-	}
-
-	private static IEnumerable<InstructionContext> GetInstructions(ISeseRegion region)
-	{
-		return GetBasicBlocks(region).SelectMany(x => x.Instructions);
-	}
-
-	private static IEnumerable<T> GetInstructions<T>(ISeseRegion region) where T : InstructionContext
-	{
-		return GetInstructions(region).OfType<T>();
 	}
 }

@@ -14,7 +14,6 @@ internal sealed class UnconditionalBranchInstructionContext : BranchInstructionC
 	}
 	public LLVMBasicBlockRef TargetBlockRef => Operands[0].AsBasicBlock();
 	public BasicBlockContext? TargetBlock => Function?.BasicBlockLookup[TargetBlockRef];
-	public bool IsLeave { get; set; }
 
 	public override void AddInstructions(CilInstructionCollection instructions)
 	{
@@ -22,6 +21,6 @@ internal sealed class UnconditionalBranchInstructionContext : BranchInstructionC
 		Debug.Assert(TargetBlock is not null);
 
 		AddLoadIfBranchingToPhi(instructions, TargetBlock);
-		instructions.Add(IsLeave ? CilOpCodes.Leave : CilOpCodes.Br, Function.Labels[TargetBlockRef]);
+		instructions.Add(CilOpCodes.Br, Function.Labels[TargetBlockRef]);
 	}
 }

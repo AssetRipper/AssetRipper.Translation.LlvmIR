@@ -45,8 +45,7 @@ internal class GenericInstructionContext(LLVMValueRef instruction, ModuleContext
 			case LLVMOpcode.LLVMAtomicRMW:
 				goto default;
 			case LLVMOpcode.LLVMResume:
-				instructions.Add(CilOpCodes.Rethrow);
-				break;
+				goto default;
 			case LLVMOpcode.LLVMLandingPad:
 				goto default;
 			default:
@@ -74,13 +73,13 @@ internal class GenericInstructionContext(LLVMValueRef instruction, ModuleContext
 		{
 			MethodDefinition method = Module.InstructionNotSupportedExceptionType.GetMethodByName(nameof(InstructionNotSupportedException.ThrowPointer));
 			instructions.Add(CilOpCodes.Call, method);
-			instructions.Add(CilOpCodes.Stloc, GetLocalVariable());
+			AddStore(instructions);
 		}
 		else
 		{
 			MethodDefinition method = Module.InstructionNotSupportedExceptionType.GetMethodByName(nameof(InstructionNotSupportedException.ThrowStruct));
 			instructions.Add(CilOpCodes.Call, method.MakeGenericInstanceMethod(ResultTypeSignature));
-			instructions.Add(CilOpCodes.Stloc, GetLocalVariable());
+			AddStore(instructions);
 		}
 	}
 }

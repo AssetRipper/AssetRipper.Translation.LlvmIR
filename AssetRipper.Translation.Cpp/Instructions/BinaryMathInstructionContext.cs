@@ -160,6 +160,6 @@ internal sealed class BinaryMathInstructionContext : InstructionContext
 		{
 			throw new NotSupportedException();
 		}
-		instructions.Add(CilOpCodes.Stloc, GetLocalVariable());
+		AddStore(instructions);
 	}
 }

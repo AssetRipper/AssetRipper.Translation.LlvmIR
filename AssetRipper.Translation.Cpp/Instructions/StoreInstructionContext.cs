@@ -2,7 +2,6 @@
 using AsmResolver.DotNet.Signatures;
 using AsmResolver.PE.DotNet.Cil;
 using AssetRipper.CIL;
-using AssetRipper.Translation.Cpp.Extensions;
 using LLVMSharp.Interop;
 using System.Diagnostics;
 
@@ -25,17 +24,38 @@ internal sealed class StoreInstructionContext : InstructionContext
 
 	public override void AddInstructions(CilInstructionCollection instructions)
 	{
-		if (DestinationInstruction is AllocaInstructionContext { DataLocal: not null } allocaDestination && IsCompatible(allocaDestination))
+		if (DestinationInstruction is AllocaInstructionContext allocaInstruction)
 		{
-			if (allocaDestination.DataLocal.VariableType is PointerTypeSignature
-				|| SignatureComparer.Default.Equals(allocaDestination.DataLocal.VariableType, StoreTypeSignature))
+			Debug.Assert(Function is not null);
+
+			if (SignatureComparer.Default.Equals(allocaInstruction.DataTypeSignature, ResultTypeSignature))
 			{
-				Module.LoadValue(instructions, SourceOperand);
-				instructions.Add(CilOpCodes.Stloc, allocaDestination.DataLocal);
+				if (allocaInstruction.DataLocal is not null)
+				{
+					Module.LoadValue(instructions, SourceOperand);
+					instructions.Add(CilOpCodes.Stloc, allocaInstruction.DataLocal);
+				}
+				else
+				{
+					Debug.Assert(allocaInstruction.DataField is not null);
+					Function.AddLocalVariablesRef(instructions);
+					Module.LoadValue(instructions, SourceOperand);
+					instructions.Add(CilOpCodes.Stfld, allocaInstruction.DataField);
+				}
 			}
 			else
 			{
-				instructions.Add(CilOpCodes.Ldloca, allocaDestination.DataLocal);
+				if (allocaInstruction.DataLocal is not null)
+				{
+					instructions.Add(CilOpCodes.Ldloca, allocaInstruction.DataLocal);
+				}
+				else
+				{
+					Debug.Assert(allocaInstruction.DataField is not null);
+					Function.AddLocalVariablesRef(instructions);
+					instructions.Add(CilOpCodes.Ldflda, allocaInstruction.DataField);
+				}
+
 				Module.LoadValue(instructions, SourceOperand);
 				instructions.AddStoreIndirect(StoreTypeSignature);
 			}
@@ -45,24 +65,6 @@ internal sealed class StoreInstructionContext : InstructionContext
 			Module.LoadValue(instructions, DestinationOperand);
 			Module.LoadValue(instructions, SourceOperand);
 			instructions.AddStoreIndirect(StoreTypeSignature);
-		}
-
-		bool IsCompatible(AllocaInstructionContext allocaDestination)
-		{
-			Debug.Assert(allocaDestination.DataLocal is not null);
-
-			if (allocaDestination.DataLocal.VariableType is PointerTypeSignature && StoreTypeSignature is PointerTypeSignature)
-			{
-				return true;
-			}
-
-			LLVMModuleRef module = allocaDestination.Module.Module;
-			if (allocaDestination.AllocatedType.GetABISize(module) == StoreType.GetABISize(module))
-			{
-				return true;
-			}
-
-			return false;
 		}
 	}
 }

@@ -1,5 +1,7 @@
-﻿using AsmResolver.DotNet.Code.Cil;
+﻿using AsmResolver.DotNet;
+using AsmResolver.DotNet.Code.Cil;
 using AsmResolver.PE.DotNet.Cil;
+using AssetRipper.Translation.Cpp.Extensions;
 using LLVMSharp.Interop;
 using System.Diagnostics;
 
@@ -20,6 +22,15 @@ internal sealed class ReturnInstructionContext : InstructionContext
 		if (HasReturnValue)
 		{
 			Module.LoadValue(instructions, ResultOperand);
+		}
+		if (Function!.MightThrowAnException)
+		{
+			Debug.Assert(Function.StackFrameVariable is not null);
+			TypeDefinition stackFrameListType = Module.InjectedTypes[typeof(StackFrameList)];
+
+			instructions.Add(CilOpCodes.Ldsflda, stackFrameListType.GetFieldByName(nameof(StackFrameList.Current)));
+			instructions.Add(CilOpCodes.Ldloc, Function.StackFrameVariable);
+			instructions.Add(CilOpCodes.Call, stackFrameListType.Methods.Single(m => m.Name == nameof(StackFrameList.Clear) && m.IsPublic));
 		}
 		instructions.Add(CilOpCodes.Ret);
 	}

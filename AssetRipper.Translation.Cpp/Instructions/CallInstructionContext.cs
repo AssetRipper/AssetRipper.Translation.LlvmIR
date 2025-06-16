@@ -1,4 +1,8 @@
-﻿using LLVMSharp.Interop;
+﻿using AsmResolver.DotNet.Code.Cil;
+using AsmResolver.PE.DotNet.Cil;
+using AssetRipper.CIL;
+using AssetRipper.Translation.Cpp.Extensions;
+using LLVMSharp.Interop;
 using System.Diagnostics;
 
 namespace AssetRipper.Translation.Cpp.Instructions;
@@ -9,5 +13,30 @@ internal sealed class CallInstructionContext : BaseCallInstructionContext
 	{
 		Debug.Assert(Opcode == LLVMOpcode.LLVMCall);
 		Debug.Assert(Operands.Length >= 1);
+	}
+
+	public override void AddInstructions(CilInstructionCollection instructions)
+	{
+		base.AddInstructions(instructions);
+
+		if (CalledFunction is { MightThrowAnException: false})
+		{
+			return; // no need to handle exceptions
+		}
+
+		Debug.Assert(Function is not null);
+		Debug.Assert(Function.MightThrowAnException);
+
+		CilInstructionLabel defaultLabel = new();
+
+		// If exception info is not null
+		instructions.Add(CilOpCodes.Ldsfld, Module.InjectedTypes[typeof(ExceptionInfo)].GetFieldByName(nameof(ExceptionInfo.Current)));
+		instructions.Add(CilOpCodes.Brfalse, defaultLabel);
+
+		// An exception was thrown during the call, so we need to exit the function
+		instructions.AddDefaultValue(Function.ReturnTypeSignature); // Does nothing if the return type is void
+		instructions.Add(CilOpCodes.Ret);
+
+		defaultLabel.Instruction = instructions.Add(CilOpCodes.Nop);
 	}
 }

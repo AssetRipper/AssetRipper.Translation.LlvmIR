@@ -1,5 +1,6 @@
 ﻿using AsmResolver.DotNet.Code.Cil;
 using AsmResolver.PE.DotNet.Cil;
+using AssetRipper.Translation.Cpp.Extensions;
 using LLVMSharp.Interop;
 using System.Diagnostics;
 
@@ -19,7 +20,6 @@ internal sealed class InvokeInstructionContext : BaseCallInstructionContext
 	public LLVMBasicBlockRef CatchBlockRef => Operands[^2].AsBasicBlock();
 	public BasicBlockContext? DefaultBlock => Function?.BasicBlockLookup[DefaultBlockRef];
 	public BasicBlockContext? CatchBlock => Function?.BasicBlockLookup[CatchBlockRef];
-	public bool IsLeave { get; set; } = false;
 
 	public override void AddInstructions(CilInstructionCollection instructions)
 	{
@@ -29,7 +29,21 @@ internal sealed class InvokeInstructionContext : BaseCallInstructionContext
 
 		base.AddInstructions(instructions);
 
-		instructions.Add(IsLeave ? CilOpCodes.Leave : CilOpCodes.Br, Function.Labels[DefaultBlockRef]);
-		// Do we need to account for phi here?
+		CilInstructionLabel defaultLabel = new();
+
+		// if exception info is not null, branch to the catch block
+		{
+			instructions.Add(CilOpCodes.Ldsfld, Module.InjectedTypes[typeof(ExceptionInfo)].GetFieldByName(nameof(ExceptionInfo.Current)));
+			instructions.Add(CilOpCodes.Brfalse, defaultLabel);
+			AddLoadIfBranchingToPhi(instructions, CatchBlock);
+			instructions.Add(CilOpCodes.Br, Function.Labels[CatchBlockRef]);
+		}
+
+		// else branch to the default block
+		{
+			defaultLabel.Instruction = instructions.Add(CilOpCodes.Nop);
+			AddLoadIfBranchingToPhi(instructions, DefaultBlock);
+			instructions.Add(CilOpCodes.Br, Function.Labels[DefaultBlockRef]);
+		}
 	}
 }

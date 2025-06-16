@@ -63,6 +63,6 @@ internal sealed class UnaryMathInstructionContext : InstructionContext
 		{
 			throw new NotSupportedException();
 		}
-		instructions.Add(CilOpCodes.Stloc, GetLocalVariable());
+		AddStore(instructions);
 	}
 }

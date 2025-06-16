@@ -121,7 +121,7 @@ internal sealed class GetElementPointerInstructionContext : InstructionContext
 			}
 		}
 
-		instructions.Add(CilOpCodes.Stloc, GetLocalVariable());
+		AddStore(instructions);
 	}
 
 	private TypeSignature CalculateFinalType()

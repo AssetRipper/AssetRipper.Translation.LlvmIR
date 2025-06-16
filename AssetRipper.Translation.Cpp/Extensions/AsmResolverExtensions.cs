@@ -291,4 +291,9 @@ internal static class AsmResolverExtensions
 	{
 		return type.Methods.Single(m => m.Name == name);
 	}
+
+	public static FieldDefinition GetFieldByName(this TypeDefinition type, string name)
+	{
+		return type.Fields.Single(f => f.Name == name);
+	}
 }

@@ -143,6 +143,6 @@ internal sealed class NumericConversionInstructionContext : InstructionContext
 	{
 		Module.LoadValue(instructions, Operand);
 		AddConversion(instructions);
-		instructions.Add(CilOpCodes.Stloc, GetLocalVariable());
+		AddStore(instructions);
 	}
 }

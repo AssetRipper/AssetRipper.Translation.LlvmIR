@@ -1,5 +1,7 @@
-﻿using AsmResolver.DotNet.Code.Cil;
+﻿using AsmResolver.DotNet;
+using AsmResolver.DotNet.Code.Cil;
 using AsmResolver.DotNet.Signatures;
+using AsmResolver.PE.DotNet.Cil;
 using AsmResolver.PE.DotNet.Metadata.Tables;
 using AssetRipper.CIL;
 using AssetRipper.Translation.Cpp.Extensions;
@@ -56,6 +58,7 @@ internal abstract class InstructionContext
 	public LLVMOpcode Opcode => Instruction.GetOpcode();
 	public bool NoSignedWrap => LibLLVMSharp.InstructionHasNoSignedWrap(Instruction);
 	public bool NoUnsignedWrap => LibLLVMSharp.InstructionHasNoUnsignedWrap(Instruction);
+	public int Index => Function?.Instructions.IndexOf(this) ?? -1;
 	public LLVMValueRef Instruction { get; }
 	public LLVMBasicBlockRef BasicBlockRef => Instruction.InstructionParent;
 	public LLVMValueRef FunctionRef => BasicBlockRef.Parent;
@@ -68,6 +71,7 @@ internal abstract class InstructionContext
 	public List<InstructionContext> Accessors { get; } = new();
 	public TypeSignature ResultTypeSignature { get; set; }
 	public CilLocalVariable? ResultLocal { get; set; }
+	public FieldDefinition? ResultField { get; set; }
 
 	[MemberNotNullWhen(true, nameof(ResultTypeSignature))]
 	public bool HasResult => ResultTypeSignature is not null and not CorLibTypeSignature { ElementType: ElementType.Void };
@@ -77,13 +81,20 @@ internal abstract class InstructionContext
 		return Instruction.ToString();
 	}
 
-	public CilLocalVariable GetLocalVariable() => ResultLocal ?? throw new NullReferenceException("Result local is null");
-
 	public virtual void CreateLocal(CilInstructionCollection instructions)
 	{
-		if (HasResult)
+		if (!HasResult)
+		{
+		}
+		else if (Function is null or { MightThrowAnException: false })
 		{
 			ResultLocal = instructions.AddLocalVariable(ResultTypeSignature);
+		}
+		else
+		{
+			Debug.Assert(Function.LocalVariablesType is not null);
+			ResultField = new FieldDefinition($"Instruction_{Index}", FieldAttributes.Public, ResultTypeSignature);
+			Function.LocalVariablesType.Fields.Add(ResultField);
 		}
 	}
 
@@ -107,5 +118,74 @@ internal abstract class InstructionContext
 		{
 			throw new InvalidOperationException("Function is null");
 		}
+	}
+
+	public void AddLoad(CilInstructionCollection instructions)
+	{
+		if (ResultLocal is not null)
+		{
+			instructions.Add(CilOpCodes.Ldloc, ResultLocal);
+		}
+		else if (ResultField is not null)
+		{
+			Debug.Assert(Function is not null);
+			Function.AddLocalVariablesRef(instructions);
+			instructions.Add(CilOpCodes.Ldfld, ResultField);
+		}
+		else
+		{
+			Debug.Assert(false, "Result local and field are both null");
+		}
+	}
+
+	public void AddStore(CilInstructionCollection instructions)
+	{
+		if (ResultLocal is not null)
+		{
+			instructions.Add(CilOpCodes.Stloc, ResultLocal);
+		}
+		else if (ResultField is not null)
+		{
+			Debug.Assert(Function is not null);
+			CilLocalVariable tempLocal = instructions.AddLocalVariable(ResultTypeSignature);
+			instructions.Add(CilOpCodes.Stloc, tempLocal);
+			Function.AddLocalVariablesRef(instructions);
+			instructions.Add(CilOpCodes.Ldloc, tempLocal);
+			instructions.Add(CilOpCodes.Stfld, ResultField);
+		}
+		else
+		{
+			Debug.Assert(false, "Result local and field are both null");
+		}
+	}
+
+	protected void AddLoadIfBranchingToPhi(CilInstructionCollection instructions, BasicBlockContext targetBlock)
+	{
+		if (!TargetBlockStartsWithPhi(targetBlock))
+		{
+			return;
+		}
+
+		ThrowIfBasicBlockIsNull();
+		ThrowIfFunctionIsNull();
+
+		foreach (InstructionContext instruction in targetBlock.Instructions)
+		{
+			if (instruction is PhiInstructionContext phiInstruction)
+			{
+				LLVMValueRef phiOperand = phiInstruction.GetOperandForOriginBlock(BasicBlock);
+				Module.LoadValue(instructions, phiOperand);
+				phiInstruction.AddStore(instructions);
+			}
+			else
+			{
+				break;
+			}
+		}
+	}
+
+	protected static bool TargetBlockStartsWithPhi(BasicBlockContext targetBlock)
+	{
+		return targetBlock.Instructions.Count > 0 && targetBlock.Instructions[0] is PhiInstructionContext;
 	}
 }

@@ -2,6 +2,7 @@
 using AsmResolver.DotNet.Code.Cil;
 using AsmResolver.DotNet.Signatures;
 using AsmResolver.PE.DotNet.Cil;
+using AsmResolver.PE.DotNet.Metadata.Tables;
 using AssetRipper.CIL;
 using LLVMSharp.Interop;
 using System.Diagnostics;
@@ -20,24 +21,33 @@ internal sealed class AllocaInstructionContext : InstructionContext
 		}
 		AllocatedTypeSignature = module.GetTypeSignature(AllocatedType);
 		ResultTypeSignature = AllocatedTypeSignature.MakePointerType();
+		DataTypeSignature = FixedSize != 1
+			? Module.GetOrCreateInlineArray(AllocatedTypeSignature, (int)FixedSize).Type.ToTypeSignature()
+			: AllocatedTypeSignature;
 	}
 	public LLVMValueRef SizeOperand => Operands[0];
 	public long FixedSize => SizeOperand.ConstIntSExt;
 	public unsafe LLVMTypeRef AllocatedType => LLVM.GetAllocatedType(Instruction);
 	public TypeSignature AllocatedTypeSignature { get; set; }
 	public TypeSignature PointerTypeSignature => ResultTypeSignature;
+	public TypeSignature DataTypeSignature { get; set; }
 	public CilLocalVariable? DataLocal { get; set; }
+	public FieldDefinition? DataField { get; set; }
 	public CilLocalVariable? PointerLocal { get => ResultLocal; set => ResultLocal = value; }
 
 	public override void CreateLocal(CilInstructionCollection instructions)
 	{
-		if (FixedSize != 1)
+		Debug.Assert(Function is not null);
+
+		if (Function.MightThrowAnException)
 		{
-			throw new NotSupportedException("Fixed size array not supported");
+			Debug.Assert(Function.LocalVariablesType is not null);
+			DataField = new FieldDefinition($"Instruction_{Index}", FieldAttributes.Public, DataTypeSignature);
+			Function.LocalVariablesType.Fields.Add(DataField);
 		}
 		else
 		{
-			DataLocal = instructions.AddLocalVariable(AllocatedTypeSignature);
+			DataLocal = instructions.AddLocalVariable(DataTypeSignature);
 		}
 
 		if (Accessors.Count > 0)
@@ -48,18 +58,29 @@ internal sealed class AllocaInstructionContext : InstructionContext
 
 	public override void AddInstructions(CilInstructionCollection instructions)
 	{
-		if (DataLocal is null)
+		if (PointerLocal is null)
 		{
-			Debug.Assert(PointerLocal is not null);
-			throw new NotSupportedException("Stack allocated data not currently supported");
+			return;
 		}
-		else if (PointerLocal is not null)
+
+		if (DataLocal is not null)
 		{
 			//Zero out the memory
 			instructions.InitializeDefaultValue(DataLocal);
 
-			//Might need slight modifications for fixed size arrays.
+			//Store the address of the data in the pointer local
 			instructions.Add(CilOpCodes.Ldloca, DataLocal);
+			instructions.Add(CilOpCodes.Stloc, PointerLocal);
+		}
+		else
+		{
+			Debug.Assert(Function is not null);
+			Debug.Assert(DataField is not null);
+
+			//Store the address of the data in the pointer local
+			Function.AddLocalVariablesPointer(instructions);
+			instructions.Add(CilOpCodes.Ldflda, DataField);
+			instructions.Add(CilOpCodes.Conv_U);
 			instructions.Add(CilOpCodes.Stloc, PointerLocal);
 		}
 	}

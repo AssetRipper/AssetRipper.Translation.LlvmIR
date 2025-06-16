@@ -1,5 +1,7 @@
-﻿using AsmResolver.DotNet.Code.Cil;
+﻿using AsmResolver.DotNet;
+using AsmResolver.DotNet.Code.Cil;
 using AsmResolver.PE.DotNet.Cil;
+using AssetRipper.Translation.Cpp.Extensions;
 using LLVMSharp.Interop;
 using System.Diagnostics;
 
@@ -10,15 +12,18 @@ internal sealed class CleanupPadInstructionContext : InstructionContext
 	internal CleanupPadInstructionContext(LLVMValueRef instruction, ModuleContext module) : base(instruction, module)
 	{
 		Debug.Assert(Operands.Length == 1);
-		ResultTypeSignature = module.Definition.CorLibTypeFactory.Object; // Placeholder for an actual exception type
+		ResultTypeSignature = module.InjectedTypes[typeof(ExceptionInfo)].ToTypeSignature();
 	}
 
 	public LLVMValueRef Operand => Operands[0];
 	public bool IsIndependent => Operand.IsAConstantTokenNone != default;
-	public bool IsBlockSelfContained => BasicBlock?.Instructions[^1] is CleanupReturnInstructionContext cleanupReturn && cleanupReturn.UnwindsToCaller;
 
 	public override void AddInstructions(CilInstructionCollection instructions)
 	{
-		instructions.Add(CilOpCodes.Stloc, GetLocalVariable());
+		FieldDefinition field = Module.InjectedTypes[typeof(ExceptionInfo)].GetFieldByName(nameof(ExceptionInfo.Current));
+		instructions.Add(CilOpCodes.Ldsfld, field);
+		AddStore(instructions);
+		instructions.Add(CilOpCodes.Ldnull);
+		instructions.Add(CilOpCodes.Stsfld, field);
 	}
 }

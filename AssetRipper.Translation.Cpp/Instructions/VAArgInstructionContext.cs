@@ -22,6 +22,6 @@ internal class VAArgInstructionContext : InstructionContext
 		Module.LoadValue(instructions, Operand);
 		instructions.Add(CilOpCodes.Call, Module.InstructionHelperType.Methods.First(m => m.Name == nameof(InstructionHelper.VAArg)));
 		instructions.AddLoadIndirect(ResultTypeSignature);
-		instructions.Add(CilOpCodes.Stloc, GetLocalVariable());
+		AddStore(instructions);
 	}
 }

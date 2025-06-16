@@ -1,5 +1,7 @@
-﻿using AsmResolver.DotNet.Code.Cil;
+﻿using AsmResolver.DotNet;
+using AsmResolver.DotNet.Code.Cil;
 using AsmResolver.PE.DotNet.Cil;
+using AssetRipper.Translation.Cpp.Extensions;
 using LLVMSharp.Interop;
 using System.Diagnostics;
 
@@ -11,6 +13,7 @@ internal sealed class CatchPadInstructionContext : InstructionContext
 	{
 		Debug.Assert(Operands.Length >= 1);
 		Debug.Assert(Operands[^1].IsACatchSwitchInst != default);
+		ResultTypeSignature = module.InjectedTypes[typeof(ExceptionInfo)].ToTypeSignature();
 	}
 
 	public LLVMValueRef CatchSwitchRef => Operands[^1];
@@ -24,27 +27,13 @@ internal sealed class CatchPadInstructionContext : InstructionContext
 			return Function.Instructions.OfType<CatchReturnInstructionContext>().Single(i => i.CatchPad == this);
 		}
 	}
-	public bool HasFilter => true;
-	public CilInstructionLabel HandlerStartLabel { get; } = new();
-	public CilInstructionLabel HandlerEndLabel => CatchReturn.Label;
-	public CilInstructionLabel FilterStartLabel { get; } = new();
-	//public CilInstructionLabel FilterEndLabel { get; } = new();
 
 	public override void AddInstructions(CilInstructionCollection instructions)
 	{
-		// filter
-		if (HasFilter)
-		{
-			FilterStartLabel.Instruction = instructions.Add(CilOpCodes.Nop);
-			instructions.Add(CilOpCodes.Pop);// Pop the exception object
-			instructions.Add(CilOpCodes.Ldc_I4_1);// Return true
-			instructions.Add(CilOpCodes.Endfilter);
-		}
-
-		// handler
-		{
-			HandlerStartLabel.Instruction = instructions.Add(CilOpCodes.Nop);
-			instructions.Add(CilOpCodes.Pop);// Pop the exception object
-		}
+		FieldDefinition field = Module.InjectedTypes[typeof(ExceptionInfo)].GetFieldByName(nameof(ExceptionInfo.Current));
+		instructions.Add(CilOpCodes.Ldsfld, field);
+		AddStore(instructions);
+		instructions.Add(CilOpCodes.Ldnull);
+		instructions.Add(CilOpCodes.Stsfld, field);
 	}
 }

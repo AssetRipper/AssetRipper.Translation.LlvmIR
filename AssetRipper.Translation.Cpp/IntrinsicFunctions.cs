@@ -30,12 +30,10 @@ internal static partial class IntrinsicFunctions
 		}
 	}
 
-	[DoesNotReturn]
 	[MangledName("_wassert")]
 	public unsafe static void Assert(char* message, char* file, uint line)
 	{
-		// This needs to be switched to an emulated exception because _wassert exceptions can be caught by C++ code.
-		throw new Exception($"Assertion failed: {Marshal.PtrToStringUni((IntPtr)message)} at {Marshal.PtrToStringUni((IntPtr)file)}:{line}");
+		ExceptionInfo.Current = new AssertExceptionInfo($"Assertion failed: {Marshal.PtrToStringUni((IntPtr)message)} at {Marshal.PtrToStringUni((IntPtr)file)}:{line}");
 	}
 
 	/// <summary>
@@ -152,6 +150,56 @@ internal static partial class IntrinsicFunctions
 		Marshal.FreeHGlobal((IntPtr)ptr);
 	}
 
+	[MangledName("_CxxThrowException")]
+	public unsafe static void CxxThrowException(void* exceptionPointer, void* throwInfo)
+	{
+		ExceptionInfo.Current = new NativeExceptionInfo(exceptionPointer, throwInfo);
+	}
+
+	[MangledName("__CxxFrameHandler3")]
+	public static unsafe int CxxFrameHandler3(ReadOnlySpan<nint> args)
+	{
+		if (args.Length != 3)
+		{
+			throw new ArgumentException("Expected 3 arguments", nameof(args));
+		}
+
+		if (args[0] == 0 || args[1] == 0 || args[2] == 0)
+		{
+			throw new ArgumentNullException(nameof(args), "Arguments cannot be null");
+		}
+
+		void* rttiTypeDescriptor = *(void**)args[0];
+		int unknown = *(int*)args[1];
+		void** outException = (void**)args[2];
+
+		if (ExceptionInfo.Current is NativeExceptionInfo nativeException)
+		{
+			if (rttiTypeDescriptor is null)
+			{
+			}
+			else if (false) // Todo
+			{
+				return 1; // Continue search
+			}
+
+			if (outException != null)
+			{
+				*outException = nativeException.ExceptionPointer;
+			}
+
+			return 0; // Handled
+		}
+		else
+		{
+			if (rttiTypeDescriptor != null || outException != null)
+			{
+				throw new NotSupportedException($"Current exception is not a {nameof(NativeExceptionInfo)}.");
+			}
+			return 0; // Handled because throwInfo is null
+		}
+	}
+
 	[MangledName("expand")]
 	public unsafe static void* Expand(void* ptr, long size)
 	{
@@ -162,6 +210,28 @@ internal static partial class IntrinsicFunctions
 
 		// We take advantage of the fact that it's just an optimization and return null, signaling that we can't expand the memory in place.
 		return null;
+	}
+
+	private sealed unsafe class NativeExceptionInfo : ExceptionInfo
+	{
+		public void* ExceptionPointer { get; }
+		public void* ThrowInfo { get; }
+
+		public NativeExceptionInfo(void* exceptionPointer, void* throwInfo)
+		{
+			ExceptionPointer = exceptionPointer;
+			ThrowInfo = throwInfo;
+		}
+	}
+
+	private sealed class AssertExceptionInfo : ExceptionInfo
+	{
+		public string Message { get; }
+		public AssertExceptionInfo(string message)
+		{
+			Message = message;
+		}
+		public override string? GetMessage() => Message;
 	}
 }
 #pragma warning restore IDE0060 // Remove unused parameter

@@ -1,5 +1,7 @@
 ﻿using AsmResolver.DotNet.Code.Cil;
 using AsmResolver.PE.DotNet.Cil;
+using AssetRipper.CIL;
+using AssetRipper.Translation.Cpp.Extensions;
 using LLVMSharp.Interop;
 using System.Diagnostics;
 
@@ -20,16 +22,21 @@ internal sealed class CleanupReturnInstructionContext : InstructionContext
 
 	public override void AddInstructions(CilInstructionCollection instructions)
 	{
+		Debug.Assert(Function is not null);
+		Debug.Assert(CleanupPad is not null);
+		CleanupPad.AddLoad(instructions);
+		instructions.Add(CilOpCodes.Stsfld, Module.InjectedTypes[typeof(ExceptionInfo)].GetFieldByName(nameof(ExceptionInfo.Current)));
+
 		if (UnwindsToCaller)
 		{
-			instructions.Add(CilOpCodes.Rethrow);
+			instructions.AddDefaultValue(Function.ReturnTypeSignature); // Does nothing if the return type is void
+			instructions.Add(CilOpCodes.Ret);
 		}
 		else
 		{
 			// Unwind to an exception handler switch or another cleanup pad
-			Debug.Assert(CleanupPad is not null);
-			Debug.Assert(Function is not null);
-			instructions.Add(CilOpCodes.Ldloc, CleanupPad.GetLocalVariable());
+			Debug.Assert(TargetBlock is not null);
+			AddLoadIfBranchingToPhi(instructions, TargetBlock);
 			instructions.Add(CilOpCodes.Br, Function.Labels[TargetBlockRef]);
 		}
 	}

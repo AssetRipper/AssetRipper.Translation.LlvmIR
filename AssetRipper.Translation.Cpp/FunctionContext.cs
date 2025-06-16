@@ -30,6 +30,7 @@ internal sealed partial class FunctionContext : IHasName
 			ParameterAttributes[i] = AttributeWrapper.FromArray(function.GetAttributesAtIndex((LLVMAttributeIndex)(i + 1)));
 		}
 
+		MangledName = Function.Name;
 		DemangledName = LibLLVMSharp.ValueGetDemangledName(function);
 		CleanName = ExtractCleanName(MangledName, DemangledName, module.Options.RenamedSymbols);
 	}
@@ -59,64 +60,12 @@ internal sealed partial class FunctionContext : IHasName
 				basicBlock.Successors.Add(successorBlock);
 				successorBlock.Predecessors.Add(basicBlock);
 			}
-			if (basicBlock.EndsWithInvoke)
-			{
-				InvokeInstructionContext instruction = (InvokeInstructionContext)basicBlock.Instructions[^1];
-				BasicBlockContext? defaultBlock = instruction.DefaultBlock;
-				if (defaultBlock is not null)
-				{
-					basicBlock.NormalSuccessors.Add(defaultBlock);
-					defaultBlock.NormalPredecessors.Add(basicBlock);
-				}
-				BasicBlockContext? catchBlock = instruction.CatchBlock;
-				if (catchBlock is not null)
-				{
-					basicBlock.InvokeSuccessors.Add(catchBlock);
-					catchBlock.InvokePredecessors.Add(basicBlock);
-				}
-			}
-			else if (basicBlock.IsCatchSwitch)
-			{
-				foreach (BasicBlockContext successor in basicBlock.Successors)
-				{
-					basicBlock.HandlerSuccessors.Add(successor);
-					successor.HandlerPredecessors.Add(basicBlock);
-				}
-			}
-			else if (basicBlock.EndsWithCatchReturn)
-			{
-				CatchReturnInstructionContext instruction = (CatchReturnInstructionContext)basicBlock.Instructions[^1];
-				BasicBlockContext? catchBlock = instruction.TargetBlock;
-				if (catchBlock is not null)
-				{
-					basicBlock.HandlerSuccessors.Add(catchBlock);
-					catchBlock.HandlerPredecessors.Add(basicBlock);
-				}
-			}
-			else if (basicBlock.EndsWithCleanupReturn)
-			{
-				CleanupReturnInstructionContext instruction = (CleanupReturnInstructionContext)basicBlock.Instructions[^1];
-				BasicBlockContext? cleanupBlock = instruction.TargetBlock;
-				if (cleanupBlock is not null)
-				{
-					basicBlock.HandlerSuccessors.Add(cleanupBlock);
-					cleanupBlock.HandlerPredecessors.Add(basicBlock);
-				}
-			}
-			else
-			{
-				foreach (BasicBlockContext successor in basicBlock.Successors)
-				{
-					basicBlock.NormalSuccessors.Add(successor);
-					successor.NormalPredecessors.Add(basicBlock);
-				}
-			}
 		}
 		return context;
 	}
 
 	/// <inheritdoc/>
-	public string MangledName => Function.Name;
+	public string MangledName { get; }
 	/// <summary>
 	/// The demangled name of the function, which might have signature information.
 	/// </summary>
@@ -125,11 +74,16 @@ internal sealed partial class FunctionContext : IHasName
 	public string CleanName { get; }
 	/// <inheritdoc/>
 	public string Name { get; set; } = "";
+	public bool MightThrowAnException { get; set; }
 	public LLVMValueRef Function { get; }
 	public unsafe bool IsVariadic => LLVM.IsFunctionVarArg(FunctionType) != 0;
 	public LLVMTypeRef FunctionType => LibLLVMSharp.FunctionGetFunctionType(Function);
 	public LLVMTypeRef ReturnType => LibLLVMSharp.FunctionGetReturnType(Function);
+	public TypeSignature ReturnTypeSignature => Module.GetTypeSignature(ReturnType);
 	public bool IsVoidReturn => ReturnType.Kind == LLVMTypeKind.LLVMVoidTypeKind;
+	public FunctionContext? PersonalityFunction => Function.HasPersonalityFn
+		? Module.Methods.TryGetValue(Function.PersonalityFn)
+		: null;
 	public LLVMValueRef[] Parameters { get; }
 	public AttributeWrapper[] Attributes { get; }
 	public AttributeWrapper[] ReturnAttributes { get; }
@@ -142,6 +96,8 @@ internal sealed partial class FunctionContext : IHasName
 	public Dictionary<LLVMValueRef, Parameter> ParameterDictionary { get; } = new();
 	public Dictionary<LLVMValueRef, InstructionContext> InstructionLookup { get; } = new();
 	public Dictionary<LLVMBasicBlockRef, BasicBlockContext> BasicBlockLookup { get; } = new();
+	public TypeDefinition? LocalVariablesType { get; set; }
+	public CilLocalVariable? StackFrameVariable { get; set; }
 
 	public void AnalyzeDataFlow()
 	{
@@ -215,39 +171,75 @@ internal sealed partial class FunctionContext : IHasName
 		return false;
 	}
 
-	public void MaybeAddStructReturnMethod()
+	public void AddLocalVariablesPointer(CilInstructionCollection instructions)
 	{
-		if (!TryGetStructReturnType(out LLVMTypeRef structReturnType))
-		{
-			return;
-		}
+		Debug.Assert(LocalVariablesType is not null);
+		Debug.Assert(StackFrameVariable is not null);
+		instructions.Add(CilOpCodes.Ldloca, StackFrameVariable);
+		instructions.Add(CilOpCodes.Call, Module.InjectedTypes[typeof(StackFrame)].GetMethodByName(nameof(StackFrame.GetLocalsPointer)).MakeGenericInstanceMethod(LocalVariablesType.ToTypeSignature()));
+	}
 
-		TypeSignature returnTypeSignature = Module.GetTypeSignature(structReturnType);
+	public void AddLocalVariablesRef(CilInstructionCollection instructions)
+	{
+		Debug.Assert(LocalVariablesType is not null);
+		Debug.Assert(StackFrameVariable is not null);
+		instructions.Add(CilOpCodes.Ldloca, StackFrameVariable);
+		instructions.Add(CilOpCodes.Call, Module.InjectedTypes[typeof(StackFrame)].GetMethodByName(nameof(StackFrame.GetLocalsRef)).MakeGenericInstanceMethod(LocalVariablesType.ToTypeSignature()));
+	}
 
+	public void AddPublicImplementation()
+	{
 		MethodDefinition method = Definition;
+		Debug.Assert(method.Signature is not null);
 
-		MethodDefinition newMethod = new(method.Name, method.Attributes, MethodSignature.CreateStatic(returnTypeSignature, method.Parameters.Skip(1).Select(p => p.ParameterType)));
-		method.DeclaringType!.Methods.Add(newMethod);
-		newMethod.CilMethodBody = new(newMethod);
-
-		CilInstructionCollection instructions = newMethod.CilMethodBody.Instructions;
-		CilLocalVariable returnLocal = instructions.AddLocalVariable(returnTypeSignature);
-		instructions.InitializeDefaultValue(returnLocal);
-		instructions.Add(CilOpCodes.Ldloca, returnLocal);
-		foreach (Parameter parameter in newMethod.Parameters)
+		MethodDefinition newMethod;
+		CilInstructionCollection instructions;
+		if (TryGetStructReturnType(out LLVMTypeRef structReturnType))
 		{
-			instructions.Add(CilOpCodes.Ldarg, parameter);
+			TypeSignature returnTypeSignature = Module.GetTypeSignature(structReturnType);
+
+			newMethod = new(method.Name, method.Attributes, MethodSignature.CreateStatic(returnTypeSignature, method.Signature.ParameterTypes.Skip(1)));
+			Module.GlobalFunctionsType.Methods.Add(newMethod);
+			newMethod.CilMethodBody = new(newMethod);
+
+			instructions = newMethod.CilMethodBody.Instructions;
+			CilLocalVariable returnLocal = instructions.AddLocalVariable(returnTypeSignature);
+			instructions.InitializeDefaultValue(returnLocal);
+			instructions.Add(CilOpCodes.Ldloca, returnLocal);
+			foreach (Parameter parameter in newMethod.Parameters)
+			{
+				instructions.Add(CilOpCodes.Ldarg, parameter);
+			}
+			instructions.Add(CilOpCodes.Call, method);
+			instructions.Add(CilOpCodes.Ldloc, returnLocal);
+
+			// Annotate the original return parameter
+			method.Parameters[0].GetOrCreateDefinition().Name = "result";
 		}
-		instructions.Add(CilOpCodes.Call, method);
-		instructions.Add(CilOpCodes.Ldloc, returnLocal);
+		else
+		{
+			newMethod = new(method.Name, method.Attributes, MethodSignature.CreateStatic(method.Signature.ReturnType, method.Signature.ParameterTypes));
+			Module.GlobalFunctionsType.Methods.Add(newMethod);
+			newMethod.CilMethodBody = new(newMethod);
+
+			instructions = newMethod.CilMethodBody.Instructions;
+
+			foreach (Parameter parameter in newMethod.Parameters)
+			{
+				instructions.Add(CilOpCodes.Ldarg, parameter);
+			}
+			instructions.Add(CilOpCodes.Call, method);
+		}
+
+		if (MightThrowAnException)
+		{
+			instructions.Add(CilOpCodes.Call, Module.InjectedTypes[typeof(StackFrameList)].GetMethodByName(nameof(StackFrameList.ExitToUserCode)));
+		}
+
 		instructions.Add(CilOpCodes.Ret);
 		instructions.OptimizeMacros();
 
-		// Hide the original method
-		method.IsAssembly = true;
-
-		// Annotate the original return parameter
-		method.Parameters[0].GetOrCreateDefinition().Name = "result";
+		this.AddNameAttributes(newMethod);
 	}
 
 	private string GetDebuggerDisplay()

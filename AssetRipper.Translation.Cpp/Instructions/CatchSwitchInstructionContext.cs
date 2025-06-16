@@ -1,5 +1,8 @@
 ﻿using AsmResolver.DotNet.Code.Cil;
+using AsmResolver.DotNet.Signatures;
 using AsmResolver.PE.DotNet.Cil;
+using AsmResolver.PE.DotNet.Metadata.Tables;
+using AssetRipper.CIL;
 using LLVMSharp.Interop;
 using System.Diagnostics;
 
@@ -12,8 +15,6 @@ internal sealed class CatchSwitchInstructionContext : InstructionContext
 		Debug.Assert(Operands.Length >= 1);
 	}
 
-	public CilInstructionLabel TryStartLabel { get; } = new();
-	public CilInstructionLabel TryEndLabel { get; } = new();
 	public LLVMValueRef ParentRef => Operands[0];
 	public bool HasDefaultUnwind => false;
 	public LLVMBasicBlockRef DefaultUnwindTargetRef => HasDefaultUnwind ? Operands[^1].AsBasicBlock() : default;
@@ -28,42 +29,69 @@ internal sealed class CatchSwitchInstructionContext : InstructionContext
 			for (int i = 0; i < Handlers.Length; i++)
 			{
 				BasicBlockContext handlerBlock = Function.BasicBlockLookup[Handlers[i].AsBasicBlock()];
-				catchPads[i] = (CatchPadInstructionContext)handlerBlock.Instructions[0];
+				catchPads[i] = handlerBlock.Instructions.OfType<CatchPadInstructionContext>().First();
 			}
 			return catchPads;
 		}
 	}
-	public BasicBlockContext? UltimateTarget => CatchPads[0]?.CatchReturn.TargetBlock;
+
 	public override void AddInstructions(CilInstructionCollection instructions)
 	{
-		throw new NotImplementedException();
+		Debug.Assert(Function is not null);
+		Debug.Assert(Function.PersonalityFunction is not null);
+		Debug.Assert(Function.PersonalityFunction.Instructions.Count == 0, "Personality function should be intrinsic and not have instructions");
+		Debug.Assert(Function.PersonalityFunction.ReturnTypeSignature is CorLibTypeSignature { ElementType: ElementType.I4 });
+		Debug.Assert(Function.PersonalityFunction.Parameters.Length == 0);
+		Debug.Assert(Function.PersonalityFunction.IsVariadic);
+		Debug.Assert(CatchPads.Count > 0);
+
 		foreach (CatchPadInstructionContext catchPad in CatchPads)
 		{
-			if (catchPad.HasFilter)
-			{
-				instructions.Owner.ExceptionHandlers.Add(new CilExceptionHandler
-				{
-					TryStart = TryStartLabel,
-					TryEnd = TryEndLabel,
-					HandlerStart = catchPad.HandlerStartLabel,
-					HandlerEnd = catchPad.HandlerEndLabel,
-					FilterStart = catchPad.FilterStartLabel,
-					HandlerType = CilExceptionHandlerType.Filter,
-					ExceptionType = Module.Definition.CorLibTypeFactory.Object.ToTypeDefOrRef(),
-				});
-			}
-			else
-			{
-				instructions.Owner.ExceptionHandlers.Add(new CilExceptionHandler
-				{
-					TryStart = TryStartLabel,
-					TryEnd = TryEndLabel,
-					HandlerStart = catchPad.HandlerStartLabel,
-					HandlerEnd = catchPad.HandlerEndLabel,
-					HandlerType = CilExceptionHandlerType.Exception,
-					ExceptionType = Module.Definition.CorLibTypeFactory.Object.ToTypeDefOrRef(),
-				});
-			}
+			CilInstructionLabel label = new();
+			CilLocalVariable argumentsInReadOnlySpan = BaseCallInstructionContext.LoadVariadicArguments(instructions, Module, catchPad.Arguments);
+			// Call personality function
+			instructions.Add(CilOpCodes.Ldloc, argumentsInReadOnlySpan);
+			instructions.Add(CilOpCodes.Call, Function.PersonalityFunction.Definition);
+			instructions.Add(CilOpCodes.Brtrue, label);
+			AddLoadIfBranchingToPhi(instructions, catchPad.BasicBlock!);
+			instructions.Add(CilOpCodes.Br, Function.Labels[catchPad.BasicBlockRef]);
+			label.Instruction = instructions.Add(CilOpCodes.Nop);
 		}
+
+		if (HasDefaultUnwind)
+		{
+			Debug.Assert(DefaultUnwindTarget is not null);
+			AddLoadIfBranchingToPhi(instructions, DefaultUnwindTarget);
+			instructions.Add(CilOpCodes.Br, Function.Labels[DefaultUnwindTargetRef]);
+		}
+		else
+		{
+			// Unwind to caller
+			instructions.AddDefaultValue(Function.ReturnTypeSignature);
+			instructions.Add(CilOpCodes.Ret);
+		}
+	}
+
+	private enum ExceptionDisposition
+	{
+		/// <summary>
+		/// Exception handled; resume execution where it occurred
+		/// </summary>
+		ContinueExecution,
+		/// <summary>
+		/// Not handled; search next handler
+		/// </summary>
+		ContinueSearch,
+		/// <summary>
+		/// New exception occurred during existing exception handling (unwinding)
+		/// </summary>
+		NestedException,
+		/// <summary>
+		/// Unwinding interrupted by another unwind; adjust strategy
+		/// </summary>
+		/// <remarks>
+		/// Can only occur with multi-threading
+		/// </remarks>
+		CollidedUnwind,
 	}
 }

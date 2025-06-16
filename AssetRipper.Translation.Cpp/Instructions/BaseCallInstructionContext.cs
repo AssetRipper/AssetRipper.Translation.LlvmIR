@@ -77,67 +77,18 @@ internal abstract class BaseCallInstructionContext : InstructionContext
 				{
 					Module.LoadValue(instructions, arguments[i]);
 				}
-				instructions.AddDefaultValue(functionCalled.Definition.Signature!.ParameterTypes[^2]);
 				instructions.AddDefaultValue(functionCalled.Definition.Signature!.ParameterTypes[^1]);
 			}
 			else
 			{
-				CorLibTypeSignature intPtr = Module.Definition.CorLibTypeFactory.IntPtr;
-
-				TypeDefinition intPtrBuffer = Module.GetOrCreateInlineArray(intPtr, variadicParameterCount).Type;
-
-				TypeSignature intPtrSpan = Module.Definition.DefaultImporter
-					.ImportType(typeof(Span<>))
-					.MakeGenericInstanceType(intPtr);
-
-				IMethodDescriptor getTypeFromHandle = Module.Definition.DefaultImporter.ImportMethod(typeof(Type).GetMethod(nameof(Type.GetTypeFromHandle))!);
-
-				MethodSignature getItemSignature = MethodSignature.CreateInstance(new GenericParameterSignature(GenericParameterType.Type, 0).MakeByReferenceType(), Module.Definition.CorLibTypeFactory.Int32);
-
-				IMethodDescriptor intPtrSpanGetItem = new MemberReference(intPtrSpan.ToTypeDefOrRef(), "get_Item", getItemSignature);
-
-				MethodDefinition inlineArrayAsSpan = Module.InlineArrayHelperType.Methods.Single(m => m.Name == nameof(InlineArrayHelper.AsSpan));
-
-				MethodDefinition spanToReadOnly = Module.SpanHelperType.Methods.Single(m => m.Name == nameof(SpanHelper.ToReadOnly));
-
-				CilLocalVariable intPtrBufferLocal = instructions.AddLocalVariable(intPtrBuffer.ToTypeSignature());
-				instructions.AddDefaultValue(intPtrBuffer.ToTypeSignature());
-				instructions.Add(CilOpCodes.Stloc, intPtrBufferLocal);
-
-				CilLocalVariable[] variadicLocals = new CilLocalVariable[variadicParameterCount];
-				for (int i = functionCalled.Parameters.Length; i < arguments.Length; i++)
-				{
-					int index = i - functionCalled.Parameters.Length;
-
-					Module.LoadValue(instructions, arguments[i], out TypeSignature typeSignature);
-					CilLocalVariable local = instructions.AddLocalVariable(typeSignature);
-					instructions.Add(CilOpCodes.Stloc, local);
-					variadicLocals[index] = local;
-				}
-
-				CilLocalVariable intPtrSpanLocal = instructions.AddLocalVariable(intPtrSpan);
-				instructions.Add(CilOpCodes.Ldloca, intPtrBufferLocal);
-				instructions.Add(CilOpCodes.Call, inlineArrayAsSpan.MakeGenericInstanceMethod(intPtrBuffer.ToTypeSignature(), intPtr));
-				instructions.Add(CilOpCodes.Stloc, intPtrSpanLocal);
-
-				for (int i = functionCalled.Parameters.Length; i < arguments.Length; i++)
-				{
-					int index = i - functionCalled.Parameters.Length;
-
-					instructions.Add(CilOpCodes.Ldloca, intPtrSpanLocal);
-					instructions.Add(CilOpCodes.Ldc_I4, index);
-					instructions.Add(CilOpCodes.Call, intPtrSpanGetItem);
-					instructions.Add(CilOpCodes.Ldloca, variadicLocals[index]);
-					instructions.Add(CilOpCodes.Stind_I);
-				}
+				CilLocalVariable intPtrReadOnlySpanLocal = LoadVariadicArguments(instructions, Module, arguments[functionCalled.Parameters.Length..]);
 
 				// Push the arguments
 				for (int i = 0; i < functionCalled.Parameters.Length; i++)
 				{
 					Module.LoadValue(instructions, arguments[i]);
 				}
-				instructions.Add(CilOpCodes.Ldloc, intPtrSpanLocal);
-				instructions.Add(CilOpCodes.Call, spanToReadOnly.MakeGenericInstanceMethod(intPtr));
+				instructions.Add(CilOpCodes.Ldloc, intPtrReadOnlySpanLocal);
 			}
 
 			instructions.Add(CilOpCodes.Call, functionCalled.Definition);
@@ -145,12 +96,78 @@ internal abstract class BaseCallInstructionContext : InstructionContext
 
 		if (HasResult)
 		{
-			instructions.Add(CilOpCodes.Stloc, GetLocalVariable());
+			AddStore(instructions);
 		}
 	}
 
 	private static bool IsInvisibleFunction(FunctionContext functionCalled)
 	{
 		return functionCalled.MangledName is "llvm.va_end";
+	}
+
+	/// <summary>
+	/// Load variadic arguments into a local variable that contains a read only span of pointers to the arguments.
+	/// </summary>
+	/// <param name="instructions"></param>
+	/// <param name="module"></param>
+	/// <param name="variadicArguments"></param>
+	/// <returns>A local variable containing a read only span of pointers to the arguments.</returns>
+	internal static CilLocalVariable LoadVariadicArguments(CilInstructionCollection instructions, ModuleContext module, ReadOnlySpan<LLVMValueRef> variadicArguments)
+	{
+		CorLibTypeSignature intPtr = module.Definition.CorLibTypeFactory.IntPtr;
+
+		TypeDefinition intPtrBuffer = module.GetOrCreateInlineArray(intPtr, variadicArguments.Length).Type;
+
+		TypeSignature intPtrSpan = module.Definition.DefaultImporter
+			.ImportType(typeof(Span<>))
+			.MakeGenericInstanceType(intPtr);
+
+		TypeSignature intPtrReadOnlySpan = module.Definition.DefaultImporter
+			.ImportType(typeof(ReadOnlySpan<>))
+			.MakeGenericInstanceType(intPtr);
+
+		IMethodDescriptor getTypeFromHandle = module.Definition.DefaultImporter.ImportMethod(typeof(Type).GetMethod(nameof(Type.GetTypeFromHandle))!);
+
+		MethodSignature getItemSignature = MethodSignature.CreateInstance(new GenericParameterSignature(GenericParameterType.Type, 0).MakeByReferenceType(), module.Definition.CorLibTypeFactory.Int32);
+
+		IMethodDescriptor intPtrSpanGetItem = new MemberReference(intPtrSpan.ToTypeDefOrRef(), "get_Item", getItemSignature);
+
+		MethodDefinition inlineArrayAsSpan = module.InlineArrayHelperType.Methods.Single(m => m.Name == nameof(InlineArrayHelper.AsSpan));
+
+		MethodDefinition spanToReadOnly = module.SpanHelperType.Methods.Single(m => m.Name == nameof(SpanHelper.ToReadOnly));
+
+		CilLocalVariable intPtrBufferLocal = instructions.AddLocalVariable(intPtrBuffer.ToTypeSignature());
+		instructions.AddDefaultValue(intPtrBuffer.ToTypeSignature());
+		instructions.Add(CilOpCodes.Stloc, intPtrBufferLocal);
+
+		CilLocalVariable[] variadicLocals = new CilLocalVariable[variadicArguments.Length];
+		for (int i = 0; i < variadicLocals.Length; i++)
+		{
+			module.LoadValue(instructions, variadicArguments[i], out TypeSignature typeSignature);
+			CilLocalVariable local = instructions.AddLocalVariable(typeSignature);
+			instructions.Add(CilOpCodes.Stloc, local);
+			variadicLocals[i] = local;
+		}
+
+		CilLocalVariable intPtrSpanLocal = instructions.AddLocalVariable(intPtrSpan);
+		instructions.Add(CilOpCodes.Ldloca, intPtrBufferLocal);
+		instructions.Add(CilOpCodes.Call, inlineArrayAsSpan.MakeGenericInstanceMethod(intPtrBuffer.ToTypeSignature(), intPtr));
+		instructions.Add(CilOpCodes.Stloc, intPtrSpanLocal);
+
+		for (int i = 0; i < variadicArguments.Length; i++)
+		{
+			instructions.Add(CilOpCodes.Ldloca, intPtrSpanLocal);
+			instructions.Add(CilOpCodes.Ldc_I4, i);
+			instructions.Add(CilOpCodes.Call, intPtrSpanGetItem);
+			instructions.Add(CilOpCodes.Ldloca, variadicLocals[i]);
+			instructions.Add(CilOpCodes.Stind_I);
+		}
+
+		CilLocalVariable intPtrReadOnlySpanLocal = instructions.AddLocalVariable(intPtrSpan);
+		instructions.Add(CilOpCodes.Ldloc, intPtrSpanLocal);
+		instructions.Add(CilOpCodes.Call, spanToReadOnly.MakeGenericInstanceMethod(intPtr));
+		instructions.Add(CilOpCodes.Stloc, intPtrReadOnlySpanLocal);
+
+		return intPtrReadOnlySpanLocal;
 	}
 }

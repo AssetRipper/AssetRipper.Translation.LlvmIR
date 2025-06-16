@@ -22,6 +22,6 @@ internal abstract class NumericComparisonInstructionContext : InstructionContext
 		Module.LoadValue(instructions, Operand1);
 		Module.LoadValue(instructions, Operand2);
 		AddComparison(instructions);
-		instructions.Add(CilOpCodes.Stloc, GetLocalVariable());
+		AddStore(instructions);
 	}
 }

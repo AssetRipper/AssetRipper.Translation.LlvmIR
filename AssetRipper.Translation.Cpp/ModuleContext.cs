@@ -36,12 +36,16 @@ internal sealed partial class ModuleContext
 			typeof(MangledNameAttribute),
 			typeof(DemangledNameAttribute),
 			typeof(CleanNameAttribute),
+			typeof(ExceptionInfo),
+			typeof(StackFrame),
+			typeof(StackFrameList),
 			typeof(FatalException),
 		]);
 
 		Module = module;
 		Definition = definition;
 		Options = options;
+		GlobalFunctionImplementationsType = CreateStaticType(definition, "GlobalFunctionImplementations", false);
 		GlobalFunctionsType = CreateStaticType(definition, "GlobalFunctions");
 		PointerCacheType = CreateStaticType(definition, "PointerCache", false);
 		GlobalVariableInitializersType = CreateStaticType(definition, "GlobalVariableInitializers", false);
@@ -68,6 +72,7 @@ internal sealed partial class ModuleContext
 	public LLVMModuleRef Module { get; }
 	public ModuleDefinition Definition { get; }
 	public TranslatorOptions Options { get; }
+	public TypeDefinition GlobalFunctionImplementationsType { get; }
 	public TypeDefinition GlobalFunctionsType { get; }
 	public TypeDefinition PointerCacheType { get; }
 	public TypeDefinition GlobalVariableInitializersType { get; }
@@ -101,7 +106,7 @@ internal sealed partial class ModuleContext
 	{
 		foreach (LLVMValueRef function in Module.GetFunctions())
 		{
-			MethodDefinition method = CreateNewMethod(GlobalFunctionsType);
+			MethodDefinition method = CreateNewMethod(GlobalFunctionImplementationsType);
 			FunctionContext.Create(function, method, this);
 		}
 	}
@@ -167,9 +172,7 @@ internal sealed partial class ModuleContext
 
 			method.Name = functionContext.Name;
 
-			TypeSignature returnTypeSignature = GetTypeSignature(functionContext.ReturnType);
-
-			method.Signature.ReturnType = returnTypeSignature;
+			method.Signature.ReturnType = functionContext.ReturnTypeSignature;
 
 			for (int i = 0; i < functionContext.Parameters.Length; i++)
 			{
@@ -194,6 +197,57 @@ internal sealed partial class ModuleContext
 
 				method.AddParameter(pointerSpan).GetOrCreateDefinition().Name = "args";
 			}
+		}
+	}
+
+	public void IdentifyFunctionsThatMightThrow()
+	{
+		foreach (FunctionContext function in Methods.Values)
+		{
+			if (function.MangledName is "_CxxThrowException")
+			{
+				function.MightThrowAnException = true;
+			}
+		}
+
+		bool changed;
+		do
+		{
+			changed = false;
+
+			foreach (FunctionContext function in Methods.Values)
+			{
+				if (function.MightThrowAnException)
+				{
+					continue;
+				}
+
+				if (function.Instructions.OfType<BaseCallInstructionContext>().Any(static c => c.CalledFunction is null or { MightThrowAnException: true }))
+				{
+					function.MightThrowAnException = true;
+					changed = true;
+				}
+			}
+
+		} while (changed);
+
+		foreach (FunctionContext function in Methods.Values)
+		{
+			if (!function.MightThrowAnException)
+			{
+				continue;
+			}
+
+			TypeDefinition typeDefinition = new(
+				"LocalVariables",
+				$"LocalVariables_{function.Name}",
+				TypeAttributes.NotPublic | TypeAttributes.SequentialLayout | TypeAttributes.BeforeFieldInit,
+				Definition.DefaultImporter.ImportType(typeof(ValueType)));
+			Definition.TopLevelTypes.Add(typeDefinition);
+
+			function.LocalVariablesType = typeDefinition;
+
+			function.StackFrameVariable = function.Definition.CilMethodBody!.Instructions.AddLocalVariable(InjectedTypes[typeof(StackFrame)].ToTypeSignature());
 		}
 	}
 
@@ -561,14 +615,14 @@ internal sealed partial class ModuleContext
 					InstructionContext expression = InstructionContext.Create(value, this);
 					expression.CreateLocal(instructions);
 					expression.AddInstructions(instructions);
-					instructions.Add(CilOpCodes.Ldloc, expression.GetLocalVariable());
+					expression.AddLoad(instructions);
 				}
 				break;
 			case LLVMValueKind.LLVMInstructionValueKind:
 				{
-					CilLocalVariable local = Methods[value.InstructionParent.Parent].InstructionLookup[value].GetLocalVariable();
-					instructions.Add(CilOpCodes.Ldloc, local);
-					typeSignature = local.VariableType;
+					InstructionContext instruction = Methods[value.InstructionParent.Parent].InstructionLookup[value];
+					instruction.AddLoad(instructions);
+					typeSignature = instruction.ResultTypeSignature;
 				}
 				break;
 			case LLVMValueKind.LLVMArgumentValueKind:
