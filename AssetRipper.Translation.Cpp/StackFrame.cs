@@ -9,13 +9,13 @@ internal unsafe struct StackFrame
 	internal readonly int Index;
 	private void* Locals;
 
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	private StackFrame(int index, int size)
 	{
 		Index = index;
-		unchecked
-		{
-			Locals = (void*)Marshal.AllocHGlobal(size);
-		}
+		Locals = size > 0
+			? unchecked((void*)Marshal.AllocHGlobal(size))
+			: null;
 	}
 
 	internal void FreeLocals()

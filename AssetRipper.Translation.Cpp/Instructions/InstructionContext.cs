@@ -83,18 +83,9 @@ internal abstract class InstructionContext
 
 	public virtual void CreateLocal(CilInstructionCollection instructions)
 	{
-		if (!HasResult)
-		{
-		}
-		else if (Function is null or { MightThrowAnException: false })
+		if (HasResult)
 		{
 			ResultLocal = instructions.AddLocalVariable(ResultTypeSignature);
-		}
-		else
-		{
-			Debug.Assert(Function.LocalVariablesType is not null);
-			ResultField = new FieldDefinition($"Instruction_{Index}", FieldAttributes.Public, ResultTypeSignature);
-			Function.LocalVariablesType.Fields.Add(ResultField);
 		}
 	}
 
