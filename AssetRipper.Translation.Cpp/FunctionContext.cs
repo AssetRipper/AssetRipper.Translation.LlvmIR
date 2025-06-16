@@ -286,9 +286,9 @@ internal sealed partial class FunctionContext : IHasName
 		}
 	}
 
-	[GeneratedRegex(@"[: ](\w+)::\1\(")]
+	[GeneratedRegex(@"[: ]([\w <>]+)::\1\(")]
 	private static partial Regex ConstructorRegex { get; }
 
-	[GeneratedRegex(@"[: ](\w+)::\~\1\(")]
+	[GeneratedRegex(@"[: ]([\w <>]+)::\~\1\(")]
 	private static partial Regex DestructorRegex { get; }
 }
