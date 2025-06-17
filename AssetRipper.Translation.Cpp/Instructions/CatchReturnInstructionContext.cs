@@ -1,5 +1,6 @@
 ﻿using AsmResolver.DotNet.Code.Cil;
 using AsmResolver.PE.DotNet.Cil;
+using AssetRipper.Translation.Cpp.Extensions;
 using LLVMSharp.Interop;
 using System.Diagnostics;
 
@@ -19,8 +20,12 @@ internal sealed class CatchReturnInstructionContext : BranchInstructionContext
 	public BasicBlockContext? TargetBlock => Function?.BasicBlockLookup[TargetBlockRef];
 	public override void AddInstructions(CilInstructionCollection instructions)
 	{
-		ThrowIfFunctionIsNull();
+		Debug.Assert(Function is not null);
+		Debug.Assert(CatchPad is not null);
 		Debug.Assert(TargetBlock is not null);
+
+		CatchPad.AddLoad(instructions);
+		instructions.Add(CilOpCodes.Callvirt, Module.InjectedTypes[typeof(ExceptionInfo)].Methods.Single(m => m.Name == nameof(ExceptionInfo.Dispose) && m.IsPublic));
 
 		AddLoadIfBranchingToPhi(instructions, TargetBlock);
 		instructions.Add(CilOpCodes.Br, Function.Labels[TargetBlockRef]);

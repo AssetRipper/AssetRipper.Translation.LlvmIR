@@ -6,7 +6,7 @@ using System.Runtime.InteropServices;
 namespace AssetRipper.Translation.Cpp;
 
 #pragma warning disable IDE0060 // Remove unused parameter
-internal static partial class IntrinsicFunctions
+internal static unsafe partial class IntrinsicFunctions
 {
 	public static class Implemented
 	{
@@ -16,7 +16,7 @@ internal static partial class IntrinsicFunctions
 	}
 
 	[MangledName("puts")]
-	public unsafe static int PutString(sbyte* P_0)
+	public static int PutString(sbyte* P_0)
 	{
 		try
 		{
@@ -31,7 +31,7 @@ internal static partial class IntrinsicFunctions
 	}
 
 	[MangledName("_wassert")]
-	public unsafe static void Assert(char* message, char* file, uint line)
+	public static void Assert(char* message, char* file, uint line)
 	{
 		ExceptionInfo.Current = new AssertExceptionInfo($"Assertion failed: {Marshal.PtrToStringUni((IntPtr)message)} at {Marshal.PtrToStringUni((IntPtr)file)}:{line}");
 	}
@@ -53,7 +53,7 @@ internal static partial class IntrinsicFunctions
 	/// </exception>
 	[DoesNotReturn]
 	[MangledName("_invoke_watson")]
-	public unsafe static void InvokeWatson(char* expression, char* function, char* file, int line, long reserved)
+	public static void InvokeWatson(char* expression, char* function, char* file, int line, long reserved)
 	{
 		throw new FatalException($"Fatal assertion failed: {Marshal.PtrToStringUni((IntPtr)expression)} in {Marshal.PtrToStringUni((IntPtr)function)} at {Marshal.PtrToStringUni((IntPtr)file)}:{line}");
 	}
@@ -66,26 +66,26 @@ internal static partial class IntrinsicFunctions
 	}
 
 	[MangledName("llvm.va.start")]
-	public unsafe static void llvm_va_start(void** va_list)
+	public static void llvm_va_start(void** va_list)
 	{
 		// Handled elsewhere.
 		throw new NotSupportedException();
 	}
 
 	[MangledName("llvm.va.copy")]
-	public unsafe static void llvm_va_copy(void** destination, void** source)
+	public static void llvm_va_copy(void** destination, void** source)
 	{
 		*destination = *source;
 	}
 
 	[MangledName("llvm.va.end")]
-	public unsafe static void llvm_va_end(void** va_list)
+	public static void llvm_va_end(void** va_list)
 	{
 		// Do nothing because it's freed automatically.
 	}
 
 	[MangledName("strcmp")]
-	public static unsafe int strcmp(byte* p1, byte* p2)
+	public static int strcmp(byte* p1, byte* p2)
 	{
 		while (*p1 == *p2 && *p1 != '\0') // keep going while bytes match
 		{
@@ -96,7 +96,7 @@ internal static partial class IntrinsicFunctions
 	}
 
 	[MangledName("memcmp")]
-	public static unsafe int memcmp(byte* p1, byte* p2, long count)
+	public static int memcmp(byte* p1, byte* p2, long count)
 	{
 		for (long i = 0; i < count; i++)
 		{
@@ -109,19 +109,19 @@ internal static partial class IntrinsicFunctions
 	}
 
 	[MangledName("llvm.memcpy.p0.p0.i32")]
-	public unsafe static void llvm_memcpy_p0_p0_i32(void* destination, void* source, int length, bool isVolatile)
+	public static void llvm_memcpy_p0_p0_i32(void* destination, void* source, int length, bool isVolatile)
 	{
 		Unsafe.CopyBlock(destination, source, (uint)length);
 	}
 
 	[MangledName("llvm.memcpy.p0.p0.i64")]
-	public unsafe static void llvm_memcpy_p0_p0_i64(void* destination, void* source, long length, bool isVolatile)
+	public static void llvm_memcpy_p0_p0_i64(void* destination, void* source, long length, bool isVolatile)
 	{
 		Unsafe.CopyBlock(destination, source, (uint)length);
 	}
 
 	[MangledName("llvm.memmove.p0.p0.i32")]
-	public unsafe static void llvm_memmove_p0_p0_i32(void* destination, void* source, int length, bool isVolatile)
+	public static void llvm_memmove_p0_p0_i32(void* destination, void* source, int length, bool isVolatile)
 	{
 		// Same as memcpy, except that the source and destination are allowed to overlap.
 		byte[] buffer = ArrayPool<byte>.Shared.Rent(length);
@@ -132,56 +132,68 @@ internal static partial class IntrinsicFunctions
 	}
 
 	[MangledName("llvm.memmove.p0.p0.i64")]
-	public unsafe static void llvm_memmove_p0_p0_i64(void* destination, void* source, long length, bool isVolatile)
+	public static void llvm_memmove_p0_p0_i64(void* destination, void* source, long length, bool isVolatile)
 	{
 		llvm_memmove_p0_p0_i32(destination, source, (int)length, isVolatile);
 	}
 
 	[MangledName("llvm.memset.p0.i32")]
-	public unsafe static void llvm_memset_p0_i32(void* destination, sbyte value, int length, bool isVolatile)
+	public static void llvm_memset_p0_i32(void* destination, sbyte value, int length, bool isVolatile)
 	{
 		new Span<byte>(destination, length).Fill(unchecked((byte)value));
 	}
 
 	[MangledName("llvm.memset.p0.i64")]
-	public unsafe static void llvm_memset_p0_i64(void* destination, sbyte value, long length, bool isVolatile)
+	public static void llvm_memset_p0_i64(void* destination, sbyte value, long length, bool isVolatile)
 	{
 		llvm_memset_p0_i32(destination, value, (int)length, isVolatile);
 	}
 
 	[MangledName("malloc")]
 	[MangledName("??2@YAPEAX_K@Z")] // new
-	public unsafe static void* Alloc(long size)
+	public static void* Alloc(long size)
 	{
 		return (void*)Marshal.AllocHGlobal((nint)size);
 	}
 
 	[MangledName("realloc")]
-	public unsafe static void* ReAlloc(void* ptr, long size)
+	public static void* ReAlloc(void* ptr, long size)
 	{
 		return (void*)Marshal.ReAllocHGlobal((nint)ptr, (nint)size);
 	}
 
 	[MangledName("free")]
-	public unsafe static void Free(void* ptr)
+	public static void Free(void* ptr)
 	{
 		Marshal.FreeHGlobal((IntPtr)ptr);
 	}
 
 	[MangledName("??3@YAXPEAX_K@Z")]
-	public unsafe static void Delete(void* ptr, long size)
+	public static void Delete(void* ptr, long size)
 	{
 		Marshal.FreeHGlobal((IntPtr)ptr);
 	}
 
+	[MangledName("expand")]
+	public static void* Expand(void* ptr, long size)
+	{
+		// _expand is a non-standard function available in some C++ implementations, particularly in Microsoft C Runtime Library (CRT).
+		// It is used to resize a previously allocated memory block without moving it, meaning it tries to expand or shrink the allocated memory in place.
+		// _expand is mainly useful for optimizing performance in memory management when using Microsoft CRT.
+		// If the block cannot be resized in place, _expand returns NULL, but the original block remains valid.
+
+		// We take advantage of the fact that it's just an optimization and return null, signaling that we can't expand the memory in place.
+		return null;
+	}
+
 	[MangledName("_CxxThrowException")]
-	public unsafe static void CxxThrowException(void* exceptionPointer, void* throwInfo)
+	public static void CxxThrowException(void* exceptionPointer, void* throwInfo)
 	{
 		ExceptionInfo.Current = new NativeExceptionInfo(exceptionPointer, (ThrowInfo*)throwInfo);
 	}
 
 	[MangledName("__CxxFrameHandler3")]
-	public static unsafe int CxxFrameHandler3(ReadOnlySpan<nint> args)
+	public static int CxxFrameHandler3(ReadOnlySpan<nint> args)
 	{
 		if (args.Length != 3)
 		{
@@ -221,22 +233,10 @@ internal static partial class IntrinsicFunctions
 		}
 	}
 
-	[MangledName("expand")]
-	public unsafe static void* Expand(void* ptr, long size)
+	private sealed class NativeExceptionInfo : ExceptionInfo
 	{
-		// _expand is a non-standard function available in some C++ implementations, particularly in Microsoft C Runtime Library (CRT).
-		// It is used to resize a previously allocated memory block without moving it, meaning it tries to expand or shrink the allocated memory in place.
-		// _expand is mainly useful for optimizing performance in memory management when using Microsoft CRT.
-		// If the block cannot be resized in place, _expand returns NULL, but the original block remains valid.
-
-		// We take advantage of the fact that it's just an optimization and return null, signaling that we can't expand the memory in place.
-		return null;
-	}
-
-	private sealed unsafe class NativeExceptionInfo : ExceptionInfo
-	{
-		public void* ExceptionPointer { get; }
-		public ThrowInfo* ThrowInfo { get; }
+		public void* ExceptionPointer { get; private set; }
+		public ThrowInfo* ThrowInfo { get; private set; }
 
 		public NativeExceptionInfo(void* exceptionPointer, ThrowInfo* throwInfo)
 		{
@@ -259,6 +259,20 @@ internal static partial class IntrinsicFunctions
 			}
 			return false;
 		}
+
+		protected override void Dispose(bool disposing)
+		{
+			if (ExceptionPointer != null && ThrowInfo != null)
+			{
+				delegate*<void*, void> destructor = ThrowInfo->Destructor;
+				if (destructor != null)
+				{
+					destructor(ExceptionPointer);
+				}
+			}
+			ExceptionPointer = null;
+			ThrowInfo = null;
+		}
 	}
 
 	private struct ThrowInfo
@@ -267,8 +281,8 @@ internal static partial class IntrinsicFunctions
 		public int DestructorIndex;
 		public int CatchableTypeArrayIndex;
 
-		public readonly unsafe delegate*<void*, void> Destructor => (delegate*<void*, void>)PointerIndices.GetPointer(DestructorIndex);
-		public readonly unsafe ReadOnlySpan<CatchableType> CatchableTypeArray
+		public readonly delegate*<void*, void> Destructor => (delegate*<void*, void>)PointerIndices.GetPointer(DestructorIndex);
+		public readonly ReadOnlySpan<CatchableType> CatchableTypeArray
 		{
 			get
 			{
@@ -282,13 +296,13 @@ internal static partial class IntrinsicFunctions
 		}
 	}
 
-	private unsafe struct CatchableTypeArray
+	private struct CatchableTypeArray
 	{
 		public int Count;
 		// Inline array starts here
 	}
 
-	private unsafe struct CatchableType
+	private struct CatchableType
 	{
 		public int field_0;
 		public int RttiTypeDescriptorIndex;
