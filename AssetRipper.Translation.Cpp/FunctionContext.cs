@@ -84,6 +84,7 @@ internal sealed partial class FunctionContext : IHasName
 	public FunctionContext? PersonalityFunction => Function.HasPersonalityFn
 		? Module.Methods.TryGetValue(Function.PersonalityFn)
 		: null;
+	public bool IsIntrinsic => Instructions.Count == 0;
 	public LLVMValueRef[] Parameters { get; }
 	public AttributeWrapper[] Attributes { get; }
 	public AttributeWrapper[] ReturnAttributes { get; }

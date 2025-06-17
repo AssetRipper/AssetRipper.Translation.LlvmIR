@@ -205,7 +205,7 @@ internal sealed partial class ModuleContext
 	{
 		foreach (FunctionContext function in Methods.Values)
 		{
-			if (function.MangledName is "_CxxThrowException")
+			if (function.IsIntrinsic && function.MangledName is "_CxxThrowException" or "_wassert")
 			{
 				function.MightThrowAnException = true;
 			}

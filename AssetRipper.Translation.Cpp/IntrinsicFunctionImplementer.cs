@@ -12,7 +12,7 @@ internal static partial class IntrinsicFunctionImplementer
 {
 	public static bool TryHandleIntrinsicFunction(FunctionContext context)
 	{
-		if (context.Instructions.Count != 0)
+		if (!context.IsIntrinsic)
 		{
 			return false;
 		}

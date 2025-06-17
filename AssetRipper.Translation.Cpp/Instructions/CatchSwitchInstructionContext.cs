@@ -39,7 +39,7 @@ internal sealed class CatchSwitchInstructionContext : InstructionContext
 	{
 		Debug.Assert(Function is not null);
 		Debug.Assert(Function.PersonalityFunction is not null);
-		Debug.Assert(Function.PersonalityFunction.Instructions.Count == 0, "Personality function should be intrinsic and not have instructions");
+		Debug.Assert(Function.PersonalityFunction.IsIntrinsic, "Personality function should be intrinsic and not have instructions");
 		Debug.Assert(Function.PersonalityFunction.ReturnTypeSignature is CorLibTypeSignature { ElementType: ElementType.I4 });
 		Debug.Assert(Function.PersonalityFunction.Parameters.Length == 0);
 		Debug.Assert(Function.PersonalityFunction.IsVariadic);
