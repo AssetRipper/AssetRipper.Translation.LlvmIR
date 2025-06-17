@@ -91,6 +91,8 @@ public static unsafe class Translator
 			globalVariableContext.CreateProperties();
 		}
 
+		moduleContext.FillPointerIndexType();
+
 		foreach (GlobalVariableContext globalVariableContext in moduleContext.GlobalVariables.Values)
 		{
 			globalVariableContext.InitializeData();

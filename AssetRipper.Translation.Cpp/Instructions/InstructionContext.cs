@@ -24,7 +24,20 @@ internal abstract class InstructionContext
 
 	public static InstructionContext Create(LLVMValueRef instruction, ModuleContext module)
 	{
-		return instruction.GetOpcode() switch
+		if (TryMatchImageOffset(instruction, module, out FunctionContext? function, out GlobalVariableContext? variable))
+		{
+			if (function is not null)
+			{
+				return new FunctionImageOffsetInstructionContext(instruction, module, function);
+			}
+			else if (variable is not null)
+			{
+				return new GlobalVariableImageOffsetInstructionContext(instruction, module, variable);
+			}
+		}
+
+		LLVMOpcode opcode = instruction.GetOpcode();
+		return opcode switch
 		{
 			LLVMOpcode.LLVMAlloca => new AllocaInstructionContext(instruction, module),
 			LLVMOpcode.LLVMLoad => new LoadInstructionContext(instruction, module),
@@ -48,11 +61,69 @@ internal abstract class InstructionContext
 			LLVMOpcode.LLVMCatchRet => new CatchReturnInstructionContext(instruction, module),
 			LLVMOpcode.LLVMCleanupPad => new CleanupPadInstructionContext(instruction, module),
 			LLVMOpcode.LLVMCleanupRet => new CleanupReturnInstructionContext(instruction, module),
-			_ when UnaryMathInstructionContext.Supported(instruction.GetOpcode()) => new UnaryMathInstructionContext(instruction, module),
-			_ when BinaryMathInstructionContext.Supported(instruction.GetOpcode()) => new BinaryMathInstructionContext(instruction, module),
-			_ when NumericConversionInstructionContext.Supported(instruction.GetOpcode()) => new NumericConversionInstructionContext(instruction, module),
+			_ when UnaryMathInstructionContext.Supported(opcode) => new UnaryMathInstructionContext(instruction, module),
+			_ when BinaryMathInstructionContext.Supported(opcode) => new BinaryMathInstructionContext(instruction, module),
+			_ when NumericConversionInstructionContext.Supported(opcode) => new NumericConversionInstructionContext(instruction, module),
 			_ => new GenericInstructionContext(instruction, module),
 		};
+
+		static bool TryMatchImageOffset(LLVMValueRef instruction, ModuleContext module, out FunctionContext? function, out GlobalVariableContext? variable)
+		{
+			if (instruction.Kind is not LLVMValueKind.LLVMConstantExprValueKind)
+			{
+				return False(out function, out variable);
+			}
+
+			LLVMValueRef trunc = instruction;
+			if (trunc.ConstOpcode is not LLVMOpcode.LLVMTrunc || trunc.TypeOf is not { Kind: LLVMTypeKind.LLVMIntegerTypeKind, IntWidth: 32 })
+			{
+				return False(out function, out variable);
+			}
+
+			LLVMValueRef sub = trunc.GetOperand(0);
+			if (sub.ConstOpcode is not LLVMOpcode.LLVMSub || sub.TypeOf is not { Kind: LLVMTypeKind.LLVMIntegerTypeKind, IntWidth: 64 })
+			{
+				return False(out function, out variable);
+			}
+
+			LLVMValueRef ptrToInt_Left = sub.GetOperand(0);
+			LLVMValueRef ptrToInt_Right = sub.GetOperand(1);
+			if (ptrToInt_Left.ConstOpcode is not LLVMOpcode.LLVMPtrToInt || ptrToInt_Right.ConstOpcode is not LLVMOpcode.LLVMPtrToInt)
+			{
+				return False(out function, out variable);
+			}
+
+			LLVMValueRef imageBase = ptrToInt_Right.GetOperand(0);
+			if (imageBase.Kind is not LLVMValueKind.LLVMGlobalVariableValueKind || imageBase.Name is not "__ImageBase")
+			{
+				return False(out function, out variable);
+			}
+
+			LLVMValueRef address = ptrToInt_Left.GetOperand(0);
+			if (address.Kind is LLVMValueKind.LLVMFunctionValueKind)
+			{
+				function = module.Methods[address];
+				variable = null;
+				return true;
+			}
+			else if (address.Kind is LLVMValueKind.LLVMGlobalVariableValueKind)
+			{
+				variable = module.GlobalVariables[address];
+				function = null;
+				return true;
+			}
+			else
+			{
+				return False(out function, out variable);
+			}
+
+			static bool False(out FunctionContext? function, out GlobalVariableContext? variable)
+			{
+				function = null;
+				variable = null;
+				return false;
+			}
+		}
 	}
 
 	public LLVMOpcode Opcode => Instruction.GetOpcode();

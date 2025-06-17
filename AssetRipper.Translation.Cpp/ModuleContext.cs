@@ -45,6 +45,7 @@ internal sealed partial class ModuleContext
 		Module = module;
 		Definition = definition;
 		Options = options;
+		PointerIndexType = CreateStaticType(definition, "PointerIndex", false);
 		GlobalFunctionImplementationsType = CreateStaticType(definition, "GlobalFunctionImplementations", false);
 		GlobalFunctionsType = CreateStaticType(definition, "GlobalFunctions");
 		PointerCacheType = CreateStaticType(definition, "PointerCache", false);
@@ -72,6 +73,7 @@ internal sealed partial class ModuleContext
 	public LLVMModuleRef Module { get; }
 	public ModuleDefinition Definition { get; }
 	public TranslatorOptions Options { get; }
+	public TypeDefinition PointerIndexType { get; }
 	public TypeDefinition GlobalFunctionImplementationsType { get; }
 	public TypeDefinition GlobalFunctionsType { get; }
 	public TypeDefinition PointerCacheType { get; }
@@ -248,6 +250,90 @@ internal sealed partial class ModuleContext
 			function.LocalVariablesType = typeDefinition;
 
 			function.StackFrameVariable = function.Definition.CilMethodBody!.Instructions.AddLocalVariable(InjectedTypes[typeof(StackFrame)].ToTypeSignature());
+		}
+	}
+
+	public void FillPointerIndexType()
+	{
+		// GetIndex
+		{
+			MethodDefinition method = new MethodDefinition("GetIndex", MethodAttributes.Public | MethodAttributes.Static | MethodAttributes.HideBySig, MethodSignature.CreateStatic(Definition.CorLibTypeFactory.Int32, Definition.CorLibTypeFactory.Void.MakePointerType()));
+			PointerIndexType.Methods.Add(method);
+			method.CilMethodBody = new CilMethodBody(method);
+
+			CilInstructionCollection instructions = method.CilMethodBody.Instructions;
+
+			int functionIndex = 1;
+			foreach (LLVMValueRef function in Methods.Keys)
+			{
+				CilInstructionLabel label = new();
+				instructions.Add(CilOpCodes.Ldarg_0);
+				LoadValue(instructions, function);
+				instructions.Add(CilOpCodes.Bne_Un, label);
+				instructions.Add(CilOpCodes.Ldc_I4, functionIndex);
+				instructions.Add(CilOpCodes.Ret);
+				label.Instruction = instructions.Add(CilOpCodes.Nop);
+				functionIndex++;
+			}
+
+			int variableIndex = -1;
+			foreach (LLVMValueRef variable in GlobalVariables.Keys)
+			{
+				CilInstructionLabel label = new();
+				instructions.Add(CilOpCodes.Ldarg_0);
+				LoadValue(instructions, variable);
+				instructions.Add(CilOpCodes.Bne_Un, label);
+				instructions.Add(CilOpCodes.Ldc_I4, variableIndex);
+				instructions.Add(CilOpCodes.Ret);
+				label.Instruction = instructions.Add(CilOpCodes.Nop);
+				variableIndex--;
+			}
+
+			instructions.Add(CilOpCodes.Ldc_I4_0);
+			instructions.Add(CilOpCodes.Ret);
+
+			instructions.OptimizeMacros();
+		}
+
+		// GetPointer
+		{
+			MethodDefinition method = new MethodDefinition("GetPointer", MethodAttributes.Public | MethodAttributes.Static | MethodAttributes.HideBySig, MethodSignature.CreateStatic(Definition.CorLibTypeFactory.Void.MakePointerType(), Definition.CorLibTypeFactory.Int32));
+			PointerIndexType.Methods.Add(method);
+			method.CilMethodBody = new CilMethodBody(method);
+
+			CilInstructionCollection instructions = method.CilMethodBody.Instructions;
+
+			int functionIndex = 1;
+			foreach (LLVMValueRef function in Methods.Keys)
+			{
+				CilInstructionLabel label = new();
+				instructions.Add(CilOpCodes.Ldarg_0);
+				instructions.Add(CilOpCodes.Ldc_I4, functionIndex);
+				instructions.Add(CilOpCodes.Bne_Un, label);
+				LoadValue(instructions, function);
+				instructions.Add(CilOpCodes.Ret);
+				label.Instruction = instructions.Add(CilOpCodes.Nop);
+				functionIndex++;
+			}
+
+			int variableIndex = -1;
+			foreach (LLVMValueRef variable in GlobalVariables.Keys)
+			{
+				CilInstructionLabel label = new();
+				instructions.Add(CilOpCodes.Ldarg_0);
+				instructions.Add(CilOpCodes.Ldc_I4, variableIndex);
+				instructions.Add(CilOpCodes.Bne_Un, label);
+				LoadValue(instructions, variable);
+				instructions.Add(CilOpCodes.Ret);
+				label.Instruction = instructions.Add(CilOpCodes.Nop);
+				variableIndex--;
+			}
+
+			instructions.Add(CilOpCodes.Ldc_I4_0);
+			instructions.Add(CilOpCodes.Conv_U);
+			instructions.Add(CilOpCodes.Ret);
+
+			instructions.OptimizeMacros();
 		}
 	}
 
