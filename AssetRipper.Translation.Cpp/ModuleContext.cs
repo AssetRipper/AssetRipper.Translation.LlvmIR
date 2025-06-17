@@ -40,12 +40,12 @@ internal sealed partial class ModuleContext
 			typeof(StackFrame),
 			typeof(StackFrameList),
 			typeof(FatalException),
+			typeof(PointerIndices),
 		]);
 
 		Module = module;
 		Definition = definition;
 		Options = options;
-		PointerIndexType = CreateStaticType(definition, "PointerIndex", false);
 		GlobalFunctionImplementationsType = CreateStaticType(definition, "GlobalFunctionImplementations", false);
 		GlobalFunctionsType = CreateStaticType(definition, "GlobalFunctions");
 		PointerCacheType = CreateStaticType(definition, "PointerCache", false);
@@ -73,7 +73,6 @@ internal sealed partial class ModuleContext
 	public LLVMModuleRef Module { get; }
 	public ModuleDefinition Definition { get; }
 	public TranslatorOptions Options { get; }
-	public TypeDefinition PointerIndexType { get; }
 	public TypeDefinition GlobalFunctionImplementationsType { get; }
 	public TypeDefinition GlobalFunctionsType { get; }
 	public TypeDefinition PointerCacheType { get; }
@@ -255,10 +254,11 @@ internal sealed partial class ModuleContext
 
 	public void FillPointerIndexType()
 	{
+		TypeDefinition type = InjectedTypes[typeof(PointerIndices)];
+
 		// GetIndex
 		{
-			MethodDefinition method = new MethodDefinition("GetIndex", MethodAttributes.Public | MethodAttributes.Static | MethodAttributes.HideBySig, MethodSignature.CreateStatic(Definition.CorLibTypeFactory.Int32, Definition.CorLibTypeFactory.Void.MakePointerType()));
-			PointerIndexType.Methods.Add(method);
+			MethodDefinition method = type.GetMethodByName(nameof(PointerIndices.GetIndex));
 			method.CilMethodBody = new CilMethodBody(method);
 
 			CilInstructionCollection instructions = method.CilMethodBody.Instructions;
@@ -297,8 +297,7 @@ internal sealed partial class ModuleContext
 
 		// GetPointer
 		{
-			MethodDefinition method = new MethodDefinition("GetPointer", MethodAttributes.Public | MethodAttributes.Static | MethodAttributes.HideBySig, MethodSignature.CreateStatic(Definition.CorLibTypeFactory.Void.MakePointerType(), Definition.CorLibTypeFactory.Int32));
-			PointerIndexType.Methods.Add(method);
+			MethodDefinition method = type.GetMethodByName(nameof(PointerIndices.GetPointer));
 			method.CilMethodBody = new CilMethodBody(method);
 
 			CilInstructionCollection instructions = method.CilMethodBody.Instructions;

@@ -153,7 +153,7 @@ internal static partial class IntrinsicFunctions
 	[MangledName("_CxxThrowException")]
 	public unsafe static void CxxThrowException(void* exceptionPointer, void* throwInfo)
 	{
-		ExceptionInfo.Current = new NativeExceptionInfo(exceptionPointer, throwInfo);
+		ExceptionInfo.Current = new NativeExceptionInfo(exceptionPointer, (ThrowInfo*)throwInfo);
 	}
 
 	[MangledName("__CxxFrameHandler3")]
@@ -169,16 +169,13 @@ internal static partial class IntrinsicFunctions
 			throw new ArgumentNullException(nameof(args), "Arguments cannot be null");
 		}
 
-		void* rttiTypeDescriptor = *(void**)args[0];
+		RttiTypeDescriptor* rttiTypeDescriptor = *(RttiTypeDescriptor**)args[0];
 		int unknown = *(int*)args[1];
 		void** outException = (void**)args[2];
 
 		if (ExceptionInfo.Current is NativeExceptionInfo nativeException)
 		{
-			if (rttiTypeDescriptor is null)
-			{
-			}
-			else if (false) // Todo
+			if (rttiTypeDescriptor is not null && !nativeException.Contains(rttiTypeDescriptor))
 			{
 				return 1; // Continue search
 			}
@@ -215,13 +212,76 @@ internal static partial class IntrinsicFunctions
 	private sealed unsafe class NativeExceptionInfo : ExceptionInfo
 	{
 		public void* ExceptionPointer { get; }
-		public void* ThrowInfo { get; }
+		public ThrowInfo* ThrowInfo { get; }
 
-		public NativeExceptionInfo(void* exceptionPointer, void* throwInfo)
+		public NativeExceptionInfo(void* exceptionPointer, ThrowInfo* throwInfo)
 		{
 			ExceptionPointer = exceptionPointer;
 			ThrowInfo = throwInfo;
 		}
+
+		public bool Contains(RttiTypeDescriptor* rttiTypeDescriptor)
+		{
+			if (ThrowInfo == null)
+			{
+				return false;
+			}
+			foreach (CatchableType catchableType in ThrowInfo->CatchableTypeArray)
+			{
+				if (catchableType.RttiTypeDescriptor == rttiTypeDescriptor)
+				{
+					return true;
+				}
+			}
+			return false;
+		}
+	}
+
+	private struct ThrowInfo
+	{
+		public int field_0;
+		public int DestructorIndex;
+		public int CatchableTypeArrayIndex;
+
+		public readonly unsafe delegate*<void*, void> Destructor => (delegate*<void*, void>)PointerIndices.GetPointer(DestructorIndex);
+		public readonly unsafe ReadOnlySpan<CatchableType> CatchableTypeArray
+		{
+			get
+			{
+				CatchableTypeArray* array = (CatchableTypeArray*)PointerIndices.GetPointer(CatchableTypeArrayIndex);
+				if (array == null || array->Count <= 0)
+				{
+					return [];
+				}
+				return new ReadOnlySpan<CatchableType>((byte*)array + sizeof(int), array->Count);
+			}
+		}
+	}
+
+	private unsafe struct CatchableTypeArray
+	{
+		public int Count;
+		// Inline array starts here
+	}
+
+	private unsafe struct CatchableType
+	{
+		public int field_0;
+		public int RttiTypeDescriptorIndex;
+		public int field_2;
+		public int field_3;
+		public int field_4;
+		public int field_5;
+		public int ConstructorIndex;
+
+		public readonly RttiTypeDescriptor* RttiTypeDescriptor => (RttiTypeDescriptor*)PointerIndices.GetPointer(RttiTypeDescriptorIndex);
+
+		// Not sure if the signature is always this
+		public readonly delegate*<void*, void*, void*> Constructor => (delegate*<void*, void*, void*>)PointerIndices.GetPointer(ConstructorIndex);
+	}
+
+	private struct RttiTypeDescriptor
+	{
 	}
 
 	private sealed class AssertExceptionInfo : ExceptionInfo

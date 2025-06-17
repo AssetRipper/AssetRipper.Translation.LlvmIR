@@ -16,7 +16,7 @@ internal sealed class FunctionImageOffsetInstructionContext : LiftedInstructionC
 	public override void AddInstructions(CilInstructionCollection instructions)
 	{
 		Module.LoadValue(instructions, TargetFunction.Function);
-		instructions.Add(CilOpCodes.Call, Module.PointerIndexType.GetMethodByName("GetIndex"));
+		instructions.Add(CilOpCodes.Call, Module.InjectedTypes[typeof(PointerIndices)].GetMethodByName(nameof(PointerIndices.GetIndex)));
 		AddStore(instructions);
 	}
 }

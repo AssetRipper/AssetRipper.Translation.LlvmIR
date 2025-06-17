@@ -16,7 +16,7 @@ internal sealed class GlobalVariableImageOffsetInstructionContext : LiftedInstru
 	public override void AddInstructions(CilInstructionCollection instructions)
 	{
 		Module.LoadValue(instructions, TargetVariable.GlobalVariable);
-		instructions.Add(CilOpCodes.Call, Module.PointerIndexType.GetMethodByName("GetIndex"));
+		instructions.Add(CilOpCodes.Call, Module.InjectedTypes[typeof(PointerIndices)].GetMethodByName(nameof(PointerIndices.GetIndex)));
 		AddStore(instructions);
 	}
 }
