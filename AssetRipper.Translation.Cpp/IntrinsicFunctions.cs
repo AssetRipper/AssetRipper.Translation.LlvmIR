@@ -84,6 +84,30 @@ internal static partial class IntrinsicFunctions
 		// Do nothing because it's freed automatically.
 	}
 
+	[MangledName("strcmp")]
+	public static unsafe int strcmp(byte* p1, byte* p2)
+	{
+		while (*p1 == *p2 && *p1 != '\0') // keep going while bytes match
+		{
+			++p1;
+			++p2;
+		}
+		return *p1 - *p2; // positive, negative, or zero
+	}
+
+	[MangledName("memcmp")]
+	public static unsafe int memcmp(byte* p1, byte* p2, long count)
+	{
+		for (long i = 0; i < count; i++)
+		{
+			if (p1[i] != p2[i])
+			{
+				return p1[i] - p2[i]; // Return the difference of the first non-matching bytes
+			}
+		}
+		return 0; // All bytes match
+	}
+
 	[MangledName("llvm.memcpy.p0.p0.i32")]
 	public unsafe static void llvm_memcpy_p0_p0_i32(void* destination, void* source, int length, bool isVolatile)
 	{
