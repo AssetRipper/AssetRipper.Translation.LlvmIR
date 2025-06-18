@@ -45,11 +45,22 @@ internal static class AsmResolverExtensions
 		ModuleDefinition module2 = ModuleDefinition.FromBytes(stream.ToArray());
 		AssemblyReference? systemPrivateCorLib = module2.AssemblyReferences.FirstOrDefault(a => a.Name == "System.Private.CoreLib");
 		AssemblyReference? systemRuntime = module2.AssemblyReferences.FirstOrDefault(a => a.Name == "System.Runtime");
+		AssemblyReference? systemRuntimeInteropServices = module2.AssemblyReferences.FirstOrDefault(a => a.Name == "System.Runtime.InteropServices");
 		if (systemPrivateCorLib is not null && systemRuntime is not null)
 		{
 			foreach (TypeReference typeReference in module2.GetImportedTypeReferences())
 			{
-				if (typeReference.Scope == systemPrivateCorLib)
+				if (typeReference.Scope != systemPrivateCorLib)
+				{
+					continue;
+				}
+
+				if (typeReference is { Namespace.Value: "System.Runtime.InteropServices", Name.Value: "Marshal" })
+				{
+					// Need to special-case Marshal to System.Runtime.InteropServices
+					typeReference.Scope = systemRuntimeInteropServices;
+				}
+				else
 				{
 					typeReference.Scope = systemRuntime;
 				}
