@@ -152,7 +152,7 @@ internal sealed class GlobalVariableContext : IHasName
 				instructions.Add(CilOpCodes.Ret);
 			}
 
-			MethodDefinition staticConstructor = Module.GlobalVariablesType.GetOrCreateStaticConstructor();
+			MethodDefinition staticConstructor = Module.GlobalVariablePointersType.GetOrCreateStaticConstructor();
 			{
 				CilInstructionCollection instructions = staticConstructor.CilMethodBody!.Instructions;
 				instructions.Pop();
