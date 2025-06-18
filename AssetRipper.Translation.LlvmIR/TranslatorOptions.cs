@@ -23,7 +23,7 @@ public sealed record class TranslatorOptions
 	{
 		if (string.IsNullOrEmpty(Namespace))
 		{
-			return subNamespace;
+			return string.IsNullOrEmpty(subNamespace) ? null : subNamespace;
 		}
 		else if (string.IsNullOrEmpty(subNamespace))
 		{
