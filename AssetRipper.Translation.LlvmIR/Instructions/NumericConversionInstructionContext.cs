@@ -15,6 +15,7 @@ internal sealed class NumericConversionInstructionContext : InstructionContext
 		Debug.Assert(Operands.Length == 1);
 	}
 	public LLVMValueRef Operand => Operands[0];
+	public TypeSignature SourceTypeSignature => Module.GetTypeSignature(Operand);
 	public static bool Supported(LLVMOpcode opcode) => opcode switch
 	{
 		LLVMOpcode.LLVMZExt => true,
@@ -31,7 +32,7 @@ internal sealed class NumericConversionInstructionContext : InstructionContext
 		_ => false,
 	};
 
-	public void AddConversion(CilInstructionCollection cilInstructions)
+	public void AddConversion(CilInstructionCollection instructions)
 	{
 		switch (Opcode)
 		{
@@ -43,23 +44,23 @@ internal sealed class NumericConversionInstructionContext : InstructionContext
 						switch (c.ElementType)
 						{
 							case ElementType.I1 or ElementType.U1:
-								cilInstructions.Add(CilOpCodes.Conv_I1);
+								instructions.Add(CilOpCodes.Conv_I1);
 								break;
 							case ElementType.I2 or ElementType.U2 or ElementType.Char:
-								cilInstructions.Add(CilOpCodes.Conv_I2);
+								instructions.Add(CilOpCodes.Conv_I2);
 								break;
 							case ElementType.I4 or ElementType.U4:
-								cilInstructions.Add(CilOpCodes.Conv_I4);
+								instructions.Add(CilOpCodes.Conv_I4);
 								break;
 							case ElementType.I8 or ElementType.U8:
-								cilInstructions.Add(CilOpCodes.Conv_I8);
+								instructions.Add(CilOpCodes.Conv_I8);
 								break;
 							case ElementType.I or ElementType.U:
-								cilInstructions.Add(CilOpCodes.Conv_I);
+								instructions.Add(CilOpCodes.Conv_I);
 								break;
 							case ElementType.Boolean:
-								cilInstructions.AddDefaultValue(Module.GetTypeSignature(Operand.TypeOf));
-								cilInstructions.Add(CilOpCodes.Ceq);
+								instructions.AddDefaultValue(Module.GetTypeSignature(Operand.TypeOf));
+								instructions.Add(CilOpCodes.Ceq);
 								break;
 							default:
 								throw new NotSupportedException();
@@ -80,23 +81,28 @@ internal sealed class NumericConversionInstructionContext : InstructionContext
 						switch (c.ElementType)
 						{
 							case ElementType.I1 or ElementType.U1:
-								cilInstructions.Add(CilOpCodes.Conv_U1);
+								AddFlipToUnsigned(instructions);
+								instructions.Add(CilOpCodes.Conv_U1);
 								break;
 							case ElementType.I2 or ElementType.U2 or ElementType.Char:
-								cilInstructions.Add(CilOpCodes.Conv_U2);
+								AddFlipToUnsigned(instructions);
+								instructions.Add(CilOpCodes.Conv_U2);
 								break;
 							case ElementType.I4 or ElementType.U4:
-								cilInstructions.Add(CilOpCodes.Conv_U4);
+								AddFlipToUnsigned(instructions);
+								instructions.Add(CilOpCodes.Conv_U4);
 								break;
 							case ElementType.I8 or ElementType.U8:
-								cilInstructions.Add(CilOpCodes.Conv_U8);
+								AddFlipToUnsigned(instructions);
+								instructions.Add(CilOpCodes.Conv_U8);
 								break;
 							case ElementType.I or ElementType.U:
-								cilInstructions.Add(CilOpCodes.Conv_U);
+								AddFlipToUnsigned(instructions);
+								instructions.Add(CilOpCodes.Conv_U);
 								break;
 							case ElementType.Boolean:
-								cilInstructions.AddDefaultValue(Module.GetTypeSignature(Operand.TypeOf));
-								cilInstructions.Add(CilOpCodes.Ceq);
+								instructions.AddDefaultValue(SourceTypeSignature);
+								instructions.Add(CilOpCodes.Ceq);
 								break;
 							default:
 								throw new NotSupportedException();
@@ -104,7 +110,7 @@ internal sealed class NumericConversionInstructionContext : InstructionContext
 					}
 					else if (ResultTypeSignature is PointerTypeSignature)
 					{
-						cilInstructions.Add(CilOpCodes.Conv_U);
+						instructions.Add(CilOpCodes.Conv_U);
 					}
 					else
 					{
@@ -121,10 +127,10 @@ internal sealed class NumericConversionInstructionContext : InstructionContext
 						switch (c.ElementType)
 						{
 							case ElementType.R4:
-								cilInstructions.Add(CilOpCodes.Conv_R4);
+								instructions.Add(CilOpCodes.Conv_R4);
 								break;
 							case ElementType.R8:
-								cilInstructions.Add(CilOpCodes.Conv_R8);
+								instructions.Add(CilOpCodes.Conv_R8);
 								break;
 							default:
 								throw new NotSupportedException();
@@ -136,6 +142,31 @@ internal sealed class NumericConversionInstructionContext : InstructionContext
 					}
 				}
 				break;
+		}
+	}
+
+	private void AddFlipToUnsigned(CilInstructionCollection instructions)
+	{
+		if (SourceTypeSignature is CorLibTypeSignature c)
+		{
+			switch (c.ElementType)
+			{
+				case ElementType.I1:
+					instructions.Add(CilOpCodes.Conv_U1);
+					break;
+				case ElementType.I2:
+					instructions.Add(CilOpCodes.Conv_U2);
+					break;
+				case ElementType.I4:
+					instructions.Add(CilOpCodes.Conv_U4);
+					break;
+				case ElementType.I8:
+					instructions.Add(CilOpCodes.Conv_U8);
+					break;
+				case ElementType.I:
+					instructions.Add(CilOpCodes.Conv_U);
+					break;
+			}
 		}
 	}
 
