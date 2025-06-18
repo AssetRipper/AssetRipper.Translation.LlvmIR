@@ -91,6 +91,10 @@ internal sealed partial class ModuleContext
 
 	public InlineArrayContext GetOrCreateInlineArray(TypeSignature type, int size)
 	{
+		if (type is PointerTypeSignature)
+		{
+			type = Definition.CorLibTypeFactory.IntPtr; // Pointers cannot be used as generic type arguments, so we use IntPtr instead.
+		}
 		(TypeSignature, int) pair = (type, size);
 		if (!inlineArrayCache.TryGetValue(pair, out InlineArrayContext? arrayType))
 		{
@@ -581,6 +585,8 @@ internal sealed partial class ModuleContext
 						instructions.Add(CilOpCodes.Stloc, spanLocal);
 					}
 
+					Debug.Assert(elementType is not PointerTypeSignature, "Pointers cannot be used as generic type arguments");
+
 					ITypeDescriptor spanType = Definition.DefaultImporter
 						.ImportType(typeof(ReadOnlySpan<>))
 						.MakeGenericInstanceType(elementType);
@@ -608,10 +614,7 @@ internal sealed partial class ModuleContext
 						throw new Exception("Array element count mismatch");
 					}
 
-					if (elementType is PointerTypeSignature)
-					{
-						elementType = Definition.CorLibTypeFactory.IntPtr;
-					}
+					Debug.Assert(elementType is not PointerTypeSignature, "Pointers cannot be used as generic type arguments");
 
 					TypeSignature spanType = Definition.DefaultImporter
 						.ImportType(typeof(Span<>))

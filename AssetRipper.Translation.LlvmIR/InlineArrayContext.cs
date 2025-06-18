@@ -5,6 +5,7 @@ using AsmResolver.PE.DotNet.Cil;
 using AsmResolver.PE.DotNet.Metadata.Tables;
 using AssetRipper.Translation.LlvmIR.Extensions;
 using System.Runtime.CompilerServices;
+using AsmResolverElementType = AsmResolver.PE.DotNet.Metadata.Tables.ElementType;
 
 namespace AssetRipper.Translation.LlvmIR;
 
@@ -89,79 +90,57 @@ internal sealed class InlineArrayContext
 
 	private void ImplementInterface()
 	{
-		string propertyName = nameof(IInlineArray<>.Length);
-		string methodName = $"get_{propertyName}";
-		MethodSignature methodSignature = MethodSignature.CreateStatic(Module.Definition.CorLibTypeFactory.Int32);
-		PropertySignature propertySignature = PropertySignature.CreateStatic(Module.Definition.CorLibTypeFactory.Int32);
-
 		// Normal implementation
 		{
-			GenericInstanceTypeSignature interfaceType = Module.InlineArrayInterface.MakeGenericInstanceType(ElementType);
-
-			Type.Interfaces.Add(new InterfaceImplementation(interfaceType.ToTypeDefOrRef()));
-
-			MemberReference interfaceMethod = new(interfaceType.ToTypeDefOrRef(), methodName, methodSignature);
-
-			MethodDefinition method = new(methodName, MethodAttributes.Public | MethodAttributes.HideBySig | MethodAttributes.SpecialName | MethodAttributes.Static, methodSignature);
-			method.CilMethodBody = new(method);
-
-			CilInstructionCollection instructions = method.CilMethodBody.Instructions;
-			instructions.Add(CilOpCodes.Ldc_I4, Length);
-			instructions.Add(CilOpCodes.Ret);
-			instructions.OptimizeMacros();
-
-			Type.Methods.Add(method);
-			Type.MethodImplementations.Add(new MethodImplementation(interfaceMethod, method));
-
-			PropertyDefinition property = new(propertyName, PropertyAttributes.None, propertySignature);
-			property.GetMethod = method;
-			Type.Properties.Add(property);
+			ImplementInterfaceForType(ElementType, Length, false);
 		}
 
 		// Special implementation
 		if (GetUltimateElementType(out TypeSignature elementType, out int length))
 		{
+			ImplementInterfaceForType(elementType, length, true);
+		}
+
+		if (elementType.TryGetReverseSign(out TypeSignature? opposite))
+		{
+			ImplementInterfaceForType(opposite, length, true);
+		}
+
+		if (elementType is CorLibTypeSignature { ElementType: AsmResolverElementType.I2 or AsmResolverElementType.U2 })
+		{
+			ImplementInterfaceForType(Module.Definition.CorLibTypeFactory.Char, length, true);
+		}
+
+		void ImplementInterfaceForType(TypeSignature elementType, int length, bool @explicit)
+		{
+			const string propertyName = nameof(IInlineArray<>.Length);
+			const string methodName = $"get_{propertyName}";
+			MethodSignature methodSignature = MethodSignature.CreateStatic(Module.Definition.CorLibTypeFactory.Int32);
+			PropertySignature propertySignature = PropertySignature.CreateStatic(Module.Definition.CorLibTypeFactory.Int32);
+
 			GenericInstanceTypeSignature interfaceType = Module.InlineArrayInterface.MakeGenericInstanceType(elementType);
 
 			Type.Interfaces.Add(new InterfaceImplementation(interfaceType.ToTypeDefOrRef()));
 
 			MemberReference interfaceMethod = new(interfaceType.ToTypeDefOrRef(), methodName, methodSignature);
 
-			string @namespace = interfaceType.Namespace is { Length: > 0 }
-				? interfaceType.Namespace + "."
-				: string.Empty;
-			string prefix = $"{@namespace}{nameof(IInlineArray<>)}<{elementType.FullName}>.";
+			string prefix;
+			MethodAttributes attributes;
+			if (@explicit)
+			{
+				string @namespace = interfaceType.Namespace is { Length: > 0 }
+					? interfaceType.Namespace + "."
+					: string.Empty;
+				prefix = $"{@namespace}{nameof(IInlineArray<>)}<{elementType.FullName}>.";
+				attributes = MethodAttributes.Private | MethodAttributes.HideBySig | MethodAttributes.SpecialName | MethodAttributes.Static;
+			}
+			else
+			{
+				prefix = "";
+				attributes = MethodAttributes.Public | MethodAttributes.HideBySig | MethodAttributes.SpecialName | MethodAttributes.Static;
+			}
 
-			MethodDefinition method = new(prefix + methodName, MethodAttributes.Private | MethodAttributes.HideBySig | MethodAttributes.SpecialName | MethodAttributes.Static, methodSignature);
-			method.CilMethodBody = new(method);
-
-			CilInstructionCollection instructions = method.CilMethodBody.Instructions;
-			instructions.Add(CilOpCodes.Ldc_I4, length);
-			instructions.Add(CilOpCodes.Ret);
-			instructions.OptimizeMacros();
-
-			Type.Methods.Add(method);
-			Type.MethodImplementations.Add(new MethodImplementation(interfaceMethod, method));
-
-			PropertyDefinition property = new(prefix + propertyName, PropertyAttributes.None, propertySignature);
-			property.GetMethod = method;
-			Type.Properties.Add(property);
-		}
-
-		if (elementType.TryGetReverseSign(out TypeSignature? opposite))
-		{
-			GenericInstanceTypeSignature interfaceType = Module.InlineArrayInterface.MakeGenericInstanceType(opposite);
-
-			Type.Interfaces.Add(new InterfaceImplementation(interfaceType.ToTypeDefOrRef()));
-
-			MemberReference interfaceMethod = new(interfaceType.ToTypeDefOrRef(), methodName, methodSignature);
-
-			string @namespace = interfaceType.Namespace is { Length: > 0 }
-				? interfaceType.Namespace + "."
-				: string.Empty;
-			string prefix = $"{@namespace}{nameof(IInlineArray<>)}<{opposite.FullName}>.";
-
-			MethodDefinition method = new(prefix + methodName, MethodAttributes.Private | MethodAttributes.HideBySig | MethodAttributes.SpecialName | MethodAttributes.Static, methodSignature);
+			MethodDefinition method = new(prefix + methodName, attributes, methodSignature);
 			method.CilMethodBody = new(method);
 
 			CilInstructionCollection instructions = method.CilMethodBody.Instructions;
