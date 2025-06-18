@@ -23,14 +23,19 @@ internal static class Program
 		string name = Path.GetFileNameWithoutExtension(args.Input);
 		byte[] data = File.ReadAllBytes(args.Input);
 
-		TranslatorOptions options = new() { FixAssemblyReferences = true };
+		TranslatorOptions options = new()
+		{
+			FixAssemblyReferences = true,
+			Namespace = args.Namespace,
+			ModuleName = args.ModuleName,
+		};
 		for (int i = 0; i < mangledNames.Length; i++)
 		{
 			options.RenamedSymbols[mangledNames[i]] = newNames[i];
 		}
 
 		ModuleDefinition moduleDefinition = Translator.Translate(name, data, options);
-		moduleDefinition.Write("ConvertedCpp.dll");
+		moduleDefinition.Write($"{moduleDefinition.Name}.dll");
 		Console.WriteLine("Done!");
 	}
 }

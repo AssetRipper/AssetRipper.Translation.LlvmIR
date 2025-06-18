@@ -62,7 +62,7 @@ internal sealed class InlineArrayContext
 		string name = $"InlineArray_{size}";
 		string uniqueName = NameGenerator.GenerateName(name, type.FullName);
 
-		TypeDefinition arrayType = new("InlineArrays", uniqueName, TypeAttributes.Public | TypeAttributes.SequentialLayout | TypeAttributes.Sealed, module.Definition.DefaultImporter.ImportType(typeof(ValueType)));
+		TypeDefinition arrayType = new(module.Options.GetNamespace("InlineArrays"), uniqueName, TypeAttributes.Public | TypeAttributes.SequentialLayout | TypeAttributes.Sealed, module.Definition.DefaultImporter.ImportType(typeof(ValueType)));
 		module.Definition.TopLevelTypes.Add(arrayType);
 
 		//Add InlineArrayAttribute to arrayType

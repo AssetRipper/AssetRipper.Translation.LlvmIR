@@ -11,6 +11,14 @@ sealed partial class Arguments
 	[Description("The path to the input LLVM IR text file.")]
 	public required string Input { get; set; }
 
+	[CommandLineArgument]
+	[Description("The root namespace to use for the generated assembly.")]
+	public string? Namespace { get; set; }
+
+	[CommandLineArgument]
+	[Description("The module name to use for the generated assembly.")]
+	public string? ModuleName { get; set; }
+
 	[CommandLineArgument("mangled-name")]
 	[Description("The set of mangled names.")]
 	public string[]? MangledNames { get; set; }

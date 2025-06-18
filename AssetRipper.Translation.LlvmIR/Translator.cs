@@ -64,7 +64,7 @@ public static unsafe class Translator
 			var metadataList = module.GetNamedMetadata().ToList();
 		}
 
-		ModuleDefinition moduleDefinition = new("ConvertedCpp", KnownCorLibs.SystemRuntime_v9_0_0_0);
+		ModuleDefinition moduleDefinition = new(string.IsNullOrEmpty(options.ModuleName) ? "ConvertedCpp" : options.ModuleName, KnownCorLibs.SystemRuntime_v9_0_0_0);
 
 		moduleDefinition.AddTargetFrameworkAttributeForDotNet9();
 

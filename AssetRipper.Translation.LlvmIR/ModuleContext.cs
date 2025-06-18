@@ -22,7 +22,7 @@ internal sealed partial class ModuleContext
 {
 	public ModuleContext(LLVMModuleRef module, ModuleDefinition definition, TranslatorOptions options)
 	{
-		InjectedTypes = new TypeInjector(definition).Inject(
+		InjectedTypes = new TypeInjector(definition, options.Namespace).Inject(
 		[
 			typeof(IntrinsicFunctions),
 			typeof(InlineArrayHelper),
@@ -46,12 +46,12 @@ internal sealed partial class ModuleContext
 		Module = module;
 		Definition = definition;
 		Options = options;
-		GlobalFunctionImplementationsType = CreateStaticType(definition, "GlobalFunctionImplementations", false);
-		GlobalFunctionsType = CreateStaticType(definition, "GlobalFunctions");
-		PointerCacheType = CreateStaticType(definition, "PointerCache", false);
-		GlobalVariableInitializersType = CreateStaticType(definition, "GlobalVariableInitializers", false);
-		GlobalVariablePointersType = CreateStaticType(definition, "GlobalVariablePointers", false);
-		GlobalVariablesType = CreateStaticType(definition, "GlobalVariables");
+		GlobalFunctionImplementationsType = CreateStaticType("GlobalFunctionImplementations", false);
+		GlobalFunctionsType = CreateStaticType("GlobalFunctions");
+		PointerCacheType = CreateStaticType("PointerCache", false);
+		GlobalVariableInitializersType = CreateStaticType("GlobalVariableInitializers", false);
+		GlobalVariablePointersType = CreateStaticType("GlobalVariablePointers", false);
+		GlobalVariablesType = CreateStaticType("GlobalVariables");
 
 		CompilerGeneratedAttributeConstructor = (IMethodDefOrRef)definition.DefaultImporter.ImportMethod(typeof(CompilerGeneratedAttribute).GetConstructors()[0]);
 
@@ -240,7 +240,7 @@ internal sealed partial class ModuleContext
 			}
 
 			TypeDefinition typeDefinition = new(
-				"LocalVariables",
+				Options.GetNamespace("LocalVariables"),
 				$"LocalVariables_{function.Name}",
 				TypeAttributes.NotPublic | TypeAttributes.SequentialLayout | TypeAttributes.BeforeFieldInit,
 				Definition.DefaultImporter.ImportType(typeof(ValueType)));
@@ -389,7 +389,7 @@ internal sealed partial class ModuleContext
 					if (!Structs.TryGetValue(type, out StructContext? structContext))
 					{
 						TypeDefinition typeDefinition = new(
-							"Structures",
+							Options.GetNamespace("Structures"),
 							type.StructName,
 							TypeAttributes.Public | TypeAttributes.SequentialLayout | TypeAttributes.BeforeFieldInit,
 							Definition.DefaultImporter.ImportType(typeof(ValueType)));
@@ -731,10 +731,10 @@ internal sealed partial class ModuleContext
 		return method;
 	}
 
-	private static TypeDefinition CreateStaticType(ModuleDefinition moduleDefinition, string name, bool @public = true)
+	private TypeDefinition CreateStaticType(string name, bool @public = true)
 	{
-		TypeDefinition typeDefinition = new(null, name, (@public ? TypeAttributes.Public : TypeAttributes.NotPublic) | TypeAttributes.Abstract | TypeAttributes.Sealed, moduleDefinition.CorLibTypeFactory.Object.ToTypeDefOrRef());
-		moduleDefinition.TopLevelTypes.Add(typeDefinition);
+		TypeDefinition typeDefinition = new(Options.Namespace, name, (@public ? TypeAttributes.Public : TypeAttributes.NotPublic) | TypeAttributes.Abstract | TypeAttributes.Sealed, Definition.CorLibTypeFactory.Object.ToTypeDefOrRef());
+		Definition.TopLevelTypes.Add(typeDefinition);
 		return typeDefinition;
 	}
 
