@@ -8,12 +8,11 @@ using AssetRipper.Translation.LlvmIR.Extensions;
 using AssetRipper.Translation.LlvmIR.Instructions;
 using LLVMSharp.Interop;
 using System.Diagnostics;
-using System.Text.RegularExpressions;
 
 namespace AssetRipper.Translation.LlvmIR;
 
 [DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
-internal sealed partial class FunctionContext : IHasName
+internal sealed class FunctionContext : IHasName
 {
 	private FunctionContext(LLVMValueRef function, MethodDefinition definition, ModuleContext module)
 	{
@@ -259,13 +258,24 @@ internal sealed partial class FunctionContext : IHasName
 			return result;
 		}
 
-		if (ConstructorRegex.TryMatchAndGetFirstGroup(demangledName ?? "", out string? typeName))
+		if (!string.IsNullOrEmpty(demangledName) && demangledName != mangledName && DemangledNamesParser.ParseFunction(demangledName, out string? returnType, out _, out string? typeName, out string? functionIdentifier, out string? functionName, out _, out _))
 		{
-			return NameGenerator.CleanName(typeName, "Type") + "_Constructor";
-		}
-		else if (DestructorRegex.TryMatchAndGetFirstGroup(demangledName ?? "", out typeName))
-		{
-			return NameGenerator.CleanName(typeName, "Type") + "_Destructor";
+			if (returnType is null && functionName == typeName)
+			{
+				return NameGenerator.CleanName(typeName, "Type") + "_Constructor";
+			}
+			else if (returnType is null && functionName == $"~{typeName}")
+			{
+				return NameGenerator.CleanName(typeName ?? "", "Type") + "_Destructor";
+			}
+			else if (returnType is "void *" && functionName == "`scalar deleting dtor'")
+			{
+				return NameGenerator.CleanName(typeName ?? "", "Type") + "_Delete";
+			}
+			else
+			{
+				return NameGenerator.CleanName(functionIdentifier, "Function");
+			}
 		}
 		else
 		{
@@ -286,10 +296,4 @@ internal sealed partial class FunctionContext : IHasName
 			}
 		}
 	}
-
-	[GeneratedRegex(@"[: ]([\w <>]+)::\1\(")]
-	private static partial Regex ConstructorRegex { get; }
-
-	[GeneratedRegex(@"[: ]([\w <>]+)::\~\1\(")]
-	private static partial Regex DestructorRegex { get; }
 }
