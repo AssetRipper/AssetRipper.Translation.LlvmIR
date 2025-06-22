@@ -35,7 +35,15 @@ internal static class Program
 		}
 
 		ModuleDefinition moduleDefinition = Translator.Translate(name, data, options);
-		moduleDefinition.Write($"{moduleDefinition.Name}.dll");
+		if (string.IsNullOrEmpty(args.DecompileDirectory))
+		{
+			moduleDefinition.Write($"{moduleDefinition.Name}.dll");
+		}
+		else
+		{
+			Directory.CreateDirectory(args.DecompileDirectory);
+			new TranslationProjectDecompiler().DecompileProject(moduleDefinition, args.DecompileDirectory, new StringWriter());
+		}
 		Console.WriteLine("Done!");
 	}
 }

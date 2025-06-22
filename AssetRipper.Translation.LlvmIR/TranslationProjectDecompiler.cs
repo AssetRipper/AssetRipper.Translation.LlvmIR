@@ -29,7 +29,7 @@ public class TranslationProjectDecompiler : WholeProjectDecompiler
 		return assemblyResolver;
 	}
 
-	public void DecompileProject(ModuleDefinition module, string outputDirectory)
+	public void DecompileProject(ModuleDefinition module, string outputDirectory, TextWriter? projectFileWriter = null)
 	{
 		string file = Path.GetTempFileName();
 		try
@@ -39,7 +39,29 @@ public class TranslationProjectDecompiler : WholeProjectDecompiler
 				module.Write(fileStream);
 			}
 			using PEFile moduleFile = new(file);
-			DecompileProject(moduleFile, outputDirectory);
+			if (projectFileWriter is null)
+			{
+				DecompileProject(moduleFile, outputDirectory);
+			}
+			else
+			{
+				DecompileProject(moduleFile, outputDirectory, projectFileWriter);
+			}
+
+			string propertiesDirectory = Path.Combine(outputDirectory, "Properties");
+			if (Directory.Exists(propertiesDirectory))
+			{
+				string assemblyInfoFile = Path.Combine(propertiesDirectory, "AssemblyInfo.cs");
+
+				if (File.Exists(assemblyInfoFile))
+				{
+					File.Delete(assemblyInfoFile); // remove AssemblyInfo.cs, as it is not needed
+				}
+				if (!Directory.EnumerateFileSystemEntries(propertiesDirectory).Any())
+				{
+					Directory.Delete(propertiesDirectory); // remove empty Properties directory
+				}
+			}
 		}
 		finally
 		{

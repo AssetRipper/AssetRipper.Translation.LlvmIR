@@ -26,4 +26,8 @@ sealed partial class Arguments
 	[CommandLineArgument("new-name")]
 	[Description("The set of new names.")]
 	public string[]? NewNames { get; set; }
+
+	[CommandLineArgument]
+	[Description("The path to the output directory for C# decompilation. If provided, a dll will not be saved.")]
+	public string? DecompileDirectory { get; set; }
 }
