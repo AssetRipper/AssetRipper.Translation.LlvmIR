@@ -1,6 +1,4 @@
 ﻿using AsmResolver.DotNet;
-using ICSharpCode.Decompiler.CSharp.ProjectDecompiler;
-using ICSharpCode.Decompiler.Metadata;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Emit;
@@ -23,22 +21,11 @@ internal static class AssertionHelpers
 
 	public static void AssertDecompilesSuccessfully(ModuleDefinition module)
 	{
-		string file = Path.GetTempFileName();
 		string directory = Path.GetRandomFileName();
 		Directory.CreateDirectory(directory);
 		try
 		{
-			using(FileStream fileStream = new(file, FileMode.Open, FileAccess.Write))
-			{
-				module.Write(fileStream);
-			}
-
-			using PEFile moduleFile = new(file);
-			UniversalAssemblyResolver assemblyResolver = new(null, true, ".NETCoreApp,Version=v9.0");
-			assemblyResolver.AddSearchDirectory(AppContext.BaseDirectory); // for any NuGet references
-			WholeProjectDecompiler projectDecompiler = new(assemblyResolver);
-			projectDecompiler.Settings.CheckForOverflowUnderflow = true;
-			projectDecompiler.DecompileProject(moduleFile, directory);
+			new TranslationProjectDecompiler().DecompileProject(module, directory);
 
 			using (Assert.EnterMultipleScope())
 			{
@@ -48,7 +35,6 @@ internal static class AssertionHelpers
 		}
 		finally
 		{
-			File.Delete(file);
 			Directory.Delete(directory, true);
 		}
 	}
