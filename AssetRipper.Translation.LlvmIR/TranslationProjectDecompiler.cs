@@ -65,6 +65,17 @@ public class TranslationProjectDecompiler : WholeProjectDecompiler
 					Directory.Delete(propertiesDirectory); // remove empty Properties directory
 				}
 			}
+
+			// Remove carriage returns from all files
+			foreach (string filePath in Directory.EnumerateFiles(outputDirectory, "*.cs", SearchOption.AllDirectories))
+			{
+				string text = File.ReadAllText(filePath);
+				string updatedText = text.Replace("\r", null);
+				if (text != updatedText)
+				{
+					File.WriteAllText(filePath, updatedText);
+				}
+			}
 		}
 		finally
 		{
