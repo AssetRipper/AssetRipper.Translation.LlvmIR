@@ -12,8 +12,10 @@ public class TranslationProjectDecompiler : WholeProjectDecompiler
 {
 	public TranslationProjectDecompiler() : base(CreateAssemblyResolver())
 	{
+		Settings.SetLanguageVersion(LanguageVersion.Latest);
 		Settings.CheckForOverflowUnderflow = true;
 		Settings.UseNestedDirectoriesForNamespaces = true;
+		Settings.AggressiveInlining = true;
 	}
 
 	protected override CSharpDecompiler CreateDecompiler(DecompilerTypeSystem ts)
