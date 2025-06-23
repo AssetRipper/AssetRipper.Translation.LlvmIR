@@ -13,6 +13,7 @@ public class TranslationProjectDecompiler : WholeProjectDecompiler
 	public TranslationProjectDecompiler() : base(CreateAssemblyResolver())
 	{
 		Settings.CheckForOverflowUnderflow = true;
+		Settings.UseNestedDirectoriesForNamespaces = true;
 	}
 
 	protected override CSharpDecompiler CreateDecompiler(DecompilerTypeSystem ts)
