@@ -25,6 +25,13 @@ public class TranslationProjectDecompiler : WholeProjectDecompiler
 		return decompiler;
 	}
 
+	protected override TextWriter CreateFile(string path)
+	{
+		TextWriter result = base.CreateFile(path);
+		result.NewLine = "\n"; // use LF line endings
+		return result;
+	}
+
 	private static UniversalAssemblyResolver CreateAssemblyResolver()
 	{
 		UniversalAssemblyResolver assemblyResolver = new(null, true, ".NETCoreApp,Version=v9.0");
@@ -63,17 +70,6 @@ public class TranslationProjectDecompiler : WholeProjectDecompiler
 				if (!Directory.EnumerateFileSystemEntries(propertiesDirectory).Any())
 				{
 					Directory.Delete(propertiesDirectory); // remove empty Properties directory
-				}
-			}
-
-			// Remove carriage returns from all files
-			foreach (string filePath in Directory.EnumerateFiles(outputDirectory, "*.cs", SearchOption.AllDirectories))
-			{
-				string text = File.ReadAllText(filePath);
-				string updatedText = text.Replace("\r", null);
-				if (text != updatedText)
-				{
-					File.WriteAllText(filePath, updatedText);
 				}
 			}
 		}
