@@ -760,13 +760,22 @@ internal sealed partial class ModuleContext
 
 		string fieldName = HashDataToBase64(data);
 		TypeSignature fieldType = nestedType.ToTypeSignature();
-		FieldDefinition privateImplementationField = new FieldDefinition(fieldName, FieldAttributes.Assembly | FieldAttributes.Static, fieldType);
-		privateImplementationField.IsInitOnly = true;
-		privateImplementationField.FieldRva = new DataSegment(data);
-		privateImplementationField.HasFieldRva = true;
-		AddCompilerGeneratedAttribute(privateImplementationField);
 
-		PrivateImplementationDetails.Fields.Add(privateImplementationField);
+		FieldDefinition? privateImplementationField = PrivateImplementationDetails.Fields.FirstOrDefault(f => f.Name == fieldName);
+		if (privateImplementationField is not null)
+		{
+			Debug.Assert(SignatureComparer.Default.Equals(privateImplementationField.Signature?.FieldType, fieldType));
+		}
+		else
+		{
+			privateImplementationField = new FieldDefinition(fieldName, FieldAttributes.Assembly | FieldAttributes.Static, fieldType);
+			privateImplementationField.IsInitOnly = true;
+			privateImplementationField.FieldRva = new DataSegment(data);
+			privateImplementationField.HasFieldRva = true;
+			AddCompilerGeneratedAttribute(privateImplementationField);
+
+			PrivateImplementationDetails.Fields.Add(privateImplementationField);
+		}
 
 		return privateImplementationField;
 

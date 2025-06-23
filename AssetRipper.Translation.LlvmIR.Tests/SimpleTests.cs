@@ -197,4 +197,37 @@ public partial class SimpleTests
 		  ret <vscale x 4 x i32> %3
 		}
 		""";
+
+	[SavesSuccessfully]
+	[DecompilesSuccessfully]
+	private const string StaticIntVariable = """
+		@value = internal global i32 1, align 4
+
+		define dso_local void @increment() {
+		  %1 = load i32, ptr @value, align 4
+		  %2 = add nsw i32 %1, 1
+		  store i32 %2, ptr @value, align 4
+		  ret void
+		}
+
+		define dso_local void @decrement() {
+		  %1 = load i32, ptr @value, align 4
+		  %2 = add nsw i32 %1, -1
+		  store i32 %2, ptr @value, align 4
+		  ret void
+		}
+
+		define dso_local i32 @get() {
+		  %1 = load i32, ptr @value, align 4
+		  ret i32 %1
+		}
+
+		define dso_local void @set(i32 noundef %0) {
+		  %2 = alloca i32, align 4
+		  store i32 %0, ptr %2, align 4
+		  %3 = load i32, ptr %2, align 4
+		  store i32 %3, ptr @value, align 4
+		  ret void
+		}
+		""";
 }
