@@ -109,6 +109,7 @@ internal sealed class GlobalVariableContext : IHasName
 			}
 
 			DataSetMethod = new MethodDefinition("set_" + Name, MethodAttributes.Public | MethodAttributes.Static | MethodAttributes.HideBySig | MethodAttributes.SpecialName, MethodSignature.CreateStatic(Module.Definition.CorLibTypeFactory.Void, underlyingType));
+			DataSetMethod.Parameters[0].GetOrCreateDefinition().Name = "value";
 			Module.GlobalVariablesType.Methods.Add(DataSetMethod);
 
 			DataSetMethod.CilMethodBody = new(DataSetMethod);
