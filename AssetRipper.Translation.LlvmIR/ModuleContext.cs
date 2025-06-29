@@ -36,6 +36,7 @@ internal sealed partial class ModuleContext
 			typeof(MangledNameAttribute),
 			typeof(DemangledNameAttribute),
 			typeof(CleanNameAttribute),
+			typeof(MightThrowAttribute),
 			typeof(ExceptionInfo),
 			typeof(StackFrame),
 			typeof(StackFrameList),
@@ -207,12 +208,39 @@ internal sealed partial class ModuleContext
 
 	public void IdentifyFunctionsThatMightThrow()
 	{
+		HashSet<string> intrinsicMethodsThatMightThrow = new();
+		foreach (MethodDefinition method in IntrinsicsType.Methods)
+		{
+			if (!method.HasCustomAttribute(Options.Namespace, nameof(MightThrowAttribute)))
+			{
+				continue;
+			}
+
+			foreach (CustomAttribute attribute in method.FindCustomAttributes(Options.Namespace, nameof(MangledNameAttribute)))
+			{
+				string? mangledName = attribute.Signature?.FixedArguments[0].Element?.ToString();
+				if (mangledName is not null)
+				{
+					intrinsicMethodsThatMightThrow.Add(mangledName);
+				}
+			}
+		}
+
+		bool anyIntrinsicsUsedThatMightThrow = false;
 		foreach (FunctionContext function in Methods.Values)
 		{
-			if (function.IsIntrinsic && function.MangledName is "_CxxThrowException" or "_wassert")
+			if (function.IsIntrinsic && intrinsicMethodsThatMightThrow.Contains(function.MangledName))
 			{
 				function.MightThrowAnException = true;
+				anyIntrinsicsUsedThatMightThrow = true;
 			}
+		}
+
+		if (!anyIntrinsicsUsedThatMightThrow && !Methods.Values.SelectMany(f => f.Instructions).OfType<InvokeInstructionContext>().Any())
+		{
+			// If no intrinsic methods that might throw are used, and no invoke instructions are present,
+			// so we can assume that no function pointer calls might throw exceptions.
+			return;
 		}
 
 		bool changed;

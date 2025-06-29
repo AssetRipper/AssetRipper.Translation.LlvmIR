@@ -31,6 +31,7 @@ internal static unsafe partial class IntrinsicFunctions
 	}
 
 	[MangledName("_wassert")]
+	[MightThrow]
 	public static void Assert(char* message, char* file, uint line)
 	{
 		ExceptionInfo.Current = new AssertExceptionInfo($"Assertion failed: {Marshal.PtrToStringUni((IntPtr)message)} at {Marshal.PtrToStringUni((IntPtr)file)}:{line}");
@@ -217,6 +218,7 @@ internal static unsafe partial class IntrinsicFunctions
 	}
 
 	[MangledName("_CxxThrowException")]
+	[MightThrow]
 	public static void CxxThrowException(void* exceptionPointer, void* throwInfo)
 	{
 		ExceptionInfo.Current = new NativeExceptionInfo(exceptionPointer, (ThrowInfo*)throwInfo);

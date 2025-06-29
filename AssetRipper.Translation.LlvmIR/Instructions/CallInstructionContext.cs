@@ -19,13 +19,11 @@ internal sealed class CallInstructionContext : BaseCallInstructionContext
 	{
 		base.AddInstructions(instructions);
 
-		if (CalledFunction is { MightThrowAnException: false})
+		Debug.Assert(Function is not null);
+		if (CalledFunction is { MightThrowAnException: false} || !Function.MightThrowAnException)
 		{
 			return; // no need to handle exceptions
 		}
-
-		Debug.Assert(Function is not null);
-		Debug.Assert(Function.MightThrowAnException);
 
 		CilInstructionLabel defaultLabel = new();
 
