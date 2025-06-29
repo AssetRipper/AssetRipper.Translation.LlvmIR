@@ -149,6 +149,36 @@ internal static unsafe partial class IntrinsicFunctions
 		llvm_memset_p0_i32(destination, value, (int)length, isVolatile);
 	}
 
+	[MangledName("calloc")]
+	public static void* CAlloc(long elementCount, long elementSize)
+	{
+		// https://en.cppreference.com/w/c/memory/calloc
+
+		if (elementCount <= 0 || elementSize <= 0)
+		{
+			return null; // Return null for zero or negative allocation
+		}
+
+		if (elementCount > int.MaxValue || elementSize > int.MaxValue)
+		{
+			return null; // Return null for allocations that exceed int.MaxValue
+		}
+
+		long totalSize = elementCount * elementSize;
+
+		if (totalSize > int.MaxValue)
+		{
+			return null; // Return null for allocations that exceed int.MaxValue
+		}
+
+		void* result = Alloc(totalSize);
+
+		// Zero the allocated memory
+		new Span<byte>(result, (int)totalSize).Clear();
+
+		return result;
+	}
+
 	[MangledName("malloc")]
 	[MangledName("??2@YAPEAX_K@Z")] // new
 	public static void* Alloc(long size)
