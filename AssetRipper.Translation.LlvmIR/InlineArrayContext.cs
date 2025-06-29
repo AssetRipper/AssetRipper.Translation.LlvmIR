@@ -4,6 +4,7 @@ using AsmResolver.DotNet.Signatures;
 using AsmResolver.PE.DotNet.Cil;
 using AsmResolver.PE.DotNet.Metadata.Tables;
 using AssetRipper.Translation.LlvmIR.Extensions;
+using System.Numerics;
 using System.Runtime.CompilerServices;
 using AsmResolverElementType = AsmResolver.PE.DotNet.Metadata.Tables.ElementType;
 
@@ -79,6 +80,104 @@ internal sealed class InlineArrayContext
 		{
 			FieldDefinition field = new("__element0", FieldAttributes.Private, type);
 			arrayType.Fields.Add(field);
+		}
+
+		//Equality operator
+		MethodDefinition equalityOperator;
+		{
+			equalityOperator = new("op_Equality", MethodAttributes.Public | MethodAttributes.HideBySig | MethodAttributes.SpecialName | MethodAttributes.Static, MethodSignature.CreateStatic(module.Definition.CorLibTypeFactory.Boolean, arrayType.ToTypeSignature(), arrayType.ToTypeSignature()));
+			equalityOperator.CilMethodBody = new(equalityOperator);
+			CilInstructionCollection instructions = equalityOperator.CilMethodBody.Instructions;
+			MethodDefinition helperMethod = module.InlineArrayHelperType.GetMethodByName(nameof(InlineArrayHelper.Equals));
+			instructions.Add(CilOpCodes.Ldarg_0);
+			instructions.Add(CilOpCodes.Ldarg_1);
+			instructions.Add(CilOpCodes.Call, helperMethod.MakeGenericInstanceMethod(arrayType.ToTypeSignature(), type));
+			instructions.Add(CilOpCodes.Ret);
+			arrayType.Methods.Add(equalityOperator);
+
+			equalityOperator.Parameters[0].GetOrCreateDefinition().Name = "x";
+			equalityOperator.Parameters[1].GetOrCreateDefinition().Name = "y";
+		}
+
+		//Inequality operator
+		{
+			MethodDefinition inequalityOperator = new("op_Inequality", MethodAttributes.Public | MethodAttributes.HideBySig | MethodAttributes.SpecialName | MethodAttributes.Static, MethodSignature.CreateStatic(module.Definition.CorLibTypeFactory.Boolean, arrayType.ToTypeSignature(), arrayType.ToTypeSignature()));
+			inequalityOperator.CilMethodBody = new(inequalityOperator);
+			CilInstructionCollection instructions = inequalityOperator.CilMethodBody.Instructions;
+			instructions.Add(CilOpCodes.Ldarg_0);
+			instructions.Add(CilOpCodes.Ldarg_1);
+			instructions.Add(CilOpCodes.Call, equalityOperator);
+			instructions.Add(CilOpCodes.Ldc_I4_0);
+			instructions.Add(CilOpCodes.Ceq);
+			instructions.Add(CilOpCodes.Ret);
+			arrayType.Methods.Add(inequalityOperator);
+
+			inequalityOperator.Parameters[0].GetOrCreateDefinition().Name = "x";
+			inequalityOperator.Parameters[1].GetOrCreateDefinition().Name = "y";
+		}
+
+		//Equals(InlineArray)
+		MethodDefinition equalsMethod;
+		{
+			equalsMethod = new("Equals", MethodAttributes.Public | MethodAttributes.HideBySig | MethodAttributes.Virtual | MethodAttributes.Final | MethodAttributes.NewSlot, MethodSignature.CreateInstance(module.Definition.CorLibTypeFactory.Boolean, arrayType.ToTypeSignature()));
+			equalsMethod.CilMethodBody = new(equalsMethod);
+			CilInstructionCollection instructions = equalsMethod.CilMethodBody.Instructions;
+			instructions.Add(CilOpCodes.Ldarg_0);
+			instructions.Add(CilOpCodes.Ldobj, arrayType);
+			instructions.Add(CilOpCodes.Ldarg_1);
+			instructions.Add(CilOpCodes.Call, equalityOperator);
+			instructions.Add(CilOpCodes.Ret);
+			arrayType.Methods.Add(equalsMethod);
+
+			equalsMethod.Parameters[0].GetOrCreateDefinition().Name = "other";
+		}
+
+		//Equals(object)
+		{
+			// return other is InlineArray array && Equals(array);
+			MethodDefinition method = new("Equals", MethodAttributes.Public | MethodAttributes.HideBySig | MethodAttributes.Virtual, MethodSignature.CreateInstance(module.Definition.CorLibTypeFactory.Boolean, module.Definition.CorLibTypeFactory.Object));
+			method.CilMethodBody = new(method);
+			CilInstructionCollection instructions = method.CilMethodBody.Instructions;
+			CilInstructionLabel falseLabel = new();
+			instructions.Add(CilOpCodes.Ldarg_1);
+			instructions.Add(CilOpCodes.Isinst, arrayType);
+			instructions.Add(CilOpCodes.Brfalse_S, falseLabel);
+			instructions.Add(CilOpCodes.Ldarg_0);
+			instructions.Add(CilOpCodes.Ldarg_1);
+			instructions.Add(CilOpCodes.Unbox_Any, arrayType);
+			instructions.Add(CilOpCodes.Call, equalsMethod);
+			instructions.Add(CilOpCodes.Ret);
+			falseLabel.Instruction = instructions.Add(CilOpCodes.Ldc_I4_0);
+			instructions.Add(CilOpCodes.Ret);
+			arrayType.Methods.Add(method);
+
+			method.Parameters[0].GetOrCreateDefinition().Name = "other";
+		}
+
+		//GetHashCode
+		{
+			MethodDefinition method = new("GetHashCode", MethodAttributes.Public | MethodAttributes.HideBySig | MethodAttributes.Virtual, MethodSignature.CreateInstance(module.Definition.CorLibTypeFactory.Int32));
+			method.CilMethodBody = new(method);
+			CilInstructionCollection instructions = method.CilMethodBody.Instructions;
+			MethodDefinition helperMethod = module.InlineArrayHelperType.GetMethodByName(nameof(InlineArrayHelper.GetHashCode));
+			instructions.Add(CilOpCodes.Ldarg_0);
+			instructions.Add(CilOpCodes.Call, helperMethod.MakeGenericInstanceMethod(arrayType.ToTypeSignature(), type));
+			instructions.Add(CilOpCodes.Ret);
+			arrayType.Methods.Add(method);
+		}
+
+		//IEquatable<> interface
+		{
+			ITypeDefOrRef iequatable = module.Definition.DefaultImporter.ImportType(typeof(IEquatable<>));
+			GenericInstanceTypeSignature genericInstance = iequatable.MakeGenericInstanceType(arrayType.ToTypeSignature());
+			arrayType.Interfaces.Add(new InterfaceImplementation(genericInstance.ToTypeDefOrRef()));
+		}
+
+		//IEqualityOperators
+		{
+			ITypeDefOrRef iEqualityOperators = module.Definition.DefaultImporter.ImportType(typeof(IEqualityOperators<,,>));
+			GenericInstanceTypeSignature genericInstance = iEqualityOperators.MakeGenericInstanceType(arrayType.ToTypeSignature(), arrayType.ToTypeSignature(), module.Definition.CorLibTypeFactory.Boolean);
+			arrayType.Interfaces.Add(new InterfaceImplementation(genericInstance.ToTypeDefOrRef()));
 		}
 
 		InlineArrayContext result = new(module, arrayType, type, size);

@@ -42,4 +42,21 @@ internal static class InlineArrayHelper
 	{
 		buffer.AsSpan<TBuffer, TElement>()[index] = value;
 	}
+
+	public static bool Equals<TBuffer, TElement>(TBuffer x, TBuffer y)
+		where TBuffer : struct, IInlineArray<TElement>
+	{
+		return x.AsReadOnlySpan<TBuffer, TElement>().SequenceEqual(y.AsReadOnlySpan<TBuffer, TElement>());
+	}
+
+	public static int GetHashCode<TBuffer, TElement>(this ref TBuffer buffer)
+		where TBuffer : struct, IInlineArray<TElement>
+	{
+		HashCode hash = default;
+		foreach (TElement element in buffer.AsReadOnlySpan<TBuffer, TElement>())
+		{
+			hash.Add(element);
+		}
+		return hash.ToHashCode();
+	}
 }
