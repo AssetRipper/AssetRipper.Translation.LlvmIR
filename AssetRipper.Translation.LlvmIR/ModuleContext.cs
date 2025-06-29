@@ -512,17 +512,31 @@ internal sealed partial class ModuleContext
 		{
 			case LLVMValueKind.LLVMConstantIntValueKind:
 				{
+					const int BitsPerByte = 8;
 					long integer = value.ConstIntSExt;
 					LLVMTypeRef operandType = value.TypeOf;
-					if (integer is <= int.MaxValue and >= int.MinValue && operandType is { IntWidth: <= sizeof(int) * 8 })
+					typeSignature = GetTypeSignature(operandType);
+					if (integer is <= int.MaxValue and >= int.MinValue && operandType is { IntWidth: <= sizeof(int) * BitsPerByte })
 					{
 						instructions.Add(CilOpCodes.Ldc_I4, (int)integer);
 					}
-					else
+					else if (operandType is { IntWidth: sizeof(long) * BitsPerByte })
 					{
 						instructions.Add(CilOpCodes.Ldc_I8, integer);
 					}
-					typeSignature = GetTypeSignature(operandType);
+					else if (operandType is { IntWidth: 2 * sizeof(long) * BitsPerByte })
+					{
+						instructions.Add(CilOpCodes.Ldc_I8, integer);
+						MethodDefinition conversionMethod = typeSignature.Resolve()!.Methods.First(m =>
+						{
+							return m.Name == "op_Implicit" && m.Parameters.Count == 1 && m.Parameters[0].ParameterType is CorLibTypeSignature { ElementType: ElementType.I8 };
+						});
+						instructions.Add(CilOpCodes.Call, Definition.DefaultImporter.ImportMethod(conversionMethod));
+					}
+					else
+					{
+						throw new NotSupportedException($"Unsupported integer type: {typeSignature}");
+					}
 				}
 				break;
 			case LLVMValueKind.LLVMGlobalVariableValueKind:
