@@ -21,6 +21,12 @@ internal static partial class IntrinsicFunctionImplementer
 
 		if (TryGetInjectedIntrinsic(context.Module, context.MangledName, out MethodDefinition? implementation) && implementation.Parameters.Count == context.Definition.Parameters.Count)
 		{
+			// Set parameter names to match the implementation.
+			for (int i = 0; i < context.Definition.Parameters.Count; i++)
+			{
+				context.Definition.Parameters[i].GetOrCreateDefinition().Name = implementation.Parameters[i].Name;
+			}
+
 			MoveToImplementedType(context);
 
 			foreach (Parameter parameter in context.Definition.Parameters)
