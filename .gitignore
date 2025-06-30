@@ -10,3 +10,4 @@ bin
 .vscode/
 launchSettings.json
 .DS_Store
+.antlr/

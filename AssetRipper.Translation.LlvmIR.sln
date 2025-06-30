@@ -28,6 +28,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AssetRipper.Translation.Llv
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AssetRipper.Translation.LlvmIR.SourceGenerator", "AssetRipper.Translation.LlvmIR.SourceGenerator\AssetRipper.Translation.LlvmIR.SourceGenerator.csproj", "{065B4C6C-36BE-4552-88BF-86B502716FB4}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LlvmBinaryTextConverter", "LlvmBinaryTextConverter\LlvmBinaryTextConverter.csproj", "{C3F93AB9-D338-4A69-A1D2-44027F296D23}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -62,6 +64,10 @@ Global
 		{065B4C6C-36BE-4552-88BF-86B502716FB4}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{065B4C6C-36BE-4552-88BF-86B502716FB4}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{065B4C6C-36BE-4552-88BF-86B502716FB4}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C3F93AB9-D338-4A69-A1D2-44027F296D23}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C3F93AB9-D338-4A69-A1D2-44027F296D23}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C3F93AB9-D338-4A69-A1D2-44027F296D23}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C3F93AB9-D338-4A69-A1D2-44027F296D23}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
