@@ -117,92 +117,26 @@ internal sealed partial class ModuleContext
 		}
 	}
 
-	public void AssignFunctionNames() => AssignNames(Methods.Values);
+	public void AssignFunctionNames()
+	{
+		Methods.Values.AssignNames();
+		foreach (FunctionContext functionContext in Methods.Values)
+		{
+			functionContext.Definition.Name = functionContext.Name;
+		}
+	}
 
-	public void AssignGlobalVariableNames() => AssignNames(GlobalVariables.Values);
+	public void AssignGlobalVariableNames()
+	{
+		GlobalVariables.Values.AssignNames();
+	}
 
 	public void AssignStructNames()
 	{
-		AssignNames(Structs.Values);
+		Structs.Values.AssignNames();
 		foreach (StructContext structContext in Structs.Values)
 		{
 			structContext.AddNameAttributes();
-		}
-	}
-
-	private static void AssignNames<T>(IEnumerable<T> items) where T : IHasName
-	{
-		Dictionary<string, List<T>> demangledNames = new();
-		foreach (T item in items)
-		{
-			if (!demangledNames.TryGetValue(item.CleanName, out List<T>? list))
-			{
-				list = new();
-				demangledNames.Add(item.CleanName, list);
-			}
-			list.Add(item);
-		}
-
-		foreach ((string cleanName, List<T> list) in demangledNames)
-		{
-			if (list.Count == 1)
-			{
-				list[0].Name = cleanName;
-			}
-			else if (list.Select(x => x.MangledName).Distinct().Count() != list.Count)
-			{
-				// There is at least two items with the same mangled name,
-				// so we need to use the index when generating unique names.
-				for (int i = 0; i < list.Count; i++)
-				{
-					T item = list[i];
-					item.Name = NameGenerator.GenerateName(cleanName, item.MangledName, i);
-				}
-			}
-			else
-			{
-				foreach (T item in list)
-				{
-					item.Name = NameGenerator.GenerateName(cleanName, item.MangledName);
-				}
-			}
-		}
-	}
-
-	public void InitializeMethodSignatures()
-	{
-		foreach (FunctionContext functionContext in Methods.Values)
-		{
-			MethodDefinition method = functionContext.Definition;
-			Debug.Assert(method.Signature is not null);
-
-			method.Name = functionContext.Name;
-
-			method.Signature.ReturnType = functionContext.ReturnTypeSignature;
-
-			for (int i = 0; i < functionContext.Parameters.Length; i++)
-			{
-				LLVMValueRef parameter = functionContext.Parameters[i];
-				TypeSignature parameterType;
-				if (i == 0 && functionContext.TryGetStructReturnType(out LLVMTypeRef type))
-				{
-					parameterType = GetTypeSignature(type).MakePointerType();
-				}
-				else
-				{
-					parameterType = GetTypeSignature(parameter.TypeOf);
-				}
-				functionContext.ParameterDictionary[parameter] = method.AddParameter(parameterType);
-			}
-
-			if (functionContext.IsVariadic)
-			{
-				TypeSignature pointerSpan = Definition.DefaultImporter
-					.ImportType(typeof(ReadOnlySpan<>))
-					.MakeGenericInstanceType(Definition.CorLibTypeFactory.IntPtr);
-
-				method.AddParameter(pointerSpan).GetOrCreateDefinition().Name = "args";
-			}
 		}
 	}
 
@@ -496,7 +430,7 @@ internal sealed partial class ModuleContext
 		return value.Kind switch
 		{
 			LLVMValueKind.LLVMInstructionValueKind => Methods[value.InstructionParent.Parent].InstructionLookup[value].ResultTypeSignature,
-			LLVMValueKind.LLVMArgumentValueKind => Methods[value.ParamParent].ParameterDictionary[value].ParameterType,
+			LLVMValueKind.LLVMArgumentValueKind => Methods[value.ParamParent].ParameterLookup[value].Definition.ParameterType,
 			LLVMValueKind.LLVMGlobalVariableValueKind => GlobalVariables[value].PointerGetMethod.Signature!.ReturnType,
 			_ => GetTypeSignature(value.TypeOf),
 		};
@@ -757,7 +691,7 @@ internal sealed partial class ModuleContext
 				break;
 			case LLVMValueKind.LLVMArgumentValueKind:
 				{
-					Parameter parameter = Methods[value.ParamParent].ParameterDictionary[value];
+					Parameter parameter = Methods[value.ParamParent].ParameterLookup[value].Definition;
 					instructions.Add(CilOpCodes.Ldarg, parameter);
 					typeSignature = parameter.ParameterType;
 				}

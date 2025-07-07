@@ -87,7 +87,7 @@ internal static partial class IntrinsicFunctionImplementer
 
 	private static bool TryImplementNumericOperation(FunctionContext context)
 	{
-		if (context.Parameters.Length == 0 || context.IsVoidReturn)
+		if (context.NormalParameters.Length == 0 || context.IsVoidReturn)
 		{
 			return false;
 		}

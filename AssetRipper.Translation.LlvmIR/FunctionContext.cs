@@ -8,6 +8,7 @@ using AssetRipper.Translation.LlvmIR.Extensions;
 using AssetRipper.Translation.LlvmIR.Instructions;
 using LLVMSharp.Interop;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 
 namespace AssetRipper.Translation.LlvmIR;
 
@@ -17,17 +18,11 @@ internal sealed class FunctionContext : IHasName
 	private FunctionContext(LLVMValueRef function, MethodDefinition definition, ModuleContext module)
 	{
 		Function = function;
-		Parameters = function.GetParams();
 		Definition = definition;
 		Module = module;
 
 		Attributes = AttributeWrapper.FromArray(function.GetAttributesAtIndex(LLVMAttributeIndex.LLVMAttributeFunctionIndex));
 		ReturnAttributes = AttributeWrapper.FromArray(function.GetAttributesAtIndex(LLVMAttributeIndex.LLVMAttributeReturnIndex));
-		ParameterAttributes = new AttributeWrapper[Parameters.Length][];
-		for (int i = 0; i < Parameters.Length; i++)
-		{
-			ParameterAttributes[i] = AttributeWrapper.FromArray(function.GetAttributesAtIndex((LLVMAttributeIndex)(i + 1)));
-		}
 
 		MangledName = Function.Name;
 		DemangledName = LibLLVMSharp.ValueGetDemangledName(function);
@@ -36,6 +31,7 @@ internal sealed class FunctionContext : IHasName
 
 	public static FunctionContext Create(LLVMValueRef function, MethodDefinition definition, ModuleContext module)
 	{
+		Debug.Assert(definition.Signature is not null);
 		FunctionContext context = new(function, definition, module);
 		module.Methods.Add(function, context);
 		foreach (LLVMBasicBlockRef block in function.GetBasicBlocks())
@@ -60,6 +56,32 @@ internal sealed class FunctionContext : IHasName
 				successorBlock.Predecessors.Add(basicBlock);
 			}
 		}
+
+		definition.Signature.ReturnType = context.ReturnTypeSignature;
+
+		LLVMValueRef[] normalParameterRefs = function.GetParams();
+		ParameterContext[] normalParameterContexts = new ParameterContext[normalParameterRefs.Length];
+		for (int i = 0; i < normalParameterRefs.Length; i++)
+		{
+			LLVMValueRef parameter = normalParameterRefs[i];
+			ParameterContext parameterContext = new(parameter, definition.AddParameter(module.Definition.CorLibTypeFactory.Object), context);
+			normalParameterContexts[i] = parameterContext;
+			context.ParameterLookup[parameter] = parameterContext;
+		}
+
+		if (context.IsVariadic)
+		{
+			context.VariadicParameter = new(definition.AddParameter(module.Definition.CorLibTypeFactory.Object), context);
+		}
+
+		context.NormalParameters = normalParameterContexts;
+
+		context.AllParameters.AssignNames();
+		foreach (BaseParameterContext parameter in context.AllParameters)
+		{
+			parameter.Definition.GetOrCreateDefinition().Name = parameter.Name;
+		}
+
 		return context;
 	}
 
@@ -84,16 +106,19 @@ internal sealed class FunctionContext : IHasName
 		? Module.Methods.TryGetValue(Function.PersonalityFn)
 		: null;
 	public bool IsIntrinsic => Instructions.Count == 0;
-	public LLVMValueRef[] Parameters { get; }
+	public ParameterContext[] NormalParameters { get; private set; } = [];
+	public VariadicParameterContext? VariadicParameter { get; private set; }
+	public IEnumerable<BaseParameterContext> AllParameters => VariadicParameter is null
+		? NormalParameters
+		: NormalParameters.Append<BaseParameterContext>(VariadicParameter);
 	public AttributeWrapper[] Attributes { get; }
 	public AttributeWrapper[] ReturnAttributes { get; }
-	public AttributeWrapper[][] ParameterAttributes { get; }
 	public MethodDefinition Definition { get; }
 	public ModuleContext Module { get; }
 	public List<BasicBlockContext> BasicBlocks { get; } = new();
 	public List<InstructionContext> Instructions { get; } = new();
 	public Dictionary<LLVMBasicBlockRef, CilInstructionLabel> Labels { get; } = new();
-	public Dictionary<LLVMValueRef, Parameter> ParameterDictionary { get; } = new();
+	public Dictionary<LLVMValueRef, ParameterContext> ParameterLookup { get; } = new();
 	public Dictionary<LLVMValueRef, InstructionContext> InstructionLookup { get; } = new();
 	public Dictionary<LLVMBasicBlockRef, BasicBlockContext> BasicBlockLookup { get; } = new();
 	public TypeDefinition? LocalVariablesType { get; set; }
@@ -148,29 +173,6 @@ internal sealed class FunctionContext : IHasName
 		}
 	}
 
-	public bool TryGetStructReturnType(out LLVMTypeRef type)
-	{
-		if (!IsVoidReturn || Parameters.Length == 0 || Parameters[0].TypeOf.Kind != LLVMTypeKind.LLVMPointerTypeKind)
-		{
-			type = default;
-			return false;
-		}
-
-		AttributeWrapper[] parameter0Attributes = ParameterAttributes[0];
-		for (int i = 0; i < parameter0Attributes.Length; i++)
-		{
-			AttributeWrapper attribute = parameter0Attributes[i];
-			if (attribute.IsTypeAttribute) // Todo: Need to check the kind
-			{
-				type = attribute.TypeValue;
-				return true;
-			}
-		}
-
-		type = default;
-		return false;
-	}
-
 	public void AddLocalVariablesPointer(CilInstructionCollection instructions)
 	{
 		Debug.Assert(LocalVariablesType is not null);
@@ -194,10 +196,8 @@ internal sealed class FunctionContext : IHasName
 
 		MethodDefinition newMethod;
 		CilInstructionCollection instructions;
-		if (TryGetStructReturnType(out LLVMTypeRef structReturnType))
+		if (TryGetStructReturnType(out TypeSignature? returnTypeSignature))
 		{
-			TypeSignature returnTypeSignature = Module.GetTypeSignature(structReturnType);
-
 			newMethod = new(method.Name, method.Attributes, MethodSignature.CreateStatic(returnTypeSignature, method.Signature.ParameterTypes.Skip(1)));
 			Module.GlobalFunctionsType.Methods.Add(newMethod);
 			newMethod.CilMethodBody = new(newMethod);
@@ -213,8 +213,14 @@ internal sealed class FunctionContext : IHasName
 			instructions.Add(CilOpCodes.Call, method);
 			instructions.Add(CilOpCodes.Ldloc, returnLocal);
 
-			// Annotate the original return parameter
-			method.Parameters[0].GetOrCreateDefinition().Name = "result";
+			// Copy parameter names from the original method to the new method.
+			for (int i = 0; i < newMethod.Parameters.Count; i++)
+			{
+				Parameter originalParameter = method.Parameters[i + 1];
+				Parameter newParameter = newMethod.Parameters[i];
+				Debug.Assert(originalParameter.Definition is not null);
+				newParameter.GetOrCreateDefinition().Name = originalParameter.Definition.Name;
+			}
 		}
 		else
 		{
@@ -229,6 +235,15 @@ internal sealed class FunctionContext : IHasName
 				instructions.Add(CilOpCodes.Ldarg, parameter);
 			}
 			instructions.Add(CilOpCodes.Call, method);
+
+			// Copy parameter names from the original method to the new method.
+			for (int i = 0; i < newMethod.Parameters.Count; i++)
+			{
+				Parameter originalParameter = method.Parameters[i];
+				Parameter newParameter = newMethod.Parameters[i];
+				Debug.Assert(originalParameter.Definition is not null);
+				newParameter.GetOrCreateDefinition().Name = originalParameter.Definition.Name;
+			}
 		}
 
 		if (MightThrowAnException)
@@ -240,6 +255,18 @@ internal sealed class FunctionContext : IHasName
 		instructions.OptimizeMacros();
 
 		this.AddNameAttributes(newMethod);
+
+		bool TryGetStructReturnType([NotNullWhen(true)] out TypeSignature? type)
+		{
+			if (IsVoidReturn && NormalParameters.Length > 0)
+			{
+				type = NormalParameters[0].StructReturnTypeSignature;
+				return type is not null;
+			}
+
+			type = default;
+			return false;
+		}
 	}
 
 	private string GetDebuggerDisplay()

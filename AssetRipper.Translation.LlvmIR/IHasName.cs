@@ -54,4 +54,43 @@ internal static class IHasNameExtensions
 			definition.CustomAttributes.Add(attribute);
 		}
 	}
+
+	public static void AssignNames<T>(this IEnumerable<T> items) where T : IHasName
+	{
+		Dictionary<string, List<T>> demangledNames = new();
+		foreach (T item in items)
+		{
+			if (!demangledNames.TryGetValue(item.CleanName, out List<T>? list))
+			{
+				list = new();
+				demangledNames.Add(item.CleanName, list);
+			}
+			list.Add(item);
+		}
+
+		foreach ((string cleanName, List<T> list) in demangledNames)
+		{
+			if (list.Count == 1)
+			{
+				list[0].Name = cleanName;
+			}
+			else if (list.Select(x => x.MangledName).Distinct().Count() != list.Count)
+			{
+				// There is at least two items with the same mangled name,
+				// so we need to use the index when generating unique names.
+				for (int i = 0; i < list.Count; i++)
+				{
+					T item = list[i];
+					item.Name = NameGenerator.GenerateName(cleanName, item.MangledName, i);
+				}
+			}
+			else
+			{
+				foreach (T item in list)
+				{
+					item.Name = NameGenerator.GenerateName(cleanName, item.MangledName);
+				}
+			}
+		}
+	}
 }

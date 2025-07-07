@@ -82,8 +82,6 @@ public static unsafe class Translator
 
 		moduleContext.AssignFunctionNames();
 
-		moduleContext.InitializeMethodSignatures();
-
 		moduleContext.IdentifyFunctionsThatMightThrow();
 
 		foreach (GlobalVariableContext globalVariableContext in moduleContext.GlobalVariables.Values)

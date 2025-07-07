@@ -53,7 +53,7 @@ internal abstract class BaseCallInstructionContext : InstructionContext
 		}
 		else if (functionCalled.MangledName is "llvm.va_start")
 		{
-			Debug.Assert(functionCalled.IsVoidReturn && functionCalled.Parameters.Length is 1);
+			Debug.Assert(functionCalled.IsVoidReturn && functionCalled.NormalParameters.Length is 1);
 
 			Module.LoadValue(instructions, ArgumentOperands[0]);
 			instructions.Add(CilOpCodes.Ldarg, Function!.Definition.Parameters[^1]);// args
@@ -63,17 +63,17 @@ internal abstract class BaseCallInstructionContext : InstructionContext
 		{
 			ReadOnlySpan<LLVMValueRef> arguments = ArgumentOperands;
 
-			int variadicParameterCount = arguments.Length - functionCalled.Parameters.Length;
+			int variadicParameterCount = arguments.Length - functionCalled.NormalParameters.Length;
 			if (!functionCalled.IsVariadic)
 			{
-				for (int i = 0; i < functionCalled.Parameters.Length; i++)
+				for (int i = 0; i < functionCalled.NormalParameters.Length; i++)
 				{
 					Module.LoadValue(instructions, arguments[i]);
 				}
 			}
 			else if (variadicParameterCount == 0)
 			{
-				for (int i = 0; i < functionCalled.Parameters.Length; i++)
+				for (int i = 0; i < functionCalled.NormalParameters.Length; i++)
 				{
 					Module.LoadValue(instructions, arguments[i]);
 				}
@@ -81,10 +81,10 @@ internal abstract class BaseCallInstructionContext : InstructionContext
 			}
 			else
 			{
-				CilLocalVariable intPtrReadOnlySpanLocal = LoadVariadicArguments(instructions, Module, arguments[functionCalled.Parameters.Length..]);
+				CilLocalVariable intPtrReadOnlySpanLocal = LoadVariadicArguments(instructions, Module, arguments[functionCalled.NormalParameters.Length..]);
 
 				// Push the arguments
-				for (int i = 0; i < functionCalled.Parameters.Length; i++)
+				for (int i = 0; i < functionCalled.NormalParameters.Length; i++)
 				{
 					Module.LoadValue(instructions, arguments[i]);
 				}
