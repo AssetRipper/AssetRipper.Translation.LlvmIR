@@ -56,14 +56,14 @@ internal sealed class SwitchBranchInstructionContext : BranchInstructionContext
 
 			caseLabels[i].Instruction = instructions.Add(CilOpCodes.Nop);
 			AddLoadIfBranchingToPhi(instructions, targetBlock);
-			instructions.Add(CilOpCodes.Br, Function.Labels[targetBlock.Block]);
+			instructions.Add(CilOpCodes.Br, Function.BasicBlockLookup[targetBlock.Block].Label);
 		}
 
 		// Default case
 		{
 			defaultLabel.Instruction = instructions.Add(CilOpCodes.Nop);
 			AddLoadIfBranchingToPhi(instructions, DefaultBlock);
-			instructions.Add(CilOpCodes.Br, Function.Labels[DefaultBlockRef]);
+			instructions.Add(CilOpCodes.Br, Function.BasicBlockLookup[DefaultBlockRef].Label);
 		}
 	}
 }

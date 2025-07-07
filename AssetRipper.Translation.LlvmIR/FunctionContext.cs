@@ -48,7 +48,6 @@ internal sealed class FunctionContext : IHasName
 		}
 		foreach (BasicBlockContext basicBlock in context.BasicBlocks)
 		{
-			context.Labels[basicBlock.Block] = new();
 			foreach (LLVMBasicBlockRef successor in basicBlock.Block.GetSuccessors())
 			{
 				BasicBlockContext successorBlock = context.BasicBlockLookup[successor];
@@ -117,7 +116,6 @@ internal sealed class FunctionContext : IHasName
 	public ModuleContext Module { get; }
 	public List<BasicBlockContext> BasicBlocks { get; } = new();
 	public List<InstructionContext> Instructions { get; } = new();
-	public Dictionary<LLVMBasicBlockRef, CilInstructionLabel> Labels { get; } = new();
 	public Dictionary<LLVMValueRef, ParameterContext> ParameterLookup { get; } = new();
 	public Dictionary<LLVMValueRef, InstructionContext> InstructionLookup { get; } = new();
 	public Dictionary<LLVMBasicBlockRef, BasicBlockContext> BasicBlockLookup { get; } = new();

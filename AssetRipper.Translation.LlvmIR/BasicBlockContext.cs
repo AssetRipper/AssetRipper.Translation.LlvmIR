@@ -1,4 +1,5 @@
-﻿using AssetRipper.Translation.LlvmIR.Extensions;
+﻿using AsmResolver.PE.DotNet.Cil;
+using AssetRipper.Translation.LlvmIR.Extensions;
 using AssetRipper.Translation.LlvmIR.Instructions;
 using LLVMSharp.Interop;
 
@@ -8,6 +9,7 @@ internal sealed class BasicBlockContext
 {
 	public LLVMBasicBlockRef Block { get; }
 	public FunctionContext Function { get; }
+	public CilInstructionLabel Label { get; } = new();
 	public List<InstructionContext> Instructions { get; } = new();
 	public List<BasicBlockContext> Predecessors { get; } = new();
 	public List<BasicBlockContext> Successors { get; } = new();

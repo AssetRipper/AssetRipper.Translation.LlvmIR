@@ -36,14 +36,14 @@ internal sealed class InvokeInstructionContext : BaseCallInstructionContext
 			instructions.Add(CilOpCodes.Ldsfld, Module.InjectedTypes[typeof(ExceptionInfo)].GetFieldByName(nameof(ExceptionInfo.Current)));
 			instructions.Add(CilOpCodes.Brfalse, defaultLabel);
 			AddLoadIfBranchingToPhi(instructions, CatchBlock);
-			instructions.Add(CilOpCodes.Br, Function.Labels[CatchBlockRef]);
+			instructions.Add(CilOpCodes.Br, Function.BasicBlockLookup[CatchBlockRef].Label);
 		}
 
 		// else branch to the default block
 		{
 			defaultLabel.Instruction = instructions.Add(CilOpCodes.Nop);
 			AddLoadIfBranchingToPhi(instructions, DefaultBlock);
-			instructions.Add(CilOpCodes.Br, Function.Labels[DefaultBlockRef]);
+			instructions.Add(CilOpCodes.Br, Function.BasicBlockLookup[DefaultBlockRef].Label);
 		}
 	}
 }

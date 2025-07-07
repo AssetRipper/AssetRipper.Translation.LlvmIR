@@ -28,6 +28,6 @@ internal sealed class CatchReturnInstructionContext : BranchInstructionContext
 		instructions.Add(CilOpCodes.Callvirt, Module.InjectedTypes[typeof(ExceptionInfo)].Methods.Single(m => m.Name == nameof(ExceptionInfo.Dispose) && m.IsPublic));
 
 		AddLoadIfBranchingToPhi(instructions, TargetBlock);
-		instructions.Add(CilOpCodes.Br, Function.Labels[TargetBlockRef]);
+		instructions.Add(CilOpCodes.Br, Function.BasicBlockLookup[TargetBlockRef].Label);
 	}
 }

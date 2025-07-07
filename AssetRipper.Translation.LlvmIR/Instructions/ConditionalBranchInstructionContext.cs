@@ -37,16 +37,16 @@ internal sealed class ConditionalBranchInstructionContext : BranchInstructionCon
 			instructions.Add(CilOpCodes.Brfalse, falseLabel);
 
 			AddLoadIfBranchingToPhi(instructions, TrueBlock);
-			instructions.Add(CilOpCodes.Br, Function.Labels[TrueBlockRef]);
+			instructions.Add(CilOpCodes.Br, Function.BasicBlockLookup[TrueBlockRef].Label);
 
 			falseLabel.Instruction = instructions.Add(CilOpCodes.Nop);
 		}
 		else
 		{
-			instructions.Add(CilOpCodes.Brtrue, Function.Labels[TrueBlockRef]);
+			instructions.Add(CilOpCodes.Brtrue, Function.BasicBlockLookup[TrueBlockRef].Label);
 		}
 
 		AddLoadIfBranchingToPhi(instructions, FalseBlock);
-		instructions.Add(CilOpCodes.Br, Function.Labels[FalseBlockRef]);
+		instructions.Add(CilOpCodes.Br, Function.BasicBlockLookup[FalseBlockRef].Label);
 	}
 }

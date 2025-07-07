@@ -37,7 +37,7 @@ internal sealed class CleanupReturnInstructionContext : InstructionContext
 			// Unwind to an exception handler switch or another cleanup pad
 			Debug.Assert(TargetBlock is not null);
 			AddLoadIfBranchingToPhi(instructions, TargetBlock);
-			instructions.Add(CilOpCodes.Br, Function.Labels[TargetBlockRef]);
+			instructions.Add(CilOpCodes.Br, Function.BasicBlockLookup[TargetBlockRef].Label);
 		}
 	}
 }

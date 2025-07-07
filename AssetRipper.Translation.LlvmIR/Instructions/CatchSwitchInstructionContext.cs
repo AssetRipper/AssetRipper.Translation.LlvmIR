@@ -54,7 +54,7 @@ internal sealed class CatchSwitchInstructionContext : InstructionContext
 			instructions.Add(CilOpCodes.Call, Function.PersonalityFunction.Definition);
 			instructions.Add(CilOpCodes.Brtrue, label);
 			AddLoadIfBranchingToPhi(instructions, catchPad.BasicBlock!);
-			instructions.Add(CilOpCodes.Br, Function.Labels[catchPad.BasicBlockRef]);
+			instructions.Add(CilOpCodes.Br, Function.BasicBlockLookup[catchPad.BasicBlockRef].Label);
 			label.Instruction = instructions.Add(CilOpCodes.Nop);
 		}
 
@@ -62,7 +62,7 @@ internal sealed class CatchSwitchInstructionContext : InstructionContext
 		{
 			Debug.Assert(DefaultUnwindTarget is not null);
 			AddLoadIfBranchingToPhi(instructions, DefaultUnwindTarget);
-			instructions.Add(CilOpCodes.Br, Function.Labels[DefaultUnwindTargetRef]);
+			instructions.Add(CilOpCodes.Br, Function.BasicBlockLookup[DefaultUnwindTargetRef].Label);
 		}
 		else
 		{
