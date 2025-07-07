@@ -149,6 +149,16 @@ internal sealed class NumericConversionInstructionContext : InstructionContext
 								throw new NotSupportedException();
 						}
 					}
+					else if (ResultTypeSignature is CorLibTypeSignature && SourceTypeSignature is TypeDefOrRefSignature)
+					{
+						MethodDefinition conversionMethod = GetConversionMethod(ResolveTypeSignature(SourceTypeSignature), SourceTypeSignature, ResultTypeSignature);
+						instructions.Add(CilOpCodes.Call, Module.Definition.DefaultImporter.ImportMethod(conversionMethod));
+					}
+					else if (ResultTypeSignature is TypeDefOrRefSignature && SourceTypeSignature is CorLibTypeSignature)
+					{
+						MethodDefinition conversionMethod = GetConversionMethod(ResolveTypeSignature(ResultTypeSignature), SourceTypeSignature, ResultTypeSignature);
+						instructions.Add(CilOpCodes.Call, Module.Definition.DefaultImporter.ImportMethod(conversionMethod));
+					}
 					else
 					{
 						throw new NotSupportedException();
