@@ -197,7 +197,7 @@ internal sealed class FunctionContext : IHasName
 		if (TryGetStructReturnType(out TypeSignature? returnTypeSignature))
 		{
 			newMethod = new(method.Name, method.Attributes, MethodSignature.CreateStatic(returnTypeSignature, method.Signature.ParameterTypes.Skip(1)));
-			Module.GlobalFunctionsType.Methods.Add(newMethod);
+			Module.GlobalMembersType.Methods.Add(newMethod);
 			newMethod.CilMethodBody = new(newMethod);
 
 			instructions = newMethod.CilMethodBody.Instructions;
@@ -223,7 +223,7 @@ internal sealed class FunctionContext : IHasName
 		else
 		{
 			newMethod = new(method.Name, method.Attributes, MethodSignature.CreateStatic(method.Signature.ReturnType, method.Signature.ParameterTypes));
-			Module.GlobalFunctionsType.Methods.Add(newMethod);
+			Module.GlobalMembersType.Methods.Add(newMethod);
 			newMethod.CilMethodBody = new(newMethod);
 
 			instructions = newMethod.CilMethodBody.Instructions;
@@ -287,25 +287,27 @@ internal sealed class FunctionContext : IHasName
 		{
 			if (returnType is null && functionName == typeName)
 			{
-				return NameGenerator.CleanName(typeName, "Type") + "_Constructor";
+				result = NameGenerator.CleanName(typeName, "Type") + "_Constructor";
 			}
 			else if (returnType is null && functionName == $"~{typeName}")
 			{
-				return NameGenerator.CleanName(typeName ?? "", "Type") + "_Destructor";
+				result = NameGenerator.CleanName(typeName ?? "", "Type") + "_Destructor";
 			}
 			else if (returnType is "void *" && functionName == "`scalar deleting dtor'")
 			{
-				return NameGenerator.CleanName(typeName ?? "", "Type") + "_Delete";
+				result = NameGenerator.CleanName(typeName ?? "", "Type") + "_Delete";
 			}
 			else
 			{
-				return NameGenerator.CleanName(functionIdentifier, "Function");
+				result = NameGenerator.CleanName(functionIdentifier, "Function");
 			}
 		}
 		else
 		{
-			return NameGenerator.CleanName(TryGetSimpleName(mangledName), "Function");
+			result = NameGenerator.CleanName(TryGetSimpleName(mangledName), "Function");
 		}
+
+		return result.CapitalizeGetOrSet();
 
 		static string TryGetSimpleName(string name)
 		{

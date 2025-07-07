@@ -22,7 +22,7 @@ internal sealed partial class ModuleContext
 {
 	public ModuleContext(LLVMModuleRef module, ModuleDefinition definition, TranslatorOptions options)
 	{
-		InjectedTypes = new TypeInjector(definition, options.Namespace).Inject(
+		InjectedTypes = new TypeInjector(definition, options.GetNamespace("Helpers")).Inject(
 		[
 			typeof(IntrinsicFunctions),
 			typeof(InlineArrayHelper),
@@ -48,11 +48,10 @@ internal sealed partial class ModuleContext
 		Definition = definition;
 		Options = options;
 		GlobalFunctionImplementationsType = CreateStaticType("GlobalFunctionImplementations", false);
-		GlobalFunctionsType = CreateStaticType("GlobalFunctions");
 		PointerCacheType = CreateStaticType("PointerCache", false);
 		GlobalVariableInitializersType = CreateStaticType("GlobalVariableInitializers", false);
 		GlobalVariablePointersType = CreateStaticType("GlobalVariablePointers", false);
-		GlobalVariablesType = CreateStaticType("GlobalVariables");
+		GlobalMembersType = CreateStaticType(string.IsNullOrEmpty(options.ClassName) ? "GlobalMembers" : options.ClassName, true);
 
 		CompilerGeneratedAttributeConstructor = (IMethodDefOrRef)definition.DefaultImporter.ImportMethod(typeof(CompilerGeneratedAttribute).GetConstructors()[0]);
 
@@ -75,11 +74,10 @@ internal sealed partial class ModuleContext
 	public ModuleDefinition Definition { get; }
 	public TranslatorOptions Options { get; }
 	public TypeDefinition GlobalFunctionImplementationsType { get; }
-	public TypeDefinition GlobalFunctionsType { get; }
 	public TypeDefinition PointerCacheType { get; }
 	public TypeDefinition GlobalVariableInitializersType { get; }
 	public TypeDefinition GlobalVariablePointersType { get; }
-	public TypeDefinition GlobalVariablesType { get; }
+	public TypeDefinition GlobalMembersType { get; }
 	public TypeDefinition PrivateImplementationDetails { get; }
 	private IMethodDefOrRef CompilerGeneratedAttributeConstructor { get; }
 	public Dictionary<LLVMValueRef, FunctionContext> Methods { get; } = new();
@@ -117,18 +115,13 @@ internal sealed partial class ModuleContext
 		}
 	}
 
-	public void AssignFunctionNames()
+	public void AssignMemberNames()
 	{
-		Methods.Values.AssignNames();
+		Methods.Values.Concat<IHasName>(GlobalVariables.Values).AssignNames();
 		foreach (FunctionContext functionContext in Methods.Values)
 		{
 			functionContext.Definition.Name = functionContext.Name;
 		}
-	}
-
-	public void AssignGlobalVariableNames()
-	{
-		GlobalVariables.Values.AssignNames();
 	}
 
 	public void AssignStructNames()
@@ -710,9 +703,9 @@ internal sealed partial class ModuleContext
 		return method;
 	}
 
-	private TypeDefinition CreateStaticType(string name, bool @public = true)
+	private TypeDefinition CreateStaticType(string name, bool @public)
 	{
-		TypeDefinition typeDefinition = new(Options.Namespace, name, (@public ? TypeAttributes.Public : TypeAttributes.NotPublic) | TypeAttributes.Abstract | TypeAttributes.Sealed, Definition.CorLibTypeFactory.Object.ToTypeDefOrRef());
+		TypeDefinition typeDefinition = new(Options.GetNamespace(@public ? null : "Implementations"), name, (@public ? TypeAttributes.Public : TypeAttributes.NotPublic) | TypeAttributes.Abstract | TypeAttributes.Sealed, Definition.CorLibTypeFactory.Object.ToTypeDefOrRef());
 		Definition.TopLevelTypes.Add(typeDefinition);
 		return typeDefinition;
 	}

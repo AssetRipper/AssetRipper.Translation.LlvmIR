@@ -76,11 +76,9 @@ public static unsafe class Translator
 			moduleContext.GlobalVariables.Add(global, globalVariableContext);
 		}
 
-		moduleContext.AssignGlobalVariableNames();
-
 		moduleContext.CreateFunctions();
 
-		moduleContext.AssignFunctionNames();
+		moduleContext.AssignMemberNames();
 
 		moduleContext.IdentifyFunctionsThatMightThrow();
 

@@ -17,6 +17,11 @@ public sealed record class TranslatorOptions
 	/// </summary>
 	public string? ModuleName { get; set; }
 
+	/// <summary>
+	/// The public class name to use in the generated assembly.
+	/// </summary>
+	public string? ClassName { get; set; }
+
 	public Dictionary<string, string> RenamedSymbols { get; init; } = new();
 
 	public string? GetNamespace(string? subNamespace)

@@ -4,6 +4,7 @@ using AsmResolver.DotNet.Signatures;
 using AsmResolver.PE.DotNet.Cil;
 using AsmResolver.PE.DotNet.Metadata.Tables;
 using AssetRipper.CIL;
+using AssetRipper.Translation.LlvmIR.Extensions;
 using LLVMSharp.Interop;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
@@ -95,10 +96,10 @@ internal sealed class GlobalVariableContext : IHasName
 		// Data property
 		{
 			PropertyDefinition property = new PropertyDefinition(Name, PropertyAttributes.None, PropertySignature.CreateStatic(underlyingType));
-			Module.GlobalVariablesType.Properties.Add(property);
+			Module.GlobalMembersType.Properties.Add(property);
 
 			DataGetMethod = new MethodDefinition("get_" + Name, MethodAttributes.Public | MethodAttributes.Static | MethodAttributes.HideBySig | MethodAttributes.SpecialName, MethodSignature.CreateStatic(underlyingType));
-			Module.GlobalVariablesType.Methods.Add(DataGetMethod);
+			Module.GlobalMembersType.Methods.Add(DataGetMethod);
 
 			DataGetMethod.CilMethodBody = new(DataGetMethod);
 			{
@@ -110,7 +111,7 @@ internal sealed class GlobalVariableContext : IHasName
 
 			DataSetMethod = new MethodDefinition("set_" + Name, MethodAttributes.Public | MethodAttributes.Static | MethodAttributes.HideBySig | MethodAttributes.SpecialName, MethodSignature.CreateStatic(Module.Definition.CorLibTypeFactory.Void, underlyingType));
 			DataSetMethod.Parameters[0].GetOrCreateDefinition().Name = "value";
-			Module.GlobalVariablesType.Methods.Add(DataSetMethod);
+			Module.GlobalMembersType.Methods.Add(DataSetMethod);
 
 			DataSetMethod.CilMethodBody = new(DataSetMethod);
 			{
@@ -192,7 +193,7 @@ internal sealed class GlobalVariableContext : IHasName
 			result = demangledName ?? "";
 		}
 
-		return NameGenerator.CleanName(result, "Variable");
+		return NameGenerator.CleanName(result, "Variable").CapitalizeGetOrSet();
 
 		static bool TryGetNameFromBeginning(string mangledName, [NotNullWhen(true)] out string? result)
 		{

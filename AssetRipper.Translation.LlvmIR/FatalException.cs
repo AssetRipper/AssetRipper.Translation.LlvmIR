@@ -1,6 +1,6 @@
 ﻿namespace AssetRipper.Translation.LlvmIR;
 
-public sealed class FatalException : Exception
+internal sealed class FatalException : Exception
 {
 	public FatalException()
 	{

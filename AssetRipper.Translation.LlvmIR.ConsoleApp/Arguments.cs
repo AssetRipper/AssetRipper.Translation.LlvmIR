@@ -19,6 +19,10 @@ sealed partial class Arguments
 	[Description("The module name to use for the generated assembly.")]
 	public string? ModuleName { get; set; }
 
+	[CommandLineArgument]
+	[Description("The public class name to use in the generated assembly.")]
+	public string? ClassName { get; set; }
+
 	[CommandLineArgument("mangled-name")]
 	[Description("The set of mangled names.")]
 	public string[]? MangledNames { get; set; }

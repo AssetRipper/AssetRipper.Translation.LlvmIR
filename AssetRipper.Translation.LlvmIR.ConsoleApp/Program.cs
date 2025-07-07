@@ -28,6 +28,7 @@ internal static class Program
 			FixAssemblyReferences = true,
 			Namespace = args.Namespace,
 			ModuleName = args.ModuleName,
+			ClassName = args.ClassName,
 		};
 		for (int i = 0; i < mangledNames.Length; i++)
 		{
