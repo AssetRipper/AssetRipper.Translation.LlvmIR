@@ -72,7 +72,7 @@ internal static class Program
 	private static void GenerateIR(string inputFile, string outputFile)
 	{
 		// Prepare the Clang command to generate IR
-		string clangCommand = $"clang -g -fno-discard-value-names -S -emit-llvm -o {outputFile} {inputFile}";
+		string clangCommand = $"clang -g -fno-discard-value-names -fstandalone-debug -S -emit-llvm -o {outputFile} {inputFile}";
 
 		// Execute the Clang command
 		ProcessStartInfo processInfo = new("cmd.exe", $"/c {clangCommand}")
