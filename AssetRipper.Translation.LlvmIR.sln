@@ -30,6 +30,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AssetRipper.Translation.Llv
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LlvmBinaryTextConverter", "LlvmBinaryTextConverter\LlvmBinaryTextConverter.csproj", "{C3F93AB9-D338-4A69-A1D2-44027F296D23}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LargeProjectCompiler", "LargeProjectCompiler\LargeProjectCompiler.csproj", "{15470A24-18BF-67B0-A3A9-2F3F0B805B40}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -68,6 +70,10 @@ Global
 		{C3F93AB9-D338-4A69-A1D2-44027F296D23}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{C3F93AB9-D338-4A69-A1D2-44027F296D23}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{C3F93AB9-D338-4A69-A1D2-44027F296D23}.Release|Any CPU.Build.0 = Release|Any CPU
+		{15470A24-18BF-67B0-A3A9-2F3F0B805B40}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{15470A24-18BF-67B0-A3A9-2F3F0B805B40}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{15470A24-18BF-67B0-A3A9-2F3F0B805B40}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{15470A24-18BF-67B0-A3A9-2F3F0B805B40}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
