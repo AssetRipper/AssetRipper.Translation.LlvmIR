@@ -11,7 +11,7 @@ internal sealed class ConditionalBranchInstructionContext : BranchInstructionCon
 	internal ConditionalBranchInstructionContext(LLVMValueRef instruction, ModuleContext module) : base(instruction, module)
 	{
 		Debug.Assert(Operands.Length == 3);
-		Debug.Assert(Operands[0].IsInstruction());
+		Debug.Assert(Operands[0].IsInstruction() || Operands[0].IsConstant);
 		Debug.Assert(Operands[0] == Instruction.Condition);
 		Debug.Assert(Operands[1].IsBasicBlock);
 		Debug.Assert(Operands[2].IsBasicBlock);
