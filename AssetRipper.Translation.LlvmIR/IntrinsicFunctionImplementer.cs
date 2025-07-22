@@ -78,7 +78,7 @@ internal static partial class IntrinsicFunctionImplementer
 				return false;
 			}
 
-			return m.FindCustomAttributes(context.Options.GetNamespace("Helpers"), nameof(MangledNameAttribute))
+			return m.FindCustomAttributes(context.HelpersNamespace, nameof(MangledNameAttribute))
 				.Select(a => a.Signature?.FixedArguments[0].Element?.ToString())
 				.Contains(mangledName);
 		});

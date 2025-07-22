@@ -22,7 +22,8 @@ internal sealed partial class ModuleContext
 {
 	public ModuleContext(LLVMModuleRef module, ModuleDefinition definition, TranslatorOptions options)
 	{
-		InjectedTypes = new TypeInjector(definition, options.GetNamespace("Helpers")).Inject(
+		HelpersNamespace = options.GetNamespace("Helpers");
+		InjectedTypes = new TypeInjector(definition, HelpersNamespace).Inject(
 		[
 			typeof(IntrinsicFunctions),
 			typeof(InlineArrayHelper),
@@ -60,6 +61,7 @@ internal sealed partial class ModuleContext
 		Definition.TopLevelTypes.Add(PrivateImplementationDetails);
 	}
 
+	public string? HelpersNamespace { get; }
 	public IReadOnlyDictionary<Type, TypeDefinition> InjectedTypes { get; }
 	public TypeDefinition IntrinsicsType => InjectedTypes[typeof(IntrinsicFunctions)];
 	public TypeDefinition InlineArrayHelperType => InjectedTypes[typeof(InlineArrayHelper)];
@@ -138,12 +140,12 @@ internal sealed partial class ModuleContext
 		HashSet<string> intrinsicMethodsThatMightThrow = new();
 		foreach (MethodDefinition method in IntrinsicsType.Methods)
 		{
-			if (!method.HasCustomAttribute(Options.Namespace, nameof(MightThrowAttribute)))
+			if (!method.HasCustomAttribute(HelpersNamespace, nameof(MightThrowAttribute)))
 			{
 				continue;
 			}
 
-			foreach (CustomAttribute attribute in method.FindCustomAttributes(Options.Namespace, nameof(MangledNameAttribute)))
+			foreach (CustomAttribute attribute in method.FindCustomAttributes(HelpersNamespace, nameof(MangledNameAttribute)))
 			{
 				string? mangledName = attribute.Signature?.FixedArguments[0].Element?.ToString();
 				if (mangledName is not null)
