@@ -3,6 +3,7 @@ using AsmResolver.DotNet.Code.Cil;
 using AsmResolver.DotNet.Collections;
 using AsmResolver.DotNet.Signatures;
 using AsmResolver.PE.DotNet.Cil;
+using AsmResolver.PE.DotNet.Metadata.Tables;
 using AssetRipper.CIL;
 using AssetRipper.Translation.LlvmIR.Extensions;
 using AssetRipper.Translation.LlvmIR.Instructions;
@@ -29,8 +30,16 @@ internal sealed class FunctionContext : IHasName
 		CleanName = ExtractCleanName(MangledName, DemangledName, module.Options.RenamedSymbols);
 	}
 
-	public static FunctionContext Create(LLVMValueRef function, MethodDefinition definition, ModuleContext module)
+	public static FunctionContext Create(LLVMValueRef function, ModuleContext module)
 	{
+		TypeDefinition declaringType = new(module.Options.GetNamespace("GlobalFunctions"), null, TypeAttributes.NotPublic | TypeAttributes.Class | TypeAttributes.Abstract | TypeAttributes.Sealed | TypeAttributes.BeforeFieldInit, module.Definition.CorLibTypeFactory.Object.ToTypeDefOrRef());
+		module.Definition.TopLevelTypes.Add(declaringType);
+
+		MethodSignature signature = MethodSignature.CreateStatic(null!);
+		MethodDefinition definition = new("Invoke", MethodAttributes.Public | MethodAttributes.Static | MethodAttributes.HideBySig, signature);
+		definition.CilMethodBody = new(definition);
+		declaringType.Methods.Add(definition);
+
 		Debug.Assert(definition.Signature is not null);
 		FunctionContext context = new(function, definition, module);
 		module.Methods.Add(function, context);
@@ -81,6 +90,41 @@ internal sealed class FunctionContext : IHasName
 			parameter.Definition.GetOrCreateDefinition().Name = parameter.Name;
 		}
 
+		// Pointer
+		{
+			TypeSignature voidPointerType = module.Definition.CorLibTypeFactory.Void.MakePointerType();
+
+			FieldDefinition pointerField = new("__pointer", FieldAttributes.Private | FieldAttributes.Static, voidPointerType);
+			declaringType.Fields.Add(pointerField);
+
+			MethodDefinition getMethod = new("get_Pointer", MethodAttributes.Public | MethodAttributes.Static | MethodAttributes.HideBySig | MethodAttributes.SpecialName, MethodSignature.CreateStatic(voidPointerType));
+			declaringType.Methods.Add(getMethod);
+			getMethod.CilMethodBody = new(getMethod);
+
+			CilInstructionCollection instructions = getMethod.CilMethodBody.Instructions;
+			CilInstructionLabel notNullLabel = new();
+
+			instructions.Add(CilOpCodes.Ldsfld, pointerField);
+			instructions.Add(CilOpCodes.Ldc_I4_0);
+			instructions.Add(CilOpCodes.Conv_U);
+			instructions.Add(CilOpCodes.Bne_Un, notNullLabel);
+
+			instructions.Add(CilOpCodes.Ldftn, definition);
+			instructions.Add(CilOpCodes.Stsfld, pointerField);
+
+			instructions.Add(CilOpCodes.Ldsfld, pointerField);
+			instructions.Add(CilOpCodes.Call, module.InjectedTypes[typeof(PointerIndices)].GetMethodByName(nameof(PointerIndices.Register)));
+
+			notNullLabel.Instruction = instructions.Add(CilOpCodes.Ldsfld, pointerField);
+			instructions.Add(CilOpCodes.Ret);
+
+			PropertyDefinition property = new("Pointer", PropertyAttributes.None, PropertySignature.CreateStatic(voidPointerType));
+			declaringType.Properties.Add(property);
+			property.GetMethod = getMethod;
+
+			context.PointerGetMethod = getMethod;
+		}
+
 		return context;
 	}
 
@@ -113,6 +157,7 @@ internal sealed class FunctionContext : IHasName
 	public AttributeWrapper[] Attributes { get; }
 	public AttributeWrapper[] ReturnAttributes { get; }
 	public MethodDefinition Definition { get; }
+	public TypeDefinition DeclaringType => Definition.DeclaringType!;
 	public ModuleContext Module { get; }
 	public List<BasicBlockContext> BasicBlocks { get; } = new();
 	public List<InstructionContext> Instructions { get; } = new();
@@ -121,6 +166,7 @@ internal sealed class FunctionContext : IHasName
 	public Dictionary<LLVMBasicBlockRef, BasicBlockContext> BasicBlockLookup { get; } = new();
 	public TypeDefinition? LocalVariablesType { get; set; }
 	public CilLocalVariable? StackFrameVariable { get; set; }
+	public MethodDefinition PointerGetMethod { get; set; } = null!;
 
 	public void AnalyzeDataFlow()
 	{
@@ -196,7 +242,7 @@ internal sealed class FunctionContext : IHasName
 		CilInstructionCollection instructions;
 		if (TryGetStructReturnType(out TypeSignature? returnTypeSignature))
 		{
-			newMethod = new(method.Name, method.Attributes, MethodSignature.CreateStatic(returnTypeSignature, method.Signature.ParameterTypes.Skip(1)));
+			newMethod = new(Name, method.Attributes, MethodSignature.CreateStatic(returnTypeSignature, method.Signature.ParameterTypes.Skip(1)));
 			Module.GlobalMembersType.Methods.Add(newMethod);
 			newMethod.CilMethodBody = new(newMethod);
 
@@ -222,7 +268,7 @@ internal sealed class FunctionContext : IHasName
 		}
 		else
 		{
-			newMethod = new(method.Name, method.Attributes, MethodSignature.CreateStatic(method.Signature.ReturnType, method.Signature.ParameterTypes));
+			newMethod = new(Name, method.Attributes, MethodSignature.CreateStatic(method.Signature.ReturnType, method.Signature.ParameterTypes));
 			Module.GlobalMembersType.Methods.Add(newMethod);
 			newMethod.CilMethodBody = new(newMethod);
 

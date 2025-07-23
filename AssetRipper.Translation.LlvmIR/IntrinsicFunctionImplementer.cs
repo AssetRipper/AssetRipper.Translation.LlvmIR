@@ -57,16 +57,12 @@ internal static partial class IntrinsicFunctionImplementer
 
 	private static void MoveToImplementedType(FunctionContext context)
 	{
-		TypeDefinition declaringType = context.Module.IntrinsicsType.NestedTypes.First(t => t.Name == "Implemented");
-		context.Definition.DeclaringType!.Methods.Remove(context.Definition);
-		declaringType.Methods.Add(context.Definition);
+		context.DeclaringType.Namespace = context.Module.Options.GetNamespace("Intrinsics.Implemented");
 	}
 
 	private static void MoveToUnimplementedType(FunctionContext context)
 	{
-		TypeDefinition declaringType = context.Module.IntrinsicsType.NestedTypes.First(t => t.Name == "Unimplemented");
-		context.Definition.DeclaringType!.Methods.Remove(context.Definition);
-		declaringType.Methods.Add(context.Definition);
+		context.DeclaringType.Namespace = context.Module.Options.GetNamespace("Intrinsics.Unimplemented");
 	}
 
 	private static bool TryGetInjectedIntrinsic(ModuleContext context, string mangledName, [NotNullWhen(true)] out MethodDefinition? result)

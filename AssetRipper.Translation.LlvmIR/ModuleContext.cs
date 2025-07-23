@@ -48,10 +48,6 @@ internal sealed partial class ModuleContext
 		Module = module;
 		Definition = definition;
 		Options = options;
-		GlobalFunctionImplementationsType = CreateStaticType("GlobalFunctionImplementations", false);
-		PointerCacheType = CreateStaticType("PointerCache", false);
-		GlobalVariableInitializersType = CreateStaticType("GlobalVariableInitializers", false);
-		GlobalVariablePointersType = CreateStaticType("GlobalVariablePointers", false);
 		GlobalMembersType = CreateStaticType(string.IsNullOrEmpty(options.ClassName) ? "GlobalMembers" : options.ClassName, true);
 
 		CompilerGeneratedAttributeConstructor = (IMethodDefOrRef)definition.DefaultImporter.ImportMethod(typeof(CompilerGeneratedAttribute).GetConstructors()[0]);
@@ -75,10 +71,6 @@ internal sealed partial class ModuleContext
 	public LLVMModuleRef Module { get; }
 	public ModuleDefinition Definition { get; }
 	public TranslatorOptions Options { get; }
-	public TypeDefinition GlobalFunctionImplementationsType { get; }
-	public TypeDefinition PointerCacheType { get; }
-	public TypeDefinition GlobalVariableInitializersType { get; }
-	public TypeDefinition GlobalVariablePointersType { get; }
 	public TypeDefinition GlobalMembersType { get; }
 	public TypeDefinition PrivateImplementationDetails { get; }
 	private IMethodDefOrRef CompilerGeneratedAttributeConstructor { get; }
@@ -112,8 +104,7 @@ internal sealed partial class ModuleContext
 	{
 		foreach (LLVMValueRef function in Module.GetFunctions())
 		{
-			MethodDefinition method = CreateNewMethod(GlobalFunctionImplementationsType);
-			FunctionContext.Create(function, method, this);
+			FunctionContext.Create(function, this);
 		}
 	}
 
@@ -122,7 +113,7 @@ internal sealed partial class ModuleContext
 		Methods.Values.Concat<IHasName>(GlobalVariables.Values).AssignNames();
 		foreach (FunctionContext functionContext in Methods.Values)
 		{
-			functionContext.Definition.Name = functionContext.Name;
+			functionContext.DeclaringType.Name = functionContext.Name;
 		}
 	}
 
@@ -201,99 +192,15 @@ internal sealed partial class ModuleContext
 			}
 
 			TypeDefinition typeDefinition = new(
-				Options.GetNamespace("LocalVariables"),
-				$"LocalVariables_{function.Name}",
-				TypeAttributes.NotPublic | TypeAttributes.SequentialLayout | TypeAttributes.BeforeFieldInit,
+				null,
+				"LocalVariables",
+				TypeAttributes.NestedPrivate | TypeAttributes.SequentialLayout | TypeAttributes.BeforeFieldInit,
 				Definition.DefaultImporter.ImportType(typeof(ValueType)));
-			Definition.TopLevelTypes.Add(typeDefinition);
+			function.DeclaringType.NestedTypes.Add(typeDefinition);
 
 			function.LocalVariablesType = typeDefinition;
 
 			function.StackFrameVariable = function.Definition.CilMethodBody!.Instructions.AddLocalVariable(InjectedTypes[typeof(StackFrame)].ToTypeSignature());
-		}
-	}
-
-	public void FillPointerIndexType()
-	{
-		TypeDefinition type = InjectedTypes[typeof(PointerIndices)];
-
-		// GetIndex
-		{
-			MethodDefinition method = type.GetMethodByName(nameof(PointerIndices.GetIndex));
-			method.CilMethodBody = new CilMethodBody(method);
-
-			CilInstructionCollection instructions = method.CilMethodBody.Instructions;
-
-			int functionIndex = 1;
-			foreach (LLVMValueRef function in Methods.Keys)
-			{
-				CilInstructionLabel label = new();
-				instructions.Add(CilOpCodes.Ldarg_0);
-				LoadValue(instructions, function);
-				instructions.Add(CilOpCodes.Bne_Un, label);
-				instructions.Add(CilOpCodes.Ldc_I4, functionIndex);
-				instructions.Add(CilOpCodes.Ret);
-				label.Instruction = instructions.Add(CilOpCodes.Nop);
-				functionIndex++;
-			}
-
-			int variableIndex = -1;
-			foreach (LLVMValueRef variable in GlobalVariables.Keys)
-			{
-				CilInstructionLabel label = new();
-				instructions.Add(CilOpCodes.Ldarg_0);
-				LoadValue(instructions, variable);
-				instructions.Add(CilOpCodes.Bne_Un, label);
-				instructions.Add(CilOpCodes.Ldc_I4, variableIndex);
-				instructions.Add(CilOpCodes.Ret);
-				label.Instruction = instructions.Add(CilOpCodes.Nop);
-				variableIndex--;
-			}
-
-			instructions.Add(CilOpCodes.Ldc_I4_0);
-			instructions.Add(CilOpCodes.Ret);
-
-			instructions.OptimizeMacros();
-		}
-
-		// GetPointer
-		{
-			MethodDefinition method = type.GetMethodByName(nameof(PointerIndices.GetPointer));
-			method.CilMethodBody = new CilMethodBody(method);
-
-			CilInstructionCollection instructions = method.CilMethodBody.Instructions;
-
-			int functionIndex = 1;
-			foreach (LLVMValueRef function in Methods.Keys)
-			{
-				CilInstructionLabel label = new();
-				instructions.Add(CilOpCodes.Ldarg_0);
-				instructions.Add(CilOpCodes.Ldc_I4, functionIndex);
-				instructions.Add(CilOpCodes.Bne_Un, label);
-				LoadValue(instructions, function);
-				instructions.Add(CilOpCodes.Ret);
-				label.Instruction = instructions.Add(CilOpCodes.Nop);
-				functionIndex++;
-			}
-
-			int variableIndex = -1;
-			foreach (LLVMValueRef variable in GlobalVariables.Keys)
-			{
-				CilInstructionLabel label = new();
-				instructions.Add(CilOpCodes.Ldarg_0);
-				instructions.Add(CilOpCodes.Ldc_I4, variableIndex);
-				instructions.Add(CilOpCodes.Bne_Un, label);
-				LoadValue(instructions, variable);
-				instructions.Add(CilOpCodes.Ret);
-				label.Instruction = instructions.Add(CilOpCodes.Nop);
-				variableIndex--;
-			}
-
-			instructions.Add(CilOpCodes.Ldc_I4_0);
-			instructions.Add(CilOpCodes.Conv_U);
-			instructions.Add(CilOpCodes.Ret);
-
-			instructions.OptimizeMacros();
 		}
 	}
 
@@ -342,7 +249,7 @@ internal sealed partial class ModuleContext
 				};
 
 			case LLVMTypeKind.LLVMFunctionTypeKind:
-				//I don't think this can happen, but void* is fine.
+				//Function pointers are represented as void*, except at call sites.
 				return Definition.CorLibTypeFactory.Void.MakePointerType();
 
 			case LLVMTypeKind.LLVMStructTypeKind:
@@ -663,9 +570,8 @@ internal sealed partial class ModuleContext
 			case LLVMValueKind.LLVMFunctionValueKind:
 				{
 					typeSignature = GetTypeSignature(value.TypeOf);
-					MethodDefinition method = Methods[value].Definition;
 
-					instructions.Add(CilOpCodes.Ldftn, method);
+					instructions.Add(CilOpCodes.Call, Methods[value].PointerGetMethod);
 				}
 				break;
 			case LLVMValueKind.LLVMConstantExprValueKind:
@@ -696,18 +602,9 @@ internal sealed partial class ModuleContext
 		}
 	}
 
-	private static MethodDefinition CreateNewMethod(TypeDefinition globalMembersType)
-	{
-		MethodSignature signature = MethodSignature.CreateStatic(null!);
-		MethodDefinition method = new(null, MethodAttributes.Public | MethodAttributes.Static | MethodAttributes.HideBySig, signature);
-		method.CilMethodBody = new(method);
-		globalMembersType.Methods.Add(method);
-		return method;
-	}
-
 	private TypeDefinition CreateStaticType(string name, bool @public)
 	{
-		TypeDefinition typeDefinition = new(Options.GetNamespace(@public ? null : "Implementations"), name, (@public ? TypeAttributes.Public : TypeAttributes.NotPublic) | TypeAttributes.Abstract | TypeAttributes.Sealed, Definition.CorLibTypeFactory.Object.ToTypeDefOrRef());
+		TypeDefinition typeDefinition = new(Options.GetNamespace(@public ? null : "Implementations"), name, (@public ? TypeAttributes.Public : TypeAttributes.NotPublic) | TypeAttributes.Abstract | TypeAttributes.Sealed | TypeAttributes.BeforeFieldInit, Definition.CorLibTypeFactory.Object.ToTypeDefOrRef());
 		Definition.TopLevelTypes.Add(typeDefinition);
 		return typeDefinition;
 	}

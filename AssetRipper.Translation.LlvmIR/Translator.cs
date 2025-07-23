@@ -87,16 +87,16 @@ public static unsafe class Translator
 			globalVariableContext.CreateProperties();
 		}
 
-		moduleContext.FillPointerIndexType();
-
 		foreach (GlobalVariableContext globalVariableContext in moduleContext.GlobalVariables.Values)
 		{
 			globalVariableContext.InitializeData();
+			globalVariableContext.AddPublicImplementation();
 		}
 
 		foreach (FunctionContext functionContext in moduleContext.Methods.Values)
 		{
-			functionContext.AddNameAttributes(functionContext.Definition);
+			functionContext.AddNameAttributes(functionContext.DeclaringType);
+			functionContext.AddPublicImplementation();
 
 			if (IntrinsicFunctionImplementer.TryHandleIntrinsicFunction(functionContext))
 			{
@@ -135,8 +135,6 @@ public static unsafe class Translator
 			}
 
 			instructions.OptimizeMacros();
-
-			functionContext.AddPublicImplementation();
 		}
 
 		// Structs are discovered dynamically, so we need to assign names after all methods are created.

@@ -8,13 +8,6 @@ namespace AssetRipper.Translation.LlvmIR;
 #pragma warning disable IDE0060 // Remove unused parameter
 internal static unsafe partial class IntrinsicFunctions
 {
-	public static class Implemented
-	{
-	}
-	public static class Unimplemented
-	{
-	}
-
 	[MangledName("puts")]
 	public static int PutString(sbyte* P_0)
 	{
