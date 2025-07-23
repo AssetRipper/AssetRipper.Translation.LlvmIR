@@ -59,20 +59,20 @@ internal static unsafe partial class IntrinsicFunctions
 		throw new FatalException(nameof(Terminate));
 	}
 
-	[MangledName("llvm.va.start")]
+	[MangledName("llvm.va_start.p0")]
 	public static void llvm_va_start(void** va_list)
 	{
 		// Handled elsewhere.
 		throw new NotSupportedException();
 	}
 
-	[MangledName("llvm.va.copy")]
+	[MangledName("llvm.va_copy.p0")]
 	public static void llvm_va_copy(void** destination, void** source)
 	{
 		*destination = *source;
 	}
 
-	[MangledName("llvm.va.end")]
+	[MangledName("llvm.va_end.p0")]
 	public static void llvm_va_end(void** va_list)
 	{
 		// Do nothing because it's freed automatically.
@@ -87,6 +87,254 @@ internal static unsafe partial class IntrinsicFunctions
 			++p2;
 		}
 		return *p1 - *p2; // positive, negative, or zero
+	}
+
+	[MangledName("strchr")]
+	public static byte* strchr(byte* str, int c)
+	{
+		// https://cplusplus.com/reference/cstring/strchr/
+		if (str == null)
+		{
+			return null; // Return null for null strings
+		}
+		while (*str != '\0') // iterate until null terminator
+		{
+			if (*str == c) // check if current byte matches the character
+			{
+				return str; // return pointer to the first occurrence
+			}
+			str++;
+		}
+		return null; // return null if character not found
+	}
+
+	[MangledName("strstr")]
+	public static byte* strstr(byte* haystack, byte* needle)
+	{
+		// https://cplusplus.com/reference/cstring/strstr/
+		if (haystack == null || needle == null)
+		{
+			return null; // Return null for null strings
+		}
+
+		long haystackLength = strlen(haystack);
+		long needleLength = strlen(needle);
+
+		ReadOnlySpan<byte> haystackSpan = new(haystack, (int)haystackLength);
+		ReadOnlySpan<byte> needleSpan = new(needle, (int)needleLength);
+
+		int index = haystackSpan.IndexOf(needleSpan);
+
+		return index >= 0
+			? haystack + index // Return pointer to the first occurrence of needle in haystack
+			: null; // Return null if needle not found in haystack
+	}
+
+	[MangledName("strrchr")]
+	public static byte* strrchr(byte* str, int c)
+	{
+		// https://cplusplus.com/reference/cstring/strrchr/
+		if (str == null)
+		{
+			return null; // Return null for null strings
+		}
+
+		long length = strlen(str);
+		ReadOnlySpan<byte> span = new(str, (int)length);
+		int lastIndex = span.LastIndexOf((byte)c);
+		return lastIndex >= 0
+			? str + lastIndex // Return pointer to the last occurrence of character c in str
+			: null; // Return null if character not found
+	}
+
+	[MangledName("strrstr")]
+	public static byte* strrstr(byte* haystack, byte* needle)
+	{
+		if (haystack == null || needle == null)
+		{
+			return null; // Return null for null strings
+		}
+
+		long haystackLength = strlen(haystack);
+		long needleLength = strlen(needle);
+
+		ReadOnlySpan<byte> haystackSpan = new(haystack, (int)haystackLength);
+		ReadOnlySpan<byte> needleSpan = new(needle, (int)needleLength);
+
+		int index = haystackSpan.LastIndexOf(needleSpan);
+
+		return index >= 0
+			? haystack + index // Return pointer to the first occurrence of needle in haystack
+			: null; // Return null if needle not found in haystack
+	}
+
+	[MangledName("strlen")]
+	public static long strlen(byte* str)
+	{
+		if (str == null)
+		{
+			return 0; // Return 0 for null strings
+		}
+		long length = 0;
+		while (*str != '\0') // count until null terminator
+		{
+			length++;
+			str++;
+		}
+		return length; // return the length of the string
+	}
+
+	[MangledName("strncpy")]
+	public static byte* strncpy(byte* destination, byte* source, long count)
+	{
+		// https://cplusplus.com/reference/cstring/strncpy/
+		if (destination == null || source == null)
+		{
+			return null; // Return null for null strings
+		}
+		long sourceLength = StringLengthWithMaximum(source, count);
+		if (sourceLength > 0)
+		{
+			Buffer.MemoryCopy(source, destination, count, sourceLength); // Copy up to count bytes from source to destination
+		}
+		if (sourceLength < count)
+		{
+			new Span<byte>(destination + sourceLength, (int)(count - sourceLength)).Clear(); // Null-terminate if source is shorter than count
+		}
+		return destination; // Return pointer to the destination string
+	}
+
+	[MangledName("strncat")]
+	public static byte* strncat(byte* destination, byte* source, long count)
+	{
+		// https://cplusplus.com/reference/cstring/strncat/
+		if (destination == null || source == null)
+		{
+			return null; // Return null for null strings
+		}
+		long insertionPoint = strlen(destination); // Find the end of the destination string
+		long sourceLength = StringLengthWithMaximum(source, (int)count);
+		if (sourceLength > 0)
+		{
+			Buffer.MemoryCopy(source, destination + insertionPoint, count, sourceLength); // Copy up to count bytes from source to the end of destination
+		}
+		destination[insertionPoint + sourceLength] = 0; // Null-terminate the destination string
+		return destination; // Return pointer to the destination string
+	}
+
+	private static long StringLengthWithMaximum(byte* str, long maxLength)
+	{
+		if (str == null)
+		{
+			return 0; // Return 0 for null strings
+		}
+		long length = 0;
+		while (length < maxLength && *str != '\0') // count until null terminator or maximum length
+		{
+			length++;
+			str++;
+		}
+		return length; // return the length of the string
+	}
+
+	[MangledName("tolower")]
+	public static int ToLower(int character)
+	{
+		unchecked
+		{
+			uint u = (uint)character;
+			if (u >= ushort.MaxValue)
+			{
+				return character; // Return the original value if it's not a valid unicode character
+			}
+			char c = char.ToLower((char)u);
+			return (int)(uint)c; // Convert back to int
+		}
+	}
+
+	[MangledName("isalpha")]
+	public static int IsAlpha(int character)
+	{
+		unchecked
+		{
+			uint u = (uint)character;
+			if (u >= ushort.MaxValue)
+			{
+				return 0; // False
+			}
+			char c = (char)u;
+			return char.IsLetter(c) ? 1 : 0;
+		}
+	}
+
+	[MangledName("isdigit")]
+	public static int IsDigit(int character)
+	{
+		unchecked
+		{
+			uint u = (uint)character;
+			if (u >= ushort.MaxValue)
+			{
+				return 0; // False
+			}
+			char c = (char)u;
+			return char.IsDigit(c) ? 1 : 0;
+		}
+	}
+
+	[MangledName("atoi")]
+	public static int AsciiToInteger(byte* str)
+	{
+		// https://cplusplus.com/reference/cstdlib/atoi/
+		if (str == null)
+		{
+			return 0; // Return 0 for null strings
+		}
+
+		// Skip leading whitespace
+		while (char.IsWhiteSpace((char)*str))
+		{
+			str++;
+		}
+
+		byte* start;
+		switch (*str)
+		{
+			case (byte)'-':
+				start = str;
+				str++;
+				break;
+			case (byte)'+':
+				str++;
+				start = str;
+				break;
+			default:
+				start = str;
+				break;
+		}
+
+		byte* end;
+		while (true)
+		{
+			if (!char.IsDigit((char)*str))
+			{
+				end = str;
+				break; // Stop on non-digit character
+			}
+			str++;
+		}
+
+		long length = end - start;
+		if (length == 0)
+		{
+			return 0; // Return 0 if no digits were found
+		}
+		ReadOnlySpan<byte> span = new(start, (int)length);
+		if (length == 1 && span[0] is (byte)'-')
+		{
+			return 0; // Return 0 if only a negative sign was found
+		}
+		return int.Parse(span, System.Globalization.CultureInfo.InvariantCulture);
 	}
 
 	[MangledName("memcmp")]
