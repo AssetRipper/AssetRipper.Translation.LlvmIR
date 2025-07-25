@@ -22,7 +22,7 @@ public partial class SimpleTests
 	{
 		ExecutionHelpers.RunTest(Noop.TranslateToCIL(), assembly =>
 		{
-			Type? type = assembly.GetType("GlobalFunctions");
+			Type? type = assembly.GetType("GlobalMembers");
 			Assert.That(type, Is.Not.Null);
 			MethodInfo? method = type.GetMethod("do_nothing", BindingFlags.Public | BindingFlags.Static);
 			Assert.That(method, Is.Not.Null);
@@ -230,4 +230,18 @@ public partial class SimpleTests
 		  ret void
 		}
 		""";
+
+	[Test]
+	public void StaticIntVariable_ExecutesCorrectly()
+	{
+		ExecutionHelpers.RunTest(StaticIntVariable.TranslateToCIL(), assembly =>
+		{
+			Type? type = assembly.GetType("GlobalMembers");
+			Assert.That(type, Is.Not.Null);
+			MethodInfo? method = type.GetMethod("get", BindingFlags.Public | BindingFlags.Static);
+			Assert.That(method, Is.Not.Null);
+			int result = (int)method.Invoke(null, null)!;
+			Assert.That(result, Is.EqualTo(1));
+		});
+	}
 }

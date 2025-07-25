@@ -21,7 +21,7 @@ internal static class ExecutionHelpers
 		return context.LoadFromStream(stream);
 	}
 
-	public static void RunTest(ModuleDefinition module, Action<Assembly> testAction)
+	public static unsafe void RunTest(ModuleDefinition module, Action<Assembly> testAction)
 	{
 		AssemblyLoadContext context = CreateLoadContext();
 		
@@ -37,16 +37,16 @@ internal static class ExecutionHelpers
 			{
 				// Free unmanaged resources
 
-				Type? type = assembly.GetType("PointerCache");
-				Assert.That(type, Is.Not.Null);
-
-				foreach (FieldInfo field in type.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static))
+				foreach (Type type in assembly.GetTypes().Where(t => t.Namespace == "GlobalVariables"))
 				{
-					Assert.That(field.FieldType, Is.EqualTo(typeof(IntPtr)));
-					IntPtr pointer = (IntPtr)field.GetValue(null)!;
-					if (pointer != IntPtr.Zero)
+					foreach (FieldInfo field in type.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static))
 					{
-						Marshal.FreeHGlobal(pointer);
+						Pointer pointer = (Pointer)field.GetValue(null)!;
+						IntPtr value = (IntPtr)Pointer.Unbox(pointer);
+						if (value != IntPtr.Zero)
+						{
+							Marshal.FreeHGlobal(value);
+						}
 					}
 				}
 			}
