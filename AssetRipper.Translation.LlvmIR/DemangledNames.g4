@@ -57,7 +57,7 @@ functionIdentifier
     ;
 
 type
-    : (Class | Struct)? typeIdentifier Const? (Star | And)*
+    : (Class | Struct | Union)? typeIdentifier Const? (Star | And)*
     ;
 
 typeIdentifier

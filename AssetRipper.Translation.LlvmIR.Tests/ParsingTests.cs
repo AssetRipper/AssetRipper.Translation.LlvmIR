@@ -23,6 +23,7 @@ public class ParsingTests
 	[TestCase("auto __cdecl std::_To_address<unsigned char *>(unsigned char *const &)")]
 	[TestCase("private: static void __cdecl std::vector<unsigned int, class std::allocator<unsigned int>>::_Xlength(void)")]
 	[TestCase("decltype(auto) __cdecl std::_Get_unwrapped<unsigned char *const &>(unsigned char *const &)")]
+	[TestCase("union __clang::__vector<int, 4> __cdecl add<union __clang::__vector<int, 4>>(union __clang::__vector<int, 4>, union __clang::__vector<int, 4>)")]
 	public void ParsingSucceeds(string input)
 	{
 		IParseTree tree = DemangledNamesParser.ParseFunction(input);
