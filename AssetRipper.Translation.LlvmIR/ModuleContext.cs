@@ -425,8 +425,6 @@ internal sealed partial class ModuleContext
 
 					ReadOnlySpan<byte> data = LibLLVMSharp.ConstantDataArrayGetData(value);
 
-					CilLocalVariable spanLocal = instructions.AddLocalVariable(null!);
-
 					if (elementType is CorLibTypeSignature { ElementType: ElementType.I2 } && TryParseCharacterArray(data, out string? @string))
 					{
 						elementType = Definition.CorLibTypeFactory.Char;
@@ -436,7 +434,6 @@ internal sealed partial class ModuleContext
 
 						instructions.Add(CilOpCodes.Ldstr, @string);
 						instructions.Add(CilOpCodes.Call, toCharacterSpan);
-						instructions.Add(CilOpCodes.Stloc, spanLocal);
 					}
 					else if (elementType is CorLibTypeSignature { ElementType: ElementType.I1 or ElementType.U1 })
 					{
@@ -446,10 +443,9 @@ internal sealed partial class ModuleContext
 							.ImportMethod(typeof(ReadOnlySpan<byte>).GetConstructor([typeof(void*), typeof(int)])!);
 
 						FieldDefinition field = AddStoredDataField(data.ToArray());
-						instructions.Add(CilOpCodes.Ldloca, spanLocal);
 						instructions.Add(CilOpCodes.Ldsflda, field);
 						instructions.Add(CilOpCodes.Ldc_I4, data.Length);
-						instructions.Add(CilOpCodes.Call, spanConstructor);
+						instructions.Add(CilOpCodes.Newobj, spanConstructor);
 					}
 					else
 					{
@@ -460,7 +456,6 @@ internal sealed partial class ModuleContext
 						FieldDefinition field = AddStoredDataField(data.ToArray());
 						instructions.Add(CilOpCodes.Ldtoken, field);
 						instructions.Add(CilOpCodes.Call, createSpanInstance);
-						instructions.Add(CilOpCodes.Stloc, spanLocal);
 					}
 
 					Debug.Assert(elementType is not PointerTypeSignature, "Pointers cannot be used as generic type arguments");
@@ -473,9 +468,6 @@ internal sealed partial class ModuleContext
 						.Single(m => m.Name == nameof(InlineArrayHelper.Create))
 						.MakeGenericInstanceMethod(typeSignature, elementType);
 
-					spanLocal.VariableType = spanType.ToTypeSignature();
-
-					instructions.Add(CilOpCodes.Ldloc, spanLocal);
 					instructions.Add(CilOpCodes.Call, createInlineArray);
 				}
 				break;
