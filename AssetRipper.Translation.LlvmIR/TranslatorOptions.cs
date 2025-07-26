@@ -3,11 +3,6 @@
 public sealed record class TranslatorOptions
 {
 	/// <summary>
-	/// If <see langword="true"/>, references to System.Private.CoreLib will be replaced with System.Runtime.
-	/// </summary>
-	public bool FixAssemblyReferences { get; set; } = false;
-
-	/// <summary>
 	/// The root namespace to use for the generated assembly.
 	/// </summary>
 	public string? Namespace { get; set; }

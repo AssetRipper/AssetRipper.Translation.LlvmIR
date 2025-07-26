@@ -25,7 +25,6 @@ internal static class Program
 
 		TranslatorOptions options = new()
 		{
-			FixAssemblyReferences = true,
 			Namespace = args.Namespace,
 			ModuleName = args.ModuleName,
 			ClassName = args.ClassName,

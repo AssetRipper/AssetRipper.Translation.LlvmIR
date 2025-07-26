@@ -76,7 +76,10 @@ internal sealed class GlobalVariableContext : IHasName
 			instructions.Add(CilOpCodes.Bne_Un, label);
 
 			instructions.Add(CilOpCodes.Sizeof, underlyingType.ToTypeDefOrRef());
-			instructions.Add(CilOpCodes.Call, Module.Definition.DefaultImporter.ImportMethod(typeof(Marshal).GetMethod(nameof(Marshal.AllocHGlobal), [typeof(int)])!));
+			instructions.Add(CilOpCodes.Call, Module.InjectedTypes[typeof(NativeMemoryHelper)].Methods.First(m =>
+			{
+				return m.Name == nameof(NativeMemoryHelper.Allocate) && m.Parameters[0].ParameterType.ElementType is ElementType.I4;
+			}));
 			instructions.Add(CilOpCodes.Stsfld, pointerField);
 
 			instructions.Add(CilOpCodes.Ldsfld, pointerField);

@@ -43,6 +43,7 @@ internal sealed partial class ModuleContext
 			typeof(StackFrameList),
 			typeof(FatalException),
 			typeof(PointerIndices),
+			typeof(NativeMemoryHelper),
 		]);
 
 		Module = module;

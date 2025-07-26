@@ -1,5 +1,6 @@
 ﻿using AsmResolver.DotNet;
 using AsmResolver.DotNet.Code.Cil;
+using AsmResolver.DotNet.Signatures;
 using AsmResolver.PE.DotNet.Cil;
 using AssetRipper.Translation.LlvmIR.Extensions;
 using AssetRipper.Translation.LlvmIR.Instructions;
@@ -64,7 +65,7 @@ public static unsafe class Translator
 			var metadataList = module.GetNamedMetadata().ToList();
 		}
 
-		ModuleDefinition moduleDefinition = new(string.IsNullOrEmpty(options.ModuleName) ? "ConvertedCpp" : options.ModuleName, KnownCorLibs.SystemRuntime_v9_0_0_0);
+		CustomModuleDefinition moduleDefinition = new(string.IsNullOrEmpty(options.ModuleName) ? "ConvertedCpp" : options.ModuleName);
 
 		moduleDefinition.AddTargetFrameworkAttributeForDotNet9();
 
@@ -140,6 +141,34 @@ public static unsafe class Translator
 		// Structs are discovered dynamically, so we need to assign names after all methods are created.
 		moduleContext.AssignStructNames();
 
-		return options.FixAssemblyReferences ? moduleDefinition.FixCorLibAssemblyReferences() : moduleDefinition;
+		return moduleDefinition;
+	}
+
+	private sealed class CustomModuleDefinition(string name) : ModuleDefinition(name, KnownCorLibs.SystemRuntime_v9_0_0_0)
+	{
+		protected override ReferenceImporter GetDefaultImporter()
+		{
+			return new CustomReferenceImporter(this);
+		}
+	}
+
+	private sealed class CustomReferenceImporter(CustomModuleDefinition module) : ReferenceImporter(module)
+	{
+		protected override AssemblyReference ImportAssembly(AssemblyDescriptor assembly)
+		{
+			// This importer will fail if System.Runtime.InteropServices.Marshal is ever imported.
+			// At runtime, Marshal is part of System.Private.CoreLib.
+			// However, at compile time, it is not part of System.Runtime, but rather System.Runtime.InteropServices.
+			// If we ever try to import it, the reference will be invalid.
+			// This is one of the primary reasons for NativeMemoryHelper, which allows us to avoid referencing Marshal directly.
+			if (SignatureComparer.Default.Equals(assembly, KnownCorLibs.SystemPrivateCoreLib_v9_0_0_0))
+			{
+				return base.ImportAssembly(KnownCorLibs.SystemRuntime_v9_0_0_0);
+			}
+			else
+			{
+				return base.ImportAssembly(assembly);
+			}
+		}
 	}
 }
