@@ -129,16 +129,27 @@ internal sealed class GlobalVariableContext : IHasName
 	{
 		if (HasSingleOperand)
 		{
+			MethodDefinition initializerMethod = DeclaringType.AddMethod("Initalize", MethodAttributes.Private | MethodAttributes.Static | MethodAttributes.HideBySig, Module.Definition.CorLibTypeFactory.Void);
+			{
+				// https://github.com/icsharpcode/ILSpy/issues/3524
+
+				CilInstructionCollection instructions = initializerMethod.CilMethodBody!.Instructions;
+
+				Module.LoadValue(instructions, Operand);
+				instructions.Add(CilOpCodes.Call, DataSetMethod);
+				instructions.Add(CilOpCodes.Ret);
+
+				instructions.OptimizeMacros();
+			}
+
 			MethodDefinition staticConstructor = DeclaringType.GetOrCreateStaticConstructor();
+			{
+				CilInstructionCollection instructions = staticConstructor.CilMethodBody!.Instructions;
+				instructions.Clear();
 
-			CilInstructionCollection instructions = staticConstructor.CilMethodBody!.Instructions;
-			instructions.Clear();
-
-			Module.LoadValue(instructions, Operand);
-			instructions.Add(CilOpCodes.Call, DataSetMethod);
-			instructions.Add(CilOpCodes.Ret);
-
-			instructions.OptimizeMacros();
+				instructions.Add(CilOpCodes.Call, initializerMethod);
+				instructions.Add(CilOpCodes.Ret);
+			}
 		}
 	}
 
