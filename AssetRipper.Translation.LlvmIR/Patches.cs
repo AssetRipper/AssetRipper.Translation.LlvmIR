@@ -1,5 +1,6 @@
 ﻿using HarmonyLib;
 using LLVMSharp.Interop;
+using System.Diagnostics;
 
 namespace AssetRipper.Translation.LlvmIR;
 
@@ -8,6 +9,7 @@ namespace AssetRipper.Translation.LlvmIR;
 [HarmonyPatch]
 internal static class Patches
 {
+	[Conditional("DEBUG")]
 	public static void Apply() => Harmony.CreateAndPatchAll(typeof(Patches));
 
 	[HarmonyPrefix]
