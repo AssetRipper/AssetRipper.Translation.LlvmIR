@@ -240,6 +240,7 @@ internal sealed class FunctionContext : IHasName
 
 		MethodDefinition newMethod;
 		CilInstructionCollection instructions;
+		CilLocalVariable? returnLocal;
 		if (TryGetStructReturnType(out TypeSignature? returnTypeSignature))
 		{
 			newMethod = new(Name, method.Attributes, MethodSignature.CreateStatic(returnTypeSignature, method.Signature.ParameterTypes.Skip(1)));
@@ -247,7 +248,7 @@ internal sealed class FunctionContext : IHasName
 			newMethod.CilMethodBody = new(newMethod);
 
 			instructions = newMethod.CilMethodBody.Instructions;
-			CilLocalVariable returnLocal = instructions.AddLocalVariable(returnTypeSignature);
+			returnLocal = instructions.AddLocalVariable(returnTypeSignature);
 			instructions.InitializeDefaultValue(returnLocal);
 			instructions.Add(CilOpCodes.Ldloca, returnLocal);
 			foreach (Parameter parameter in newMethod.Parameters)
@@ -255,7 +256,6 @@ internal sealed class FunctionContext : IHasName
 				instructions.Add(CilOpCodes.Ldarg, parameter);
 			}
 			instructions.Add(CilOpCodes.Call, method);
-			instructions.Add(CilOpCodes.Ldloc, returnLocal);
 
 			// Copy parameter names from the original method to the new method.
 			for (int i = 0; i < newMethod.Parameters.Count; i++)
@@ -288,13 +288,49 @@ internal sealed class FunctionContext : IHasName
 				Debug.Assert(originalParameter.Definition is not null);
 				newParameter.GetOrCreateDefinition().Name = originalParameter.Definition.Name;
 			}
+
+			if (IsVoidReturn)
+			{
+				returnLocal = null;
+			}
+			else
+			{
+				returnLocal = instructions.AddLocalVariable(method.Signature.ReturnType);
+				instructions.Add(CilOpCodes.Stloc, returnLocal);
+			}
 		}
 
 		if (MightThrowAnException)
 		{
-			instructions.Add(CilOpCodes.Call, Module.InjectedTypes[typeof(StackFrameList)].GetMethodByName(nameof(StackFrameList.ExitToUserCode)));
+			MethodDefinition exitToUserCode = Module.InjectedTypes[typeof(StackFrameList)].GetMethodByName(nameof(StackFrameList.ExitToUserCode));
+
+			CilInstructionLabel returnLabel = new();
+
+			ICilLabel tryStartLabel = instructions[0].CreateLabel();
+			ICilLabel tryEndLabel = instructions.Add(CilOpCodes.Leave, returnLabel).CreateLabel();
+
+			ICilLabel handlerStartLabel = instructions.Add(CilOpCodes.Pop).CreateLabel();
+			instructions.Add(CilOpCodes.Call, exitToUserCode); // Clean up the stack frame.
+			ICilLabel handlerEndLabel = instructions.Add(CilOpCodes.Rethrow).CreateLabel(); // Continue propagating the exception.
+
+			returnLabel.Instruction = instructions.Add(CilOpCodes.Call, exitToUserCode); // Clean up the stack frame and maybe throw an exception.
+
+			CilExceptionHandler exceptionHandler = new()
+			{
+				HandlerType = CilExceptionHandlerType.Exception,
+				TryStart = tryStartLabel,
+				TryEnd = tryEndLabel,
+				HandlerStart = handlerStartLabel,
+				HandlerEnd = handlerEndLabel,
+				ExceptionType = Module.Definition.CorLibTypeFactory.Object.ToTypeDefOrRef(),
+			};
+			instructions.Owner.ExceptionHandlers.Add(exceptionHandler);
 		}
 
+		if (returnLocal is not null)
+		{
+			instructions.Add(CilOpCodes.Ldloc, returnLocal);
+		}
 		instructions.Add(CilOpCodes.Ret);
 		instructions.OptimizeMacros();
 
