@@ -73,6 +73,7 @@ internal sealed partial class ModuleContext
 	public TranslatorOptions Options { get; }
 	public TypeDefinition GlobalMembersType { get; }
 	public TypeDefinition PrivateImplementationDetails { get; }
+	private Dictionary<string, FieldDefinition> storedDataFieldCache = new();
 	private IMethodDefOrRef CompilerGeneratedAttributeConstructor { get; }
 	public Dictionary<LLVMValueRef, FunctionContext> Methods { get; } = new();
 	public Dictionary<LLVMTypeRef, StructContext> Structs { get; } = new();
@@ -460,10 +461,6 @@ internal sealed partial class ModuleContext
 
 					Debug.Assert(elementType is not PointerTypeSignature, "Pointers cannot be used as generic type arguments");
 
-					ITypeDescriptor spanType = Definition.DefaultImporter
-						.ImportType(typeof(ReadOnlySpan<>))
-						.MakeGenericInstanceType(elementType);
-
 					IMethodDescriptor createInlineArray = InlineArrayHelperType.Methods
 						.Single(m => m.Name == nameof(InlineArrayHelper.Create))
 						.MakeGenericInstanceMethod(typeSignature, elementType);
@@ -621,8 +618,7 @@ internal sealed partial class ModuleContext
 		string fieldName = HashDataToBase64(data);
 		TypeSignature fieldType = nestedType.ToTypeSignature();
 
-		FieldDefinition? privateImplementationField = PrivateImplementationDetails.Fields.FirstOrDefault(f => f.Name == fieldName);
-		if (privateImplementationField is not null)
+		if (storedDataFieldCache.TryGetValue(fieldName, out FieldDefinition? privateImplementationField))
 		{
 			Debug.Assert(SignatureComparer.Default.Equals(privateImplementationField.Signature?.FieldType, fieldType));
 		}
@@ -635,6 +631,7 @@ internal sealed partial class ModuleContext
 			AddCompilerGeneratedAttribute(privateImplementationField);
 
 			PrivateImplementationDetails.Fields.Add(privateImplementationField);
+			storedDataFieldCache.Add(fieldName, privateImplementationField);
 		}
 
 		return privateImplementationField;
