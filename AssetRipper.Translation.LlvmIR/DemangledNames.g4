@@ -17,7 +17,7 @@ functionReturnType
     ;
 
 functionDeclaringScope
-    : (typeIdentifier Colon Colon)?
+    : (qualifiedTypeIdentifier Colon Colon)?
     ;
 
 functionParameter
@@ -29,19 +29,19 @@ functionParameters
     | 
     ;
 
-templaceParameter
+templateParameter
     : type Const? And?
     | Number
     ;
 
 template
-    : Less templaceParameter (Comma templaceParameter)* Greater
+    : Less templateParameter (Comma templateParameter)* Greater
     | Less Greater
     | 
     ;
 
 templateNotNull
-    : Less templaceParameter (Comma templaceParameter)* Greater
+    : Less templateParameter (Comma templateParameter)* Greater
     | Less Greater
     ;
 
@@ -51,21 +51,36 @@ functionName
     | functionIdentifier template
     ;
 
+identifier
+    : Identifier
+    | EscapedString
+    ;
+
 functionIdentifier
-    : Tilde? Identifier
-    | ScalarDeletingDestructor
+    : operator
+    | Tilde? identifier+
+    | '_Static' SingleQuote SingleQuote
     ;
 
 type
-    : (Class | Struct | Union)? typeIdentifier Const? (Star | And)*
+    : (Class | Enum | Struct | Union)? qualifiedTypeIdentifier Const? (Star | And)*
+    | type LeftParen Star Const RightParen LeftBracket Number RightBracket // constant array reference
+    | type LeftParen And RightParen LeftBracket Number RightBracket // mutable array reference
+    | type LeftBracket Number RightBracket // array type
+    | type LeftParen vcSpecificModifer Star RightParen LeftParen functionParameters RightParen // function pointer type
     ;
 
 typeIdentifier
     : Void
     | DeclTypeAuto
     | numericType
-    | typeIdentifier Colon Colon Identifier template
-    | Identifier template
+    | identifier+ template
+    | Less identifier+ Greater
+    ;
+
+qualifiedTypeIdentifier
+    : qualifiedTypeIdentifier Colon Colon typeIdentifier
+    | typeIdentifier
     ;
 
 accessModifier
@@ -81,7 +96,6 @@ vcSpecificModifer
     | FastCall
     | ThisCall
     | VectorCall
-    | 
     ;
 
 numericType
@@ -99,6 +113,28 @@ integerType
     | Int64
     | Long Long
     | Long
+    ;
+
+operator
+    : 'operator' operatorName
+    ;
+
+operatorName
+    : 'new' LeftBracket RightBracket
+    | 'delete' LeftBracket RightBracket
+    | 'new'
+    | 'delete'
+    | numericType
+    | Less Less
+    | Greater Greater
+    | Less
+    | Greater
+    | LeftBracket RightBracket
+    | LeftParen RightParen
+    ;
+
+EscapedString
+    : '`' ~[']* '\''
     ;
 
 Bool
@@ -151,10 +187,6 @@ Int64
 
 Long
     : 'long'
-    ;
-
-ScalarDeletingDestructor
-    : '`scalar deleting dtor\''
     ;
 
 Short

@@ -75,11 +75,11 @@ public interface IDemangledNamesVisitor<Result> : IParseTreeVisitor<Result> {
 	/// <return>The visitor result.</return>
 	Result VisitFunctionParameters([NotNull] DemangledNamesParser.FunctionParametersContext context);
 	/// <summary>
-	/// Visit a parse tree produced by <see cref="DemangledNamesParser.templaceParameter"/>.
+	/// Visit a parse tree produced by <see cref="DemangledNamesParser.templateParameter"/>.
 	/// </summary>
 	/// <param name="context">The parse tree.</param>
 	/// <return>The visitor result.</return>
-	Result VisitTemplaceParameter([NotNull] DemangledNamesParser.TemplaceParameterContext context);
+	Result VisitTemplateParameter([NotNull] DemangledNamesParser.TemplateParameterContext context);
 	/// <summary>
 	/// Visit a parse tree produced by <see cref="DemangledNamesParser.template"/>.
 	/// </summary>
@@ -99,6 +99,12 @@ public interface IDemangledNamesVisitor<Result> : IParseTreeVisitor<Result> {
 	/// <return>The visitor result.</return>
 	Result VisitFunctionName([NotNull] DemangledNamesParser.FunctionNameContext context);
 	/// <summary>
+	/// Visit a parse tree produced by <see cref="DemangledNamesParser.identifier"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitIdentifier([NotNull] DemangledNamesParser.IdentifierContext context);
+	/// <summary>
 	/// Visit a parse tree produced by <see cref="DemangledNamesParser.functionIdentifier"/>.
 	/// </summary>
 	/// <param name="context">The parse tree.</param>
@@ -116,6 +122,12 @@ public interface IDemangledNamesVisitor<Result> : IParseTreeVisitor<Result> {
 	/// <param name="context">The parse tree.</param>
 	/// <return>The visitor result.</return>
 	Result VisitTypeIdentifier([NotNull] DemangledNamesParser.TypeIdentifierContext context);
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="DemangledNamesParser.qualifiedTypeIdentifier"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitQualifiedTypeIdentifier([NotNull] DemangledNamesParser.QualifiedTypeIdentifierContext context);
 	/// <summary>
 	/// Visit a parse tree produced by <see cref="DemangledNamesParser.accessModifier"/>.
 	/// </summary>
@@ -140,5 +152,17 @@ public interface IDemangledNamesVisitor<Result> : IParseTreeVisitor<Result> {
 	/// <param name="context">The parse tree.</param>
 	/// <return>The visitor result.</return>
 	Result VisitIntegerType([NotNull] DemangledNamesParser.IntegerTypeContext context);
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="DemangledNamesParser.operator"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitOperator([NotNull] DemangledNamesParser.OperatorContext context);
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="DemangledNamesParser.operatorName"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitOperatorName([NotNull] DemangledNamesParser.OperatorNameContext context);
 }
 } // namespace AssetRipper.Translation.LlvmIR

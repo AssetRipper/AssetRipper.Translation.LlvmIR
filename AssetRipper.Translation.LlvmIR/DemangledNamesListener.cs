@@ -102,15 +102,15 @@ public interface IDemangledNamesListener : IParseTreeListener {
 	/// <param name="context">The parse tree.</param>
 	void ExitFunctionParameters([NotNull] DemangledNamesParser.FunctionParametersContext context);
 	/// <summary>
-	/// Enter a parse tree produced by <see cref="DemangledNamesParser.templaceParameter"/>.
+	/// Enter a parse tree produced by <see cref="DemangledNamesParser.templateParameter"/>.
 	/// </summary>
 	/// <param name="context">The parse tree.</param>
-	void EnterTemplaceParameter([NotNull] DemangledNamesParser.TemplaceParameterContext context);
+	void EnterTemplateParameter([NotNull] DemangledNamesParser.TemplateParameterContext context);
 	/// <summary>
-	/// Exit a parse tree produced by <see cref="DemangledNamesParser.templaceParameter"/>.
+	/// Exit a parse tree produced by <see cref="DemangledNamesParser.templateParameter"/>.
 	/// </summary>
 	/// <param name="context">The parse tree.</param>
-	void ExitTemplaceParameter([NotNull] DemangledNamesParser.TemplaceParameterContext context);
+	void ExitTemplateParameter([NotNull] DemangledNamesParser.TemplateParameterContext context);
 	/// <summary>
 	/// Enter a parse tree produced by <see cref="DemangledNamesParser.template"/>.
 	/// </summary>
@@ -142,6 +142,16 @@ public interface IDemangledNamesListener : IParseTreeListener {
 	/// <param name="context">The parse tree.</param>
 	void ExitFunctionName([NotNull] DemangledNamesParser.FunctionNameContext context);
 	/// <summary>
+	/// Enter a parse tree produced by <see cref="DemangledNamesParser.identifier"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void EnterIdentifier([NotNull] DemangledNamesParser.IdentifierContext context);
+	/// <summary>
+	/// Exit a parse tree produced by <see cref="DemangledNamesParser.identifier"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void ExitIdentifier([NotNull] DemangledNamesParser.IdentifierContext context);
+	/// <summary>
 	/// Enter a parse tree produced by <see cref="DemangledNamesParser.functionIdentifier"/>.
 	/// </summary>
 	/// <param name="context">The parse tree.</param>
@@ -171,6 +181,16 @@ public interface IDemangledNamesListener : IParseTreeListener {
 	/// </summary>
 	/// <param name="context">The parse tree.</param>
 	void ExitTypeIdentifier([NotNull] DemangledNamesParser.TypeIdentifierContext context);
+	/// <summary>
+	/// Enter a parse tree produced by <see cref="DemangledNamesParser.qualifiedTypeIdentifier"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void EnterQualifiedTypeIdentifier([NotNull] DemangledNamesParser.QualifiedTypeIdentifierContext context);
+	/// <summary>
+	/// Exit a parse tree produced by <see cref="DemangledNamesParser.qualifiedTypeIdentifier"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void ExitQualifiedTypeIdentifier([NotNull] DemangledNamesParser.QualifiedTypeIdentifierContext context);
 	/// <summary>
 	/// Enter a parse tree produced by <see cref="DemangledNamesParser.accessModifier"/>.
 	/// </summary>
@@ -211,5 +231,25 @@ public interface IDemangledNamesListener : IParseTreeListener {
 	/// </summary>
 	/// <param name="context">The parse tree.</param>
 	void ExitIntegerType([NotNull] DemangledNamesParser.IntegerTypeContext context);
+	/// <summary>
+	/// Enter a parse tree produced by <see cref="DemangledNamesParser.operator"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void EnterOperator([NotNull] DemangledNamesParser.OperatorContext context);
+	/// <summary>
+	/// Exit a parse tree produced by <see cref="DemangledNamesParser.operator"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void ExitOperator([NotNull] DemangledNamesParser.OperatorContext context);
+	/// <summary>
+	/// Enter a parse tree produced by <see cref="DemangledNamesParser.operatorName"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void EnterOperatorName([NotNull] DemangledNamesParser.OperatorNameContext context);
+	/// <summary>
+	/// Exit a parse tree produced by <see cref="DemangledNamesParser.operatorName"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void ExitOperatorName([NotNull] DemangledNamesParser.OperatorNameContext context);
 }
 } // namespace AssetRipper.Translation.LlvmIR

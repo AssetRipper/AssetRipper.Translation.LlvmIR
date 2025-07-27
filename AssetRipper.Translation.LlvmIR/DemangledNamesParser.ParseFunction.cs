@@ -50,7 +50,7 @@ public partial class DemangledNamesParser
 		else if (declaringScope.GetChild(0).ChildCount > 2)
 		{
 			@namespace = declaringScope.GetChild(0).GetChild(0).GetText(input);
-			typeName = declaringScope.GetChild(0).GetChild(3).GetText(input) + declaringScope.GetChild(0).GetChild(4).GetText(input);
+			typeName = declaringScope.GetChild(0).GetChild(3).GetText(input);
 		}
 		else
 		{
