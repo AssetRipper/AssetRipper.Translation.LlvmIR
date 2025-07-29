@@ -58,13 +58,6 @@ public static unsafe class Translator
 
 	private static ModuleDefinition Translate(LLVMModuleRef module, TranslatorOptions options)
 	{
-		{
-			var globals = module.GetGlobals().ToList();
-			var aliases = module.GetGlobalAliases().ToList();
-			var ifuncs = module.GetGlobalIFuncs().ToList();
-			var metadataList = module.GetNamedMetadata().ToList();
-		}
-
 		CustomModuleDefinition moduleDefinition = new(string.IsNullOrEmpty(options.ModuleName) ? "ConvertedCpp" : options.ModuleName);
 
 		moduleDefinition.AddTargetFrameworkAttributeForDotNet9();
