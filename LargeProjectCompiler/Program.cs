@@ -56,7 +56,7 @@ internal static class Program
 		{
 			outputPath = arguments.Output;
 			string? directory = Path.GetDirectoryName(outputPath);
-			if (directory is not null)
+			if (!string.IsNullOrEmpty(directory))
 			{
 				Directory.CreateDirectory(directory);
 			}
@@ -67,30 +67,58 @@ internal static class Program
 
 		List<string> bcFiles = new(entries.Count);
 
+		string environmentDirectory = Environment.CurrentDirectory;
 		try
 		{
-			foreach (CompileCommand entry in entries)
+			for (int i = 0; i < entries.Count; i++)
 			{
+				CompileCommand entry = entries[i];
+
 				List<string> commandParts = CommandParser.ParseCommand(entry.Command);
 
-				string bcOutputPath = Path.ChangeExtension(entry.File, ".bc");
-				Directory.CreateDirectory(Path.GetDirectoryName(bcOutputPath)!);
-				RewriteCommand(commandParts, bcOutputPath);
+				if (commandParts.Count is 0 || !commandParts[0].Contains("CLANG_~1", StringComparison.Ordinal))
+				{
+					continue; // Skip if not a clang-cl command
+				}
 
-				Console.WriteLine($">> Compiling {Path.GetFileName(entry.File)} -> {bcOutputPath}");
+				if (!arguments.ShouldInclude(entry.File))
+				{
+					continue;
+				}
+
+				Environment.CurrentDirectory = entry.Directory;
+
+				string bcOutputPath = Path.ChangeExtension(entry.Output, ".bc");
+
+				Directory.CreateDirectory(Path.GetDirectoryName(bcOutputPath)!);
+				RewriteCommand(commandParts, bcOutputPath, entry.Output);
+
+				Console.WriteLine($">> Compiling {i + 1}/{entries.Count} {Path.GetFileName(entry.File)} -> {bcOutputPath}");
 				bool success = RunCommand(commandParts, entry.Directory);
 				if (!success)
 				{
 					Console.Error.WriteLine($"Failed to compile {entry.File}");
 					return;
 				}
-				bcFiles.Add(bcOutputPath);
+				if (!File.Exists(bcOutputPath))
+				{
+					Console.Error.WriteLine($"Expected output file {bcOutputPath} does not exist after compilation.");
+					return;
+				}
+				if (HasMain(arguments.MainFunctionDetector, bcOutputPath))
+				{
+					Console.Error.WriteLine($"Main function detected in {bcOutputPath}");
+					return;
+				}
+				bcFiles.Add(Path.GetFullPath(bcOutputPath));
 			}
+
+			Environment.CurrentDirectory = environmentDirectory;
 
 			Console.WriteLine($">> Linking all .bc files into {outputPath}");
 
 			string tempFile = "temp_args.txt";
-			CreateResponseFile(bcFiles.Where(arguments.ShouldInclude), tempFile);
+			CreateResponseFile(bcFiles, tempFile);
 			try
 			{
 				bool linkSuccess = RunCommand([llvmLinkPath, $"@{tempFile}", "-o", outputPath], Directory.GetCurrentDirectory());
@@ -126,7 +154,7 @@ internal static class Program
 		}
 	}
 
-	static void RewriteCommand(List<string> commandParts, string outputPath)
+	static void RewriteCommand(List<string> commandParts, string outputPath, string originalOutputPath)
 	{
 		if (commandParts.Count is 0)
 		{
@@ -136,7 +164,7 @@ internal static class Program
 		for (int i = commandParts.Count - 1; i >= 0; i--)
 		{
 			string part = commandParts[i];
-			if (part is "/nologo" or "-TP" or "/DWIN32" or "/D_WINDOWS" or "/W3" or "/GR" or "/EHsc" or "--" or "-MDd")
+			if (part is "-TP" or "-Zi" or "--" or "-MDd")
 			{
 				// Remove bad parts
 				commandParts.RemoveAt(i);
@@ -146,32 +174,37 @@ internal static class Program
 				// Only one -c is allowed, and we add it later.
 				commandParts.RemoveAt(i);
 			}
-			else if (part.StartsWith("-std:", StringComparison.Ordinal))
-			{
-				commandParts.RemoveAt(i);
-			}
-			else if (part.StartsWith("/W", StringComparison.Ordinal))
-			{
-				commandParts.RemoveAt(i);
-			}
-			else if (part.StartsWith("/w", StringComparison.Ordinal))
-			{
-				commandParts.RemoveAt(i);
-			}
-			else if (part.StartsWith("/Fd", StringComparison.Ordinal))
-			{
-				commandParts.RemoveAt(i);
-			}
 			else if (part.StartsWith("/Fo", StringComparison.Ordinal))
 			{
 				commandParts[i] = "-o";
 				commandParts.Insert(i + 1, outputPath);
 			}
+			else if (part == originalOutputPath)
+			{
+				commandParts[i] = outputPath;
+			}
+			else if (part.StartsWith("-std:", StringComparison.Ordinal))
+			{
+				commandParts[i] = string.Concat("-std=", part.AsSpan("-std:".Length));
+			}
+			else if (part.StartsWith('/'))
+			{
+				commandParts.RemoveAt(i);
+			}
 		}
 
-		commandParts[0] = commandParts[0].Replace("clang-cl", "clang");
+		commandParts[0] = commandParts[0].Replace("CLANG_~1", "clang");
 
 		commandParts.Insert(1, "-c");
+
+		if (!commandParts.Contains("-emit-llvm"))
+		{
+			commandParts.Add("-emit-llvm");
+		}
+		if (!commandParts.Contains("-w"))
+		{
+			commandParts.Add("-w"); // Suppress warnings
+		}
 	}
 
 	[SupportedOSPlatform("windows")]
@@ -209,6 +242,26 @@ internal static class Program
 		proc.WaitForExit();
 
 		return proc.ExitCode == 0;
+	}
+
+	static bool HasMain(string? mainFunctionDetector, string path)
+	{
+		if (string.IsNullOrEmpty(mainFunctionDetector))
+		{
+			return false; // Main function detection is not enabled.
+		}
+
+		ProcessStartInfo psi = new(mainFunctionDetector, [path])
+		{
+			UseShellExecute = false,
+		};
+
+		using Process proc = new() { StartInfo = psi };
+
+		proc.Start();
+		proc.WaitForExit();
+
+		return proc.ExitCode != 0;
 	}
 
 	[SupportedOSPlatform("windows")]

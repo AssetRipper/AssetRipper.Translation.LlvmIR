@@ -19,6 +19,10 @@ internal sealed partial class Arguments
 	[Description("Path to llvm-link")]
 	public string? LlvmLink { get; set; }
 
+	[CommandLineArgument]
+	[Description("Path to MainFunctionDetector")]
+	public string? MainFunctionDetector { get; set; }
+
 	[CommandLineArgument("exclude")]
 	[Description("Paths starting with one of these strings will be excluded from linking.")]
 	public string[]? ExcludePrefixes { get; set; }

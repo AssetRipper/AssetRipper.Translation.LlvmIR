@@ -14,5 +14,5 @@ internal sealed record class CompileCommand
 	public string File { get; set; } = "";
 
 	[JsonPropertyName("output")]
-	public string? Output { get; set; }
+	public string Output { get; set; } = "";
 }
