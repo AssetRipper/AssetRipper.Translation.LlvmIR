@@ -213,7 +213,7 @@ internal sealed partial class ModuleContext
 			TypeDefinition typeDefinition = new(
 				null,
 				"LocalVariables",
-				TypeAttributes.NestedPrivate | TypeAttributes.SequentialLayout | TypeAttributes.BeforeFieldInit,
+				TypeAttributes.NestedPrivate | TypeAttributes.SequentialLayout,
 				Definition.DefaultImporter.ImportType(typeof(ValueType)));
 			function.DeclaringType.NestedTypes.Add(typeDefinition);
 
@@ -278,7 +278,7 @@ internal sealed partial class ModuleContext
 						TypeDefinition typeDefinition = new(
 							Options.GetNamespace("Structures"),
 							type.StructName,
-							TypeAttributes.Public | TypeAttributes.SequentialLayout | TypeAttributes.BeforeFieldInit,
+							TypeAttributes.Public | TypeAttributes.SequentialLayout,
 							Definition.DefaultImporter.ImportType(typeof(ValueType)));
 						Definition.TopLevelTypes.Add(typeDefinition);
 						structContext = new(this, typeDefinition, type);
@@ -619,7 +619,7 @@ internal sealed partial class ModuleContext
 
 	private TypeDefinition CreateStaticType(string name, bool @public)
 	{
-		TypeDefinition typeDefinition = new(Options.GetNamespace(@public ? null : "Implementations"), name, (@public ? TypeAttributes.Public : TypeAttributes.NotPublic) | TypeAttributes.Abstract | TypeAttributes.Sealed | TypeAttributes.BeforeFieldInit, Definition.CorLibTypeFactory.Object.ToTypeDefOrRef());
+		TypeDefinition typeDefinition = new(Options.GetNamespace(@public ? null : "Implementations"), name, (@public ? TypeAttributes.Public : TypeAttributes.NotPublic) | TypeAttributes.Abstract | TypeAttributes.Sealed, Definition.CorLibTypeFactory.Object.ToTypeDefOrRef());
 		Definition.TopLevelTypes.Add(typeDefinition);
 		return typeDefinition;
 	}

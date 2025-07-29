@@ -8,7 +8,6 @@ using AssetRipper.Translation.LlvmIR.Extensions;
 using LLVMSharp.Interop;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
-using System.Runtime.InteropServices;
 
 namespace AssetRipper.Translation.LlvmIR;
 
@@ -46,7 +45,7 @@ internal sealed class GlobalVariableContext : IHasName
 		TypeSignature underlyingType = Module.GetTypeSignature(Type);
 		TypeSignature pointerType = underlyingType.MakePointerType();
 
-		DeclaringType = new TypeDefinition(Module.Options.GetNamespace("GlobalVariables"), Name, TypeAttributes.NotPublic | TypeAttributes.Class | TypeAttributes.Abstract | TypeAttributes.Sealed | TypeAttributes.BeforeFieldInit, Module.Definition.CorLibTypeFactory.Object.ToTypeDefOrRef());
+		DeclaringType = new TypeDefinition(Module.Options.GetNamespace("GlobalVariables"), Name, TypeAttributes.NotPublic | TypeAttributes.Class | TypeAttributes.Abstract | TypeAttributes.Sealed, Module.Definition.CorLibTypeFactory.Object.ToTypeDefOrRef());
 		Module.Definition.TopLevelTypes.Add(DeclaringType);
 		this.AddNameAttributes(DeclaringType);
 
@@ -132,26 +131,16 @@ internal sealed class GlobalVariableContext : IHasName
 	{
 		if (HasSingleOperand)
 		{
-			MethodDefinition initializerMethod = DeclaringType.AddMethod("Initalize", MethodAttributes.Private | MethodAttributes.Static | MethodAttributes.HideBySig, Module.Definition.CorLibTypeFactory.Void);
+			MethodDefinition staticConstructor = DeclaringType.GetOrCreateStaticConstructor();
 			{
-				// https://github.com/icsharpcode/ILSpy/issues/3524
-
-				CilInstructionCollection instructions = initializerMethod.CilMethodBody!.Instructions;
+				CilInstructionCollection instructions = staticConstructor.CilMethodBody!.Instructions;
+				instructions.Clear();
 
 				Module.LoadValue(instructions, Operand);
 				instructions.Add(CilOpCodes.Call, DataSetMethod);
 				instructions.Add(CilOpCodes.Ret);
 
 				instructions.OptimizeMacros();
-			}
-
-			MethodDefinition staticConstructor = DeclaringType.GetOrCreateStaticConstructor();
-			{
-				CilInstructionCollection instructions = staticConstructor.CilMethodBody!.Instructions;
-				instructions.Clear();
-
-				instructions.Add(CilOpCodes.Call, initializerMethod);
-				instructions.Add(CilOpCodes.Ret);
 			}
 		}
 	}

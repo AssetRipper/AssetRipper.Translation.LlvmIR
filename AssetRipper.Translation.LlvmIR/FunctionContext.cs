@@ -29,7 +29,7 @@ internal sealed class FunctionContext : IHasName
 
 	public static FunctionContext Create(LLVMValueRef function, ModuleContext module)
 	{
-		TypeDefinition declaringType = new(module.Options.GetNamespace("GlobalFunctions"), null, TypeAttributes.NotPublic | TypeAttributes.Class | TypeAttributes.Abstract | TypeAttributes.Sealed | TypeAttributes.BeforeFieldInit, module.Definition.CorLibTypeFactory.Object.ToTypeDefOrRef());
+		TypeDefinition declaringType = new(module.Options.GetNamespace("GlobalFunctions"), null, TypeAttributes.NotPublic | TypeAttributes.Class | TypeAttributes.Abstract | TypeAttributes.Sealed, module.Definition.CorLibTypeFactory.Object.ToTypeDefOrRef());
 		module.Definition.TopLevelTypes.Add(declaringType);
 
 		MethodSignature signature = MethodSignature.CreateStatic(null!);
