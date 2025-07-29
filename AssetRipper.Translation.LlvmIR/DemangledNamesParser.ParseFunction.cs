@@ -10,9 +10,9 @@ public partial class DemangledNamesParser
 	public static IParseTree ParseFunction(string input)
 	{
 		ICharStream stream = CharStreams.fromString(input);
-		ITokenSource lexer = new DemangledNamesLexer(stream);
+		ITokenSource lexer = new DemangledNamesLexer(stream, TextWriter.Null, TextWriter.Null);
 		ITokenStream tokens = new CommonTokenStream(lexer);
-		DemangledNamesParser parser = new(tokens);
+		DemangledNamesParser parser = new(tokens, TextWriter.Null, TextWriter.Null);
 		return parser.function();
 	}
 
@@ -40,33 +40,48 @@ public partial class DemangledNamesParser
 			return false;
 		}
 
-		returnType = tree.GetChild(1).GetText(input).ToNullIfEmpty();
-		IParseTree declaringScope = tree.GetChild(3);
-		if (declaringScope.ChildCount == 0)
+		try
 		{
+			returnType = tree.GetChild(1).GetText(input).ToNullIfEmpty();
+			IParseTree declaringScope = tree.GetChild(3);
+			if (declaringScope.ChildCount == 0)
+			{
+				@namespace = null;
+				typeName = null;
+			}
+			else if (declaringScope.GetChild(0).ChildCount > 2)
+			{
+				@namespace = declaringScope.GetChild(0).GetChild(0).GetText(input);
+				typeName = declaringScope.GetChild(0).GetChild(3).GetText(input);
+			}
+			else
+			{
+				@namespace = null;
+				typeName = declaringScope.GetChild(0).GetText(input);
+			}
+			functionIdentifier = tree.GetChild(4).GetChild(0).GetText(input);
+			functionName = tree.GetChild(4).GetChild(0).GetText(input) + tree.GetChild(4).GetChild(1).GetText(input);
+			templateParameters = tree.GetChild(4).GetChild(1).GetText(input).Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+			normalParameters = tree.GetChild(6).GetText(input).Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+			if (normalParameters.Length == 1 && normalParameters[0] == "void")
+			{
+				normalParameters = [];
+			}
+
+			return true;
+		}
+		catch (Exception exception)
+		{
+			Console.Error.WriteLine(exception);
+			returnType = null;
 			@namespace = null;
 			typeName = null;
+			functionIdentifier = null;
+			functionName = null;
+			templateParameters = null;
+			normalParameters = null;
+			return false;
 		}
-		else if (declaringScope.GetChild(0).ChildCount > 2)
-		{
-			@namespace = declaringScope.GetChild(0).GetChild(0).GetText(input);
-			typeName = declaringScope.GetChild(0).GetChild(3).GetText(input);
-		}
-		else
-		{
-			@namespace = null;
-			typeName = declaringScope.GetChild(0).GetText(input);
-		}
-		functionIdentifier = tree.GetChild(4).GetChild(0).GetText(input);
-		functionName = tree.GetChild(4).GetChild(0).GetText(input) + tree.GetChild(4).GetChild(1).GetText(input);
-		templateParameters = tree.GetChild(4).GetChild(1).GetText(input).Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
-		normalParameters = tree.GetChild(6).GetText(input).Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
-		if (normalParameters.Length == 1 && normalParameters[0] == "void")
-		{
-			normalParameters = [];
-		}
-
-		return true;
 	}
 
 	private sealed class ErrorListener : IParseTreeListener
