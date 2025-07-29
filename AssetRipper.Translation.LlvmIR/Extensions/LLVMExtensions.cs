@@ -94,6 +94,37 @@ internal static class LLVMExtensions
 		}
 	}
 
+	public static IEnumerable<LLVMValueRef> GetInstructions(this LLVMValueRef value)
+	{
+		if (value.IsAFunction != default)
+		{
+			return GetFunctionInstructions(value);
+		}
+		else if(value.IsABasicBlock != default)
+		{
+			return value.AsBasicBlock().GetInstructions();
+		}
+		else if (value.IsAInstruction != default)
+		{
+			return [value];
+		}
+		else
+		{
+			return [];
+		}
+
+		static IEnumerable<LLVMValueRef> GetFunctionInstructions(LLVMValueRef function)
+		{
+			foreach (LLVMBasicBlockRef basicBlock in function.GetBasicBlocks())
+			{
+				foreach (LLVMValueRef instruction in basicBlock.GetInstructions())
+				{
+					yield return instruction;
+				}
+			}
+		}
+	}
+
 	public static unsafe LLVMValueRef[] GetOperands(this LLVMValueRef value)
 	{
 		int numOperands = value.OperandCount;

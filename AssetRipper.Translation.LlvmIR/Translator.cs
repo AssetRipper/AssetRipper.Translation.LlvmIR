@@ -106,6 +106,7 @@ public static unsafe class Translator
 
 			CilInstructionCollection instructions = functionContext.Definition.CilMethodBody!.Instructions;
 
+			functionContext.InitializeInstructionData();
 			functionContext.AnalyzeDataFlow();
 
 			if (functionContext.MightThrowAnException)
@@ -136,6 +137,8 @@ public static unsafe class Translator
 			}
 
 			instructions.OptimizeMacros();
+
+			functionContext.ClearInstructionData();
 		}
 
 		// Structs are discovered dynamically, so we need to assign names after all methods are created.

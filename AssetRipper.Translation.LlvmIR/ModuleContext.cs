@@ -158,7 +158,7 @@ internal sealed partial class ModuleContext
 			}
 		}
 
-		if (!anyIntrinsicsUsedThatMightThrow && !Methods.Values.SelectMany(f => f.Instructions).OfType<InvokeInstructionContext>().Any())
+		if (!anyIntrinsicsUsedThatMightThrow && !Methods.Values.SelectMany(f => f.Function.GetInstructions()).Any(i => i.InstructionOpcode == LLVMOpcode.LLVMInvoke))
 		{
 			// If no intrinsic methods that might throw are used, and no invoke instructions are present,
 			// so we can assume that no function pointer calls might throw exceptions.
@@ -177,10 +177,27 @@ internal sealed partial class ModuleContext
 					continue;
 				}
 
-				if (function.Instructions.OfType<BaseCallInstructionContext>().Any(static c => c.CalledFunction is null or { MightThrowAnException: true }))
+				foreach (LLVMValueRef instruction in function.Function.GetInstructions())
 				{
-					function.MightThrowAnException = true;
-					changed = true;
+					if (instruction.InstructionOpcode is not LLVMOpcode.LLVMInvoke and not LLVMOpcode.LLVMCall)
+					{
+						continue;
+					}
+
+					LLVMValueRef calledFunction = instruction.GetOperand((uint)(instruction.OperandCount - 1));
+					if (calledFunction.IsAFunction != default)
+					{
+						if (Methods[calledFunction].MightThrowAnException)
+						{
+							function.MightThrowAnException = true;
+							changed = true;
+						}
+					}
+					else
+					{
+						function.MightThrowAnException = true;
+						changed = true;
+					}
 				}
 			}
 

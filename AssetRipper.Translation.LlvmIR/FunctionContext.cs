@@ -40,27 +40,6 @@ internal sealed class FunctionContext : IHasName
 		Debug.Assert(definition.Signature is not null);
 		FunctionContext context = new(function, definition, module);
 		module.Methods.Add(function, context);
-		foreach (LLVMBasicBlockRef block in function.GetBasicBlocks())
-		{
-			BasicBlockContext blockContext = BasicBlockContext.Create(block, context);
-			context.BasicBlocks.Add(blockContext);
-			context.BasicBlockLookup.Add(block, blockContext);
-			context.Instructions.AddRange(blockContext.Instructions);
-		}
-		context.Instructions.EnsureCapacity(context.Instructions.Count);
-		foreach (InstructionContext instruction in context.Instructions)
-		{
-			context.InstructionLookup.Add(instruction.Instruction, instruction);
-		}
-		foreach (BasicBlockContext basicBlock in context.BasicBlocks)
-		{
-			foreach (LLVMBasicBlockRef successor in basicBlock.Block.GetSuccessors())
-			{
-				BasicBlockContext successorBlock = context.BasicBlockLookup[successor];
-				basicBlock.Successors.Add(successorBlock);
-				successorBlock.Predecessors.Add(basicBlock);
-			}
-		}
 
 		definition.Signature.ReturnType = context.ReturnTypeSignature;
 
@@ -145,7 +124,7 @@ internal sealed class FunctionContext : IHasName
 	public FunctionContext? PersonalityFunction => Function.HasPersonalityFn
 		? Module.Methods.TryGetValue(Function.PersonalityFn)
 		: null;
-	public bool IsIntrinsic => Instructions.Count == 0;
+	public bool IsIntrinsic => Function.BasicBlocksCount == 0;
 	public ParameterContext[] NormalParameters { get; private set; } = [];
 	public VariadicParameterContext? VariadicParameter { get; private set; }
 	public IEnumerable<BaseParameterContext> AllParameters => VariadicParameter is null
@@ -164,6 +143,32 @@ internal sealed class FunctionContext : IHasName
 	public TypeDefinition? LocalVariablesType { get; set; }
 	public CilLocalVariable? StackFrameVariable { get; set; }
 	public MethodDefinition PointerGetMethod { get; set; } = null!;
+
+	public void InitializeInstructionData()
+	{
+		foreach (LLVMBasicBlockRef block in Function.GetBasicBlocks())
+		{
+			BasicBlockContext blockContext = BasicBlockContext.Create(block, this);
+			BasicBlocks.Add(blockContext);
+			BasicBlockLookup.Add(block, blockContext);
+			Instructions.AddRange(blockContext.Instructions);
+		}
+		Instructions.EnsureCapacity(Instructions.Count);
+		foreach (InstructionContext instruction in Instructions)
+		{
+			InstructionLookup.Add(instruction.Instruction, instruction);
+		}
+		foreach (BasicBlockContext basicBlock in BasicBlocks)
+		{
+			foreach (LLVMBasicBlockRef successor in basicBlock.Block.GetSuccessors())
+			{
+				BasicBlockContext successorBlock = BasicBlockLookup[successor];
+				basicBlock.Successors.Add(successorBlock);
+				successorBlock.Predecessors.Add(basicBlock);
+			}
+		}
+
+	}
 
 	public void AnalyzeDataFlow()
 	{
@@ -212,6 +217,14 @@ internal sealed class FunctionContext : IHasName
 				source.Accessors.Add(instruction);
 			}
 		}
+	}
+
+	public void ClearInstructionData()
+	{
+		Instructions.Clear();
+		BasicBlocks.Clear();
+		InstructionLookup.Clear();
+		BasicBlockLookup.Clear();
 	}
 
 	public void AddLocalVariablesPointer(CilInstructionCollection instructions)
