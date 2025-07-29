@@ -22,9 +22,6 @@ internal sealed class FunctionContext : IHasName
 		Definition = definition;
 		Module = module;
 
-		Attributes = AttributeWrapper.FromArray(function.GetAttributesAtIndex(LLVMAttributeIndex.LLVMAttributeFunctionIndex));
-		ReturnAttributes = AttributeWrapper.FromArray(function.GetAttributesAtIndex(LLVMAttributeIndex.LLVMAttributeReturnIndex));
-
 		MangledName = Function.Name;
 		DemangledName = LibLLVMSharp.ValueGetDemangledName(function);
 		CleanName = ExtractCleanName(MangledName, DemangledName, module.Options.RenamedSymbols);
@@ -154,8 +151,8 @@ internal sealed class FunctionContext : IHasName
 	public IEnumerable<BaseParameterContext> AllParameters => VariadicParameter is null
 		? NormalParameters
 		: NormalParameters.Append<BaseParameterContext>(VariadicParameter);
-	public AttributeWrapper[] Attributes { get; }
-	public AttributeWrapper[] ReturnAttributes { get; }
+	public AttributeWrapper[] Attributes => AttributeWrapper.FromArray(Function.GetAttributesAtIndex(LLVMAttributeIndex.LLVMAttributeFunctionIndex));
+	public AttributeWrapper[] ReturnAttributes => AttributeWrapper.FromArray(Function.GetAttributesAtIndex(LLVMAttributeIndex.LLVMAttributeReturnIndex));
 	public MethodDefinition Definition { get; }
 	public TypeDefinition DeclaringType => Definition.DeclaringType!;
 	public ModuleContext Module { get; }
