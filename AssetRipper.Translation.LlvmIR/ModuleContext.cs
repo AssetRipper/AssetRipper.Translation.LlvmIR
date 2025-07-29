@@ -353,7 +353,7 @@ internal sealed partial class ModuleContext
 		{
 			LLVMValueKind.LLVMInstructionValueKind => Methods[value.InstructionParent.Parent].InstructionLookup[value].ResultTypeSignature,
 			LLVMValueKind.LLVMArgumentValueKind => Methods[value.ParamParent].ParameterLookup[value].Definition.ParameterType,
-			LLVMValueKind.LLVMGlobalVariableValueKind => GlobalVariables[value].PointerGetMethod.Signature!.ReturnType,
+			LLVMValueKind.LLVMGlobalVariableValueKind => GlobalVariables[value].PointerField.Signature!.FieldType,
 			_ => GetTypeSignature(value.TypeOf),
 		};
 	}
@@ -399,11 +399,11 @@ internal sealed partial class ModuleContext
 				{
 					GlobalVariableContext global = GlobalVariables[value];
 
-					MethodDefinition pointerGetMethod = global.PointerGetMethod;
+					FieldDefinition pointerField = global.PointerField;
 
-					instructions.Add(CilOpCodes.Call, pointerGetMethod);
+					instructions.Add(CilOpCodes.Ldsfld, pointerField);
 
-					typeSignature = pointerGetMethod.Signature!.ReturnType;
+					typeSignature = pointerField.Signature!.FieldType;
 				}
 				break;
 			case LLVMValueKind.LLVMGlobalAliasValueKind:

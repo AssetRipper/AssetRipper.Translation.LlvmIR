@@ -36,7 +36,7 @@ internal sealed class GlobalVariableContext : IHasName
 	public LLVMValueRef Operand => !HasSingleOperand ? default : GlobalVariable.GetOperand(0);
 	public unsafe LLVMTypeRef Type => LLVM.GlobalGetValueType(GlobalVariable);
 	public TypeDefinition DeclaringType { get; set; } = null!;
-	public MethodDefinition PointerGetMethod { get; set; } = null!;
+	public FieldDefinition PointerField { get; set; } = null!;
 	public MethodDefinition DataGetMethod { get; set; } = null!;
 	public MethodDefinition DataSetMethod { get; set; } = null!;
 
@@ -49,49 +49,10 @@ internal sealed class GlobalVariableContext : IHasName
 		Module.Definition.TopLevelTypes.Add(DeclaringType);
 		this.AddNameAttributes(DeclaringType);
 
-		FieldDefinition pointerField;
+		// Pointer field
 		{
-			pointerField = new FieldDefinition("__pointer", FieldAttributes.Public | FieldAttributes.Static, pointerType);
-			DeclaringType.Fields.Add(pointerField);
-		}
-
-		// Pointer property
-		{
-			PointerGetMethod = new MethodDefinition("get_Pointer", MethodAttributes.Public | MethodAttributes.Static | MethodAttributes.HideBySig | MethodAttributes.SpecialName, MethodSignature.CreateStatic(pointerType));
-			DeclaringType.Methods.Add(PointerGetMethod);
-
-			PropertyDefinition property = new("Pointer", PropertyAttributes.None, PropertySignature.CreateStatic(pointerType));
-			DeclaringType.Properties.Add(property);
-			property.GetMethod = PointerGetMethod;
-
-			PointerGetMethod.CilMethodBody = new(PointerGetMethod);
-			CilInstructionCollection instructions = PointerGetMethod.CilMethodBody.Instructions;
-
-			CilInstructionLabel label = new();
-
-			instructions.Add(CilOpCodes.Ldsfld, pointerField);
-			instructions.Add(CilOpCodes.Ldc_I4_0);
-			instructions.Add(CilOpCodes.Conv_U);
-			instructions.Add(CilOpCodes.Bne_Un, label);
-
-			instructions.Add(CilOpCodes.Sizeof, underlyingType.ToTypeDefOrRef());
-			instructions.Add(CilOpCodes.Call, Module.InjectedTypes[typeof(NativeMemoryHelper)].Methods.First(m =>
-			{
-				return m.Name == nameof(NativeMemoryHelper.Allocate) && m.Parameters[0].ParameterType.ElementType is ElementType.I4;
-			}));
-			instructions.Add(CilOpCodes.Stsfld, pointerField);
-
-			instructions.Add(CilOpCodes.Ldsfld, pointerField);
-			instructions.AddDefaultValue(underlyingType);
-			instructions.AddStoreIndirect(underlyingType);
-
-			instructions.Add(CilOpCodes.Ldsfld, pointerField);
-			instructions.Add(CilOpCodes.Call, Module.InjectedTypes[typeof(PointerIndices)].GetMethodByName(nameof(PointerIndices.Register)));
-
-			label.Instruction = instructions.Add(CilOpCodes.Ldsfld, pointerField);
-			instructions.Add(CilOpCodes.Ret);
-
-			instructions.OptimizeMacros();
+			PointerField = new FieldDefinition("__pointer", FieldAttributes.Public | FieldAttributes.Static, pointerType);
+			DeclaringType.Fields.Add(PointerField);
 		}
 
 		// Data property
@@ -105,7 +66,7 @@ internal sealed class GlobalVariableContext : IHasName
 			DataGetMethod.CilMethodBody = new(DataGetMethod);
 			{
 				CilInstructionCollection instructions = DataGetMethod.CilMethodBody.Instructions;
-				instructions.Add(CilOpCodes.Call, PointerGetMethod);
+				instructions.Add(CilOpCodes.Ldsfld, PointerField);
 				instructions.AddLoadIndirect(underlyingType);
 				instructions.Add(CilOpCodes.Ret);
 			}
@@ -117,7 +78,7 @@ internal sealed class GlobalVariableContext : IHasName
 			DataSetMethod.CilMethodBody = new(DataSetMethod);
 			{
 				CilInstructionCollection instructions = DataSetMethod.CilMethodBody.Instructions;
-				instructions.Add(CilOpCodes.Call, PointerGetMethod);
+				instructions.Add(CilOpCodes.Ldsfld, PointerField);
 				instructions.Add(CilOpCodes.Ldarg_0);
 				instructions.AddStoreIndirect(underlyingType);
 				instructions.Add(CilOpCodes.Ret);
@@ -129,25 +90,44 @@ internal sealed class GlobalVariableContext : IHasName
 
 	public void InitializeData()
 	{
+		TypeSignature underlyingType = Module.GetTypeSignature(Type);
+		MethodDefinition staticConstructor = DeclaringType.GetOrCreateStaticConstructor();
+
+		CilInstructionCollection instructions = staticConstructor.CilMethodBody!.Instructions;
+		instructions.Clear();
+
+		// Initialize pointer field
+		{
+			instructions.Add(CilOpCodes.Sizeof, underlyingType.ToTypeDefOrRef());
+			instructions.Add(CilOpCodes.Call, Module.InjectedTypes[typeof(NativeMemoryHelper)].Methods.First(m =>
+			{
+				return m.Name == nameof(NativeMemoryHelper.Allocate) && m.Parameters[0].ParameterType.ElementType is ElementType.I4;
+			}));
+			instructions.Add(CilOpCodes.Stsfld, PointerField);
+
+			instructions.Add(CilOpCodes.Ldsfld, PointerField);
+			instructions.AddDefaultValue(underlyingType);
+			instructions.AddStoreIndirect(underlyingType);
+
+			instructions.Add(CilOpCodes.Ldsfld, PointerField);
+			instructions.Add(CilOpCodes.Call, Module.InjectedTypes[typeof(PointerIndices)].GetMethodByName(nameof(PointerIndices.Register)));
+		}
+
+		// Initialize data
 		if (HasSingleOperand)
 		{
-			MethodDefinition staticConstructor = DeclaringType.GetOrCreateStaticConstructor();
-			{
-				CilInstructionCollection instructions = staticConstructor.CilMethodBody!.Instructions;
-				instructions.Clear();
-
-				Module.LoadValue(instructions, Operand);
-				instructions.Add(CilOpCodes.Call, DataSetMethod);
-				instructions.Add(CilOpCodes.Ret);
-
-				instructions.OptimizeMacros();
-			}
+			Module.LoadValue(instructions, Operand);
+			instructions.Add(CilOpCodes.Call, DataSetMethod);
 		}
+
+		instructions.Add(CilOpCodes.Ret);
+
+		instructions.OptimizeMacros();
 	}
 
 	public void AddPublicImplementation()
 	{
-		TypeSignature underlyingType = Module.GetTypeSignature(Type);
+		TypeSignature underlyingType = DataGetMethod.Signature!.ReturnType;
 
 		PropertyDefinition property = new(Name, PropertyAttributes.None, PropertySignature.CreateStatic(underlyingType));
 		Module.GlobalMembersType.Properties.Add(property);
