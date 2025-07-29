@@ -27,4 +27,12 @@ internal static class Patches
 		__result = default;
 		return false;
 	}
+
+	[HarmonyPrefix]
+	[HarmonyPatch(typeof(LLVMModuleRef), nameof(LLVMModuleRef.ToString))]
+	public static bool ToStringPatch(ref string __result)
+	{
+		__result = "";
+		return false;
+	}
 }
