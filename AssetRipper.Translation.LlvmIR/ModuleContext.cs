@@ -343,7 +343,7 @@ internal sealed partial class ModuleContext
 				goto default;
 
 			default:
-				throw new NotSupportedException();
+				throw new NotImplementedException(type.Kind.ToString());
 		}
 	}
 
@@ -613,7 +613,7 @@ internal sealed partial class ModuleContext
 				}
 				break;
 			default:
-				throw new NotImplementedException();
+				throw new NotImplementedException(value.Kind.ToString());
 		}
 	}
 
