@@ -325,7 +325,8 @@ internal sealed partial class ModuleContext
 				}
 
 			case LLVMTypeKind.LLVMMetadataTypeKind:
-				goto default;
+				//Metadata is not a real type, so we just use Object. Anywhere metadata is supposed to be loaded, we instead load a null value.
+				return Definition.CorLibTypeFactory.Object;
 
 			case LLVMTypeKind.LLVMTokenTypeKind:
 				return Definition.CorLibTypeFactory.Void;
@@ -602,6 +603,13 @@ internal sealed partial class ModuleContext
 					Parameter parameter = Methods[value.ParamParent].ParameterLookup[value].Definition;
 					instructions.Add(CilOpCodes.Ldarg, parameter);
 					typeSignature = parameter.ParameterType;
+				}
+				break;
+			case LLVMValueKind.LLVMMetadataAsValueValueKind:
+				{
+					//Metadata is not a real type, so we just use Object. Anywhere metadata is supposed to be loaded, we instead load a null value.
+					instructions.Add(CilOpCodes.Ldnull);
+					typeSignature = Definition.CorLibTypeFactory.Object;
 				}
 				break;
 			default:
