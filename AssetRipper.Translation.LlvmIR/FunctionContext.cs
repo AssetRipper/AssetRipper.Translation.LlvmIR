@@ -24,7 +24,7 @@ internal sealed class FunctionContext : IHasName
 
 		MangledName = Function.Name;
 		DemangledName = LibLLVMSharp.ValueGetDemangledName(function);
-		CleanName = ExtractCleanName(MangledName, DemangledName, module.Options.RenamedSymbols);
+		CleanName = ExtractCleanName(MangledName, DemangledName, module.Options.RenamedSymbols, module.Options.ParseDemangledSymbols);
 	}
 
 	public static FunctionContext Create(LLVMValueRef function, ModuleContext module)
@@ -364,7 +364,7 @@ internal sealed class FunctionContext : IHasName
 		return Name;
 	}
 
-	private static string ExtractCleanName(string mangledName, string? demangledName, Dictionary<string, string> renamedSymbols)
+	private static string ExtractCleanName(string mangledName, string? demangledName, Dictionary<string, string> renamedSymbols, bool parseDemangledSymbols)
 	{
 		if (renamedSymbols.TryGetValue(mangledName, out string? result))
 		{
@@ -375,7 +375,7 @@ internal sealed class FunctionContext : IHasName
 			return result;
 		}
 
-		if (!string.IsNullOrEmpty(demangledName) && demangledName != mangledName && DemangledNamesParser.ParseFunction(demangledName, out string? returnType, out _, out string? typeName, out string? functionIdentifier, out string? functionName, out _, out _))
+		if (parseDemangledSymbols && !string.IsNullOrEmpty(demangledName) && demangledName != mangledName && DemangledNamesParser.ParseFunction(demangledName, out string? returnType, out _, out string? typeName, out string? functionIdentifier, out string? functionName, out _, out _))
 		{
 			if (returnType is null && functionName == typeName)
 			{

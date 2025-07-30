@@ -28,6 +28,8 @@ internal static class Program
 			Namespace = args.Namespace,
 			ModuleName = args.ModuleName,
 			ClassName = args.ClassName,
+			ParseDemangledSymbols = args.ParseDemangledSymbols,
+			EmitNameAttributes = args.EmitNameAttributes,
 		};
 		for (int i = 0; i < mangledNames.Length; i++)
 		{

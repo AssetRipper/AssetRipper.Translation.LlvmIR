@@ -19,6 +19,16 @@ public sealed record class TranslatorOptions
 
 	public Dictionary<string, string> RenamedSymbols { get; init; } = new();
 
+	/// <summary>
+	/// If true, demangled names will be parsed in order to extract additional information.
+	/// </summary>
+	public bool ParseDemangledSymbols { get; set; }
+
+	/// <summary>
+	/// If true, name attributes will be included in the output.
+	/// </summary>
+	public bool EmitNameAttributes { get; set; }
+
 	public string? GetNamespace(string? subNamespace)
 	{
 		if (string.IsNullOrEmpty(Namespace))

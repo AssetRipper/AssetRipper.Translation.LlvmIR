@@ -28,6 +28,11 @@ internal static class IHasNameExtensions
 {
 	public static void AddNameAttributes(this IHasName hasName, IHasCustomAttribute definition)
 	{
+		if (!hasName.Module.Options.EmitNameAttributes)
+		{
+			return;
+		}
+
 		if (hasName.MangledName != hasName.Name)
 		{
 			MethodDefinition constructor = hasName.Module.InjectedTypes[typeof(MangledNameAttribute)].GetMethodByName(".ctor");

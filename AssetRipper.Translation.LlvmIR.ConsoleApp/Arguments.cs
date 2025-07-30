@@ -34,4 +34,12 @@ sealed partial class Arguments
 	[CommandLineArgument]
 	[Description("The path to the output directory for C# decompilation. If provided, a dll will not be saved.")]
 	public string? DecompileDirectory { get; set; }
+
+	[CommandLineArgument(DefaultValue = true)]
+	[Description("If true, demangled names will be parsed in order to extract additional information.")]
+	public bool ParseDemangledSymbols { get; set; }
+
+	[CommandLineArgument(DefaultValue = true)]
+	[Description("If true, name attributes will be included in the output.")]
+	public bool EmitNameAttributes { get; set; }
 }
