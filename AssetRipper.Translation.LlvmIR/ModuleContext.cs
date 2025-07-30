@@ -579,7 +579,7 @@ internal sealed partial class ModuleContext
 				{
 					typeSignature = GetTypeSignature(value.TypeOf);
 
-					instructions.Add(CilOpCodes.Call, Methods[value].PointerGetMethod);
+					Methods[value].AddLoadFunctionPointer(instructions);
 				}
 				break;
 			case LLVMValueKind.LLVMConstantExprValueKind:

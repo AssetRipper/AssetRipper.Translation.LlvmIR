@@ -139,6 +139,11 @@ public static unsafe class Translator
 			functionContext.ClearInstructionData();
 		}
 
+		foreach (FunctionContext functionContext in moduleContext.Methods.Values)
+		{
+			functionContext.RemovePointerFieldIfNotUsed();
+		}
+
 		// Structs are discovered dynamically, so we need to assign names after all methods are created.
 		moduleContext.AssignStructNames();
 

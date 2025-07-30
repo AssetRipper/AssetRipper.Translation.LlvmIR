@@ -98,7 +98,9 @@ internal sealed class FunctionContext : IHasName
 			declaringType.Properties.Add(property);
 			property.GetMethod = getMethod;
 
+			context.PointerField = pointerField;
 			context.PointerGetMethod = getMethod;
+			context.PointerProperty = property;
 		}
 
 		return context;
@@ -142,7 +144,10 @@ internal sealed class FunctionContext : IHasName
 	public Dictionary<LLVMBasicBlockRef, BasicBlockContext> BasicBlockLookup { get; } = new();
 	public TypeDefinition? LocalVariablesType { get; set; }
 	public CilLocalVariable? StackFrameVariable { get; set; }
-	public MethodDefinition PointerGetMethod { get; set; } = null!;
+	private MethodDefinition PointerGetMethod { get; set; } = null!;
+	private FieldDefinition PointerField { get; set; } = null!;
+	private PropertyDefinition PointerProperty { get; set; } = null!;
+	private bool IsPointerFieldUsed { get; set; } = false;
 
 	public void InitializeInstructionData()
 	{
@@ -241,6 +246,25 @@ internal sealed class FunctionContext : IHasName
 		Debug.Assert(StackFrameVariable is not null);
 		instructions.Add(CilOpCodes.Ldloca, StackFrameVariable);
 		instructions.Add(CilOpCodes.Call, Module.InjectedTypes[typeof(StackFrame)].GetMethodByName(nameof(StackFrame.GetLocalsRef)).MakeGenericInstanceMethod(LocalVariablesType.ToTypeSignature()));
+	}
+
+	public void AddLoadFunctionPointer(CilInstructionCollection instructions)
+	{
+		IsPointerFieldUsed = true;
+		instructions.Add(CilOpCodes.Call, PointerGetMethod);
+	}
+
+	public void RemovePointerFieldIfNotUsed()
+	{
+		if (!IsPointerFieldUsed)
+		{
+			DeclaringType.Fields.Remove(PointerField);
+			DeclaringType.Methods.Remove(PointerGetMethod);
+			DeclaringType.Properties.Remove(PointerProperty);
+			PointerField = null!;
+			PointerGetMethod = null!;
+			PointerProperty = null!;
+		}
 	}
 
 	public void AddPublicImplementation()
