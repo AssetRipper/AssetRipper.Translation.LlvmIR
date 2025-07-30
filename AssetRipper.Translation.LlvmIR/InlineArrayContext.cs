@@ -215,13 +215,18 @@ internal sealed class InlineArrayContext
 			const string propertyName = nameof(IInlineArray<>.Length);
 			const string methodName = $"get_{propertyName}";
 			MethodSignature methodSignature = MethodSignature.CreateStatic(Module.Definition.CorLibTypeFactory.Int32);
-			PropertySignature propertySignature = PropertySignature.CreateStatic(Module.Definition.CorLibTypeFactory.Int32);
 
 			GenericInstanceTypeSignature interfaceType = Module.InlineArrayInterface.MakeGenericInstanceType(elementType);
 
 			Type.Interfaces.Add(new InterfaceImplementation(interfaceType.ToTypeDefOrRef()));
 
 			MemberReference interfaceMethod = new(interfaceType.ToTypeDefOrRef(), methodName, methodSignature);
+
+			if (@explicit && Length == length)
+			{
+				Type.MethodImplementations.Add(new MethodImplementation(interfaceMethod, Type.GetMethodByName(methodName)));
+				return;
+			}
 
 			string prefix;
 			MethodAttributes attributes;
@@ -250,7 +255,7 @@ internal sealed class InlineArrayContext
 			Type.Methods.Add(method);
 			Type.MethodImplementations.Add(new MethodImplementation(interfaceMethod, method));
 
-			PropertyDefinition property = new(prefix + propertyName, PropertyAttributes.None, propertySignature);
+			PropertyDefinition property = new(prefix + propertyName, PropertyAttributes.None, PropertySignature.CreateStatic(Module.Definition.CorLibTypeFactory.Int32));
 			property.GetMethod = method;
 			Type.Properties.Add(property);
 		}
