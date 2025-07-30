@@ -35,10 +35,16 @@ internal sealed class GlobalVariableContext : IHasName
 	public bool HasSingleOperand => GlobalVariable.OperandCount == 1;
 	public LLVMValueRef Operand => !HasSingleOperand ? default : GlobalVariable.GetOperand(0);
 	public unsafe LLVMTypeRef Type => LLVM.GlobalGetValueType(GlobalVariable);
+	public TypeSignature PointerType => PointerField?.Signature?.FieldType ?? DataGetMethod.Signature!.ReturnType.MakePointerType();
 	public TypeDefinition DeclaringType { get; set; } = null!;
-	public FieldDefinition PointerField { get; set; } = null!;
+	private FieldDefinition PointerField { get; set; } = null!;
 	public MethodDefinition DataGetMethod { get; set; } = null!;
 	public MethodDefinition DataSetMethod { get; set; } = null!;
+	private bool PointerIsUsed { get; set; } = false;
+	/// <summary>
+	/// The number of instructions in the static constructor for initializing the pointer field.
+	/// </summary>
+	private int PointerInstructionsCount { get; set; } = 0;
 
 	public void CreateProperties()
 	{
@@ -113,6 +119,8 @@ internal sealed class GlobalVariableContext : IHasName
 			instructions.Add(CilOpCodes.Call, Module.InjectedTypes[typeof(PointerIndices)].GetMethodByName(nameof(PointerIndices.Register)));
 		}
 
+		PointerInstructionsCount = instructions.Count;
+
 		// Initialize data
 		if (HasSingleOperand)
 		{
@@ -157,6 +165,43 @@ internal sealed class GlobalVariableContext : IHasName
 		property.SetSemanticMethods(getMethod, setMethod);
 
 		this.AddNameAttributes(property);
+	}
+
+	public void AddLoadPointer(CilInstructionCollection instructions)
+	{
+		PointerIsUsed = true;
+		instructions.Add(CilOpCodes.Ldsfld, PointerField);
+	}
+
+	public void RemovePointerFieldIfNotUsed()
+	{
+		if (!PointerIsUsed)
+		{
+			DeclaringType.Fields.Remove(PointerField);
+			PointerField = null!;
+			DeclaringType.GetStaticConstructor()!.CilMethodBody!.Instructions.RemoveRange(0, PointerInstructionsCount);
+			PointerInstructionsCount = 0;
+
+			FieldDefinition backingField = new("__value", FieldAttributes.Private | FieldAttributes.Static, DataGetMethod.Signature!.ReturnType);
+			DeclaringType.Fields.Add(backingField);
+
+			// Update the get method
+			{
+				CilInstructionCollection instructions = DataGetMethod.CilMethodBody!.Instructions;
+				instructions.Clear();
+				instructions.Add(CilOpCodes.Ldsfld, backingField);
+				instructions.Add(CilOpCodes.Ret);
+			}
+
+			// Update the set method
+			{
+				CilInstructionCollection instructions = DataSetMethod.CilMethodBody!.Instructions;
+				instructions.Clear();
+				instructions.Add(CilOpCodes.Ldarg_0);
+				instructions.Add(CilOpCodes.Stsfld, backingField);
+				instructions.Add(CilOpCodes.Ret);
+			}
+		}
 	}
 
 	private static string ExtractCleanName(string mangledName, string? demangledName, Dictionary<string, string> renamedSymbols)

@@ -353,7 +353,7 @@ internal sealed partial class ModuleContext
 		{
 			LLVMValueKind.LLVMInstructionValueKind => Methods[value.InstructionParent.Parent].InstructionLookup[value].ResultTypeSignature,
 			LLVMValueKind.LLVMArgumentValueKind => Methods[value.ParamParent].ParameterLookup[value].Definition.ParameterType,
-			LLVMValueKind.LLVMGlobalVariableValueKind => GlobalVariables[value].PointerField.Signature!.FieldType,
+			LLVMValueKind.LLVMGlobalVariableValueKind => GlobalVariables[value].PointerType,
 			_ => GetTypeSignature(value.TypeOf),
 		};
 	}
@@ -399,11 +399,9 @@ internal sealed partial class ModuleContext
 				{
 					GlobalVariableContext global = GlobalVariables[value];
 
-					FieldDefinition pointerField = global.PointerField;
+					global.AddLoadPointer(instructions);
 
-					instructions.Add(CilOpCodes.Ldsfld, pointerField);
-
-					typeSignature = pointerField.Signature!.FieldType;
+					typeSignature = global.PointerType;
 				}
 				break;
 			case LLVMValueKind.LLVMGlobalAliasValueKind:

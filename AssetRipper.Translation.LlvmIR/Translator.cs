@@ -139,6 +139,11 @@ public static unsafe class Translator
 			functionContext.ClearInstructionData();
 		}
 
+		foreach (GlobalVariableContext globalVariableContext in moduleContext.GlobalVariables.Values)
+		{
+			globalVariableContext.RemovePointerFieldIfNotUsed();
+		}
+
 		foreach (FunctionContext functionContext in moduleContext.Methods.Values)
 		{
 			functionContext.RemovePointerFieldIfNotUsed();
