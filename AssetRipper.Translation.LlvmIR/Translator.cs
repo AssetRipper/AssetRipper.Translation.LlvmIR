@@ -122,11 +122,16 @@ public static unsafe class Translator
 			// Add instructions to the method bodies
 			foreach (BasicBlockContext basicBlock in functionContext.BasicBlocks)
 			{
-				basicBlock.Label.Instruction = instructions.Add(CilOpCodes.Nop);
+				int currentIndex = instructions.Count;
+
 				foreach (InstructionContext instructionContext in basicBlock.Instructions)
 				{
 					instructionContext.AddInstructions(instructions);
 				}
+
+				basicBlock.Label.Instruction = instructions.Count > currentIndex
+					? instructions[currentIndex]
+					: instructions.Add(CilOpCodes.Nop);
 			}
 
 			instructions.OptimizeMacros();
