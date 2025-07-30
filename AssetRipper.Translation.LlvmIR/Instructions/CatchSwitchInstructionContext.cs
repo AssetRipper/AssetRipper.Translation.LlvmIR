@@ -45,18 +45,27 @@ internal sealed class CatchSwitchInstructionContext : InstructionContext
 		Debug.Assert(Function.PersonalityFunction.IsVariadic);
 		Debug.Assert(CatchPads.Count > 0);
 
-		foreach (CatchPadInstructionContext catchPad in CatchPads)
+		CilInstructionLabel? currentLabel = null;
+		for (int i = 0; i < CatchPads.Count; i++)
 		{
-			CilInstructionLabel label = new();
+			CatchPadInstructionContext catchPad = CatchPads[i];
+			CilInstructionLabel? previousLabel = currentLabel;
+			currentLabel = new();
+
+			int startIndex = instructions.Count;
+
 			CilLocalVariable argumentsInReadOnlySpan = BaseCallInstructionContext.LoadVariadicArguments(instructions, Module, catchPad.Arguments);
 			// Call personality function
 			instructions.Add(CilOpCodes.Ldloc, argumentsInReadOnlySpan);
 			instructions.Add(CilOpCodes.Call, Function.PersonalityFunction.Definition);
-			instructions.Add(CilOpCodes.Brtrue, label);
+			instructions.Add(CilOpCodes.Brtrue, currentLabel);
 			AddLoadIfBranchingToPhi(instructions, catchPad.BasicBlock!);
 			instructions.Add(CilOpCodes.Br, Function.BasicBlockLookup[catchPad.BasicBlockRef].Label);
-			label.Instruction = instructions.Add(CilOpCodes.Nop);
+
+			previousLabel?.Instruction = instructions[startIndex];
 		}
+
+		int defaultIndex = instructions.Count;
 
 		if (HasDefaultUnwind)
 		{
@@ -70,6 +79,8 @@ internal sealed class CatchSwitchInstructionContext : InstructionContext
 			instructions.AddDefaultValue(Function.ReturnTypeSignature);
 			instructions.Add(CilOpCodes.Ret);
 		}
+
+		currentLabel?.Instruction = instructions[defaultIndex];
 	}
 
 	private enum ExceptionDisposition

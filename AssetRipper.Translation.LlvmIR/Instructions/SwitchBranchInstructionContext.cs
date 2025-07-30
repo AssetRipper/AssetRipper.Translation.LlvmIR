@@ -33,6 +33,10 @@ internal sealed class SwitchBranchInstructionContext : BranchInstructionContext
 		Debug.Assert(DefaultBlock is not null);
 
 		Module.LoadValue(instructions, IndexOperand, out TypeSignature indexTypeSignature);
+		if (indexTypeSignature is not CorLibTypeSignature)
+		{
+			throw new NotSupportedException($"Switch index type '{indexTypeSignature}' is not currently supported.");
+		}
 		CilLocalVariable indexLocal = instructions.AddLocalVariable(indexTypeSignature);
 		instructions.Add(CilOpCodes.Stloc, indexLocal);
 
@@ -54,16 +58,18 @@ internal sealed class SwitchBranchInstructionContext : BranchInstructionContext
 		{
 			BasicBlockContext targetBlock = Function.BasicBlockLookup[Cases[i].Target.AsBasicBlock()];
 
-			caseLabels[i].Instruction = instructions.Add(CilOpCodes.Nop);
+			int caseIndex = instructions.Count;
 			AddLoadIfBranchingToPhi(instructions, targetBlock);
 			instructions.Add(CilOpCodes.Br, Function.BasicBlockLookup[targetBlock.Block].Label);
+			caseLabels[i].Instruction = instructions[caseIndex];
 		}
 
 		// Default case
 		{
-			defaultLabel.Instruction = instructions.Add(CilOpCodes.Nop);
+			int defaultIndex = instructions.Count;
 			AddLoadIfBranchingToPhi(instructions, DefaultBlock);
 			instructions.Add(CilOpCodes.Br, Function.BasicBlockLookup[DefaultBlockRef].Label);
+			defaultLabel.Instruction = instructions[defaultIndex];
 		}
 	}
 }

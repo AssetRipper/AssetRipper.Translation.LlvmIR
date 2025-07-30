@@ -26,10 +26,12 @@ internal sealed class SelectInstructionContext : InstructionContext
 		Module.LoadValue(instructions, TrueOperand);
 		instructions.Add(CilOpCodes.Br, endLabel);
 
-		falseLabel.Instruction = instructions.Add(CilOpCodes.Nop);
+		int falseIndex = instructions.Count;
 		Module.LoadValue(instructions, FalseOperand);
+		falseLabel.Instruction = instructions[falseIndex];
 
-		endLabel.Instruction = instructions.Add(CilOpCodes.Nop);
+		int endIndex = instructions.Count;
 		AddStore(instructions);
+		endLabel.Instruction = instructions[endIndex];
 	}
 }

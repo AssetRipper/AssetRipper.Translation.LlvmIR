@@ -31,22 +31,25 @@ internal sealed class ConditionalBranchInstructionContext : BranchInstructionCon
 		Debug.Assert(TrueBlock is not null);
 		Debug.Assert(FalseBlock is not null);
 
+		CilInstructionLabel? falseLabel;
 		if (TargetBlockStartsWithPhi(TrueBlock))
 		{
-			CilInstructionLabel falseLabel = new();
+			falseLabel = new();
 			instructions.Add(CilOpCodes.Brfalse, falseLabel);
 
 			AddLoadIfBranchingToPhi(instructions, TrueBlock);
 			instructions.Add(CilOpCodes.Br, Function.BasicBlockLookup[TrueBlockRef].Label);
-
-			falseLabel.Instruction = instructions.Add(CilOpCodes.Nop);
 		}
 		else
 		{
+			falseLabel = null;
 			instructions.Add(CilOpCodes.Brtrue, Function.BasicBlockLookup[TrueBlockRef].Label);
 		}
 
+		int falseIndex = instructions.Count;
 		AddLoadIfBranchingToPhi(instructions, FalseBlock);
 		instructions.Add(CilOpCodes.Br, Function.BasicBlockLookup[FalseBlockRef].Label);
+
+		falseLabel?.Instruction = instructions[falseIndex];
 	}
 }

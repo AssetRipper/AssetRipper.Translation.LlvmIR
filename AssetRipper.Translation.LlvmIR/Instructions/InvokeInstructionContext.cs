@@ -41,9 +41,10 @@ internal sealed class InvokeInstructionContext : BaseCallInstructionContext
 
 		// else branch to the default block
 		{
-			defaultLabel.Instruction = instructions.Add(CilOpCodes.Nop);
+			int currentIndex = instructions.Count;
 			AddLoadIfBranchingToPhi(instructions, DefaultBlock);
 			instructions.Add(CilOpCodes.Br, Function.BasicBlockLookup[DefaultBlockRef].Label);
+			defaultLabel.Instruction = instructions[currentIndex];
 		}
 	}
 }
