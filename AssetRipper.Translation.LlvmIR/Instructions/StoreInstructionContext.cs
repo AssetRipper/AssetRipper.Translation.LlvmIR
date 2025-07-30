@@ -4,6 +4,7 @@ using AsmResolver.PE.DotNet.Cil;
 using AssetRipper.CIL;
 using LLVMSharp.Interop;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 
 namespace AssetRipper.Translation.LlvmIR.Instructions;
 
@@ -60,11 +61,22 @@ internal sealed class StoreInstructionContext : InstructionContext
 				instructions.AddStoreIndirect(StoreTypeSignature);
 			}
 		}
+		else if (IsDestinationGlobalVariable(out GlobalVariableContext? globalVariable))
+		{
+			Module.LoadValue(instructions, SourceOperand);
+			instructions.Add(CilOpCodes.Call, globalVariable.DataSetMethod);
+		}
 		else
 		{
 			Module.LoadValue(instructions, DestinationOperand);
 			Module.LoadValue(instructions, SourceOperand);
 			instructions.AddStoreIndirect(StoreTypeSignature);
 		}
+	}
+
+	private bool IsDestinationGlobalVariable([NotNullWhen(true)] out GlobalVariableContext? globalVariable)
+	{
+		globalVariable = Module.GlobalVariables.TryGetValue(DestinationOperand);
+		return globalVariable is not null && SignatureComparer.Default.Equals(globalVariable.DataGetMethod.Signature?.ReturnType, StoreTypeSignature);
 	}
 }
