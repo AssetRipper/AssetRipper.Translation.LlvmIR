@@ -51,7 +51,7 @@ internal abstract class BaseCallInstructionContext : InstructionContext
 		{
 			Debug.Assert(functionCalled.IsVoidReturn);
 		}
-		else if (functionCalled.MangledName is "llvm.va_start")
+		else if (functionCalled.MangledName is "llvm.va_start.p0")
 		{
 			Debug.Assert(functionCalled.IsVoidReturn && functionCalled.NormalParameters.Length is 1);
 
@@ -102,7 +102,7 @@ internal abstract class BaseCallInstructionContext : InstructionContext
 
 	private static bool IsInvisibleFunction(FunctionContext functionCalled)
 	{
-		return functionCalled.MangledName is "llvm.va_end";
+		return functionCalled.MangledName is "llvm.va_end.p0";
 	}
 
 	/// <summary>
