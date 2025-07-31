@@ -1,6 +1,7 @@
 ﻿using AsmResolver.DotNet.Code.Cil;
 using AsmResolver.DotNet.Signatures;
 using AsmResolver.PE.DotNet.Cil;
+using AsmResolver.PE.DotNet.Metadata.Tables;
 using AssetRipper.CIL;
 using LLVMSharp.Interop;
 using System.Diagnostics;
@@ -26,6 +27,27 @@ internal sealed class SwitchBranchInstructionContext : BranchInstructionContext
 			return MemoryMarshal.Cast<LLVMValueRef, (LLVMValueRef Case, LLVMValueRef Target)>(Operands.AsSpan(2));
 		}
 	}
+	private bool IsSequentialAndZeroBased
+	{
+		get
+		{
+			for (int i = 0; i < Cases.Length; i++)
+			{
+				LLVMValueRef caseValue = Cases[i].Case;
+				if (caseValue.Kind is not LLVMValueKind.LLVMConstantIntValueKind || caseValue.ConstIntSExt != i)
+				{
+					return false; // Not a constant integer or not sequential
+				}
+			}
+			return true;
+		}
+	}
+
+	private BasicBlockContext GetCaseTargetBlock(int index)
+	{
+		Debug.Assert(Function is not null);
+		return Function.BasicBlockLookup[Cases[index].Target.AsBasicBlock()];
+	}
 
 	public override void AddInstructions(CilInstructionCollection instructions)
 	{
@@ -40,36 +62,63 @@ internal sealed class SwitchBranchInstructionContext : BranchInstructionContext
 		CilLocalVariable indexLocal = instructions.AddLocalVariable(indexTypeSignature);
 		instructions.Add(CilOpCodes.Stloc, indexLocal);
 
+		bool[] hasPhi = new bool[Cases.Length];
 		CilInstructionLabel[] caseLabels = new CilInstructionLabel[Cases.Length];
-		for (int i = 0; i < Cases.Length; i++)
+		for (int i = 0; i < caseLabels.Length; i++)
 		{
-			caseLabels[i] = new();
-
-			instructions.Add(CilOpCodes.Ldloc, indexLocal);
-			Module.LoadValue(instructions, Cases[i].Case);
-			instructions.Add(CilOpCodes.Ceq);
-			instructions.Add(CilOpCodes.Brtrue, caseLabels[i]);
+			BasicBlockContext targetBlock = GetCaseTargetBlock(i);
+			if (TargetBlockStartsWithPhi(targetBlock))
+			{
+				hasPhi[i] = true;
+				caseLabels[i] = new();
+			}
+			else
+			{
+				hasPhi[i] = false;
+				caseLabels[i] = targetBlock.Label;
+			}
 		}
 
-		CilInstructionLabel defaultLabel = new();
+		bool defaultHasPhi = TargetBlockStartsWithPhi(DefaultBlock);
+		CilInstructionLabel defaultLabel = defaultHasPhi ? new() : DefaultBlock.Label;
+
+		if (IsSequentialAndZeroBased && indexTypeSignature is CorLibTypeSignature { ElementType: ElementType.I4 or ElementType.U4 })
+		{
+			instructions.Add(CilOpCodes.Ldloc, indexLocal);
+			instructions.Add(CilOpCodes.Switch, caseLabels);
+		}
+		else
+		{
+			for (int i = 0; i < Cases.Length; i++)
+			{
+				instructions.Add(CilOpCodes.Ldloc, indexLocal);
+				Module.LoadValue(instructions, Cases[i].Case);
+				instructions.Add(CilOpCodes.Ceq);
+				instructions.Add(CilOpCodes.Brtrue, caseLabels[i]);
+			}
+		}
+
 		instructions.Add(CilOpCodes.Br, defaultLabel);
 
-		for (int i = 0; i < Cases.Length; i++)
+		for (int i = 0; i < caseLabels.Length; i++)
 		{
-			BasicBlockContext targetBlock = Function.BasicBlockLookup[Cases[i].Target.AsBasicBlock()];
+			if (hasPhi[i])
+			{
+				BasicBlockContext targetBlock = GetCaseTargetBlock(i);
 
-			int caseIndex = instructions.Count;
-			AddLoadIfBranchingToPhi(instructions, targetBlock);
-			instructions.Add(CilOpCodes.Br, Function.BasicBlockLookup[targetBlock.Block].Label);
-			caseLabels[i].Instruction = instructions[caseIndex];
+				int currentIndex = instructions.Count;
+				AddLoadIfBranchingToPhi(instructions, targetBlock);
+				instructions.Add(CilOpCodes.Br, targetBlock.Label);
+				caseLabels[i].Instruction = instructions[currentIndex];
+			}
 		}
 
-		// Default case
+		if (defaultHasPhi)
 		{
-			int defaultIndex = instructions.Count;
+			int currentIndex = instructions.Count;
 			AddLoadIfBranchingToPhi(instructions, DefaultBlock);
-			instructions.Add(CilOpCodes.Br, Function.BasicBlockLookup[DefaultBlockRef].Label);
-			defaultLabel.Instruction = instructions[defaultIndex];
+			instructions.Add(CilOpCodes.Br, DefaultBlock.Label);
+			defaultLabel.Instruction = instructions[currentIndex];
 		}
 	}
 }
