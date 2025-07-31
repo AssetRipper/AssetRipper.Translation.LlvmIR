@@ -31,25 +31,40 @@ internal sealed class ConditionalBranchInstructionContext : BranchInstructionCon
 		Debug.Assert(TrueBlock is not null);
 		Debug.Assert(FalseBlock is not null);
 
-		CilInstructionLabel? falseLabel;
-		if (TargetBlockStartsWithPhi(TrueBlock))
+		if (!TargetBlockStartsWithPhi(TrueBlock))
 		{
-			falseLabel = new();
+			// The true block does not start with a phi instruction.
+			// The false block might or might not start with a phi instruction.
+
+			instructions.Add(CilOpCodes.Brtrue, TrueBlock.Label);
+
+			AddLoadIfBranchingToPhi(instructions, FalseBlock);
+			instructions.Add(CilOpCodes.Br, FalseBlock.Label);
+		}
+		else if (!TargetBlockStartsWithPhi(FalseBlock))
+		{
+			// Only the true block starts with a phi instruction.
+
+			instructions.Add(CilOpCodes.Brfalse, FalseBlock.Label);
+
+			AddLoadIfBranchingToPhi(instructions, TrueBlock);
+			instructions.Add(CilOpCodes.Br, TrueBlock.Label);
+		}
+		else
+		{
+			// Both target blocks start with a phi instruction.
+
+			CilInstructionLabel falseLabel = new();
 			instructions.Add(CilOpCodes.Brfalse, falseLabel);
 
 			AddLoadIfBranchingToPhi(instructions, TrueBlock);
 			instructions.Add(CilOpCodes.Br, Function.BasicBlockLookup[TrueBlockRef].Label);
-		}
-		else
-		{
-			falseLabel = null;
-			instructions.Add(CilOpCodes.Brtrue, Function.BasicBlockLookup[TrueBlockRef].Label);
-		}
 
-		int falseIndex = instructions.Count;
-		AddLoadIfBranchingToPhi(instructions, FalseBlock);
-		instructions.Add(CilOpCodes.Br, Function.BasicBlockLookup[FalseBlockRef].Label);
+			int falseIndex = instructions.Count;
+			AddLoadIfBranchingToPhi(instructions, FalseBlock);
+			instructions.Add(CilOpCodes.Br, Function.BasicBlockLookup[FalseBlockRef].Label);
 
-		falseLabel?.Instruction = instructions[falseIndex];
+			falseLabel.Instruction = instructions[falseIndex];
+		}
 	}
 }
