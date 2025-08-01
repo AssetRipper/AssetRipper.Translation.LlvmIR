@@ -39,14 +39,18 @@ internal static class ExecutionHelpers
 
 				foreach (Type type in assembly.GetTypes().Where(t => t.Namespace == "GlobalVariables"))
 				{
-					foreach (FieldInfo field in type.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static))
+					FieldInfo? field = type.GetField("__pointer", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
+					if (field is null)
 					{
-						Pointer pointer = (Pointer)field.GetValue(null)!;
-						IntPtr value = (IntPtr)Pointer.Unbox(pointer);
-						if (value != IntPtr.Zero)
-						{
-							Marshal.FreeHGlobal(value);
-						}
+						// Some global variables don't have a pointer field because the pointer is never used.
+						continue;
+					}
+
+					Pointer pointer = (Pointer)field.GetValue(null)!;
+					IntPtr value = (IntPtr)Pointer.Unbox(pointer);
+					if (value != IntPtr.Zero)
+					{
+						Marshal.FreeHGlobal(value);
 					}
 				}
 			}
