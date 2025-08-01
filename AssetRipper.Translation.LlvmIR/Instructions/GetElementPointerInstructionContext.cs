@@ -33,11 +33,6 @@ internal sealed class GetElementPointerInstructionContext : InstructionContext
 		//This is the pointer. It's generally void* due to stripping.
 		Module.LoadValue(instructions, SourceOperand);//Pointer
 
-		//This isn't strictly necessary, but it might make ILSpy output better someday.
-		CilLocalVariable pointerLocal = instructions.AddLocalVariable(SourceElementTypeSignature.MakePointerType());
-		instructions.Add(CilOpCodes.Stloc, pointerLocal);
-		instructions.Add(CilOpCodes.Ldloc, pointerLocal);
-
 		//This is the index, which might be a constant.
 		Module.LoadValue(instructions, Operands[1]);
 		CilInstruction previousInstruction = instructions[^1];
@@ -83,6 +78,17 @@ internal sealed class GetElementPointerInstructionContext : InstructionContext
 		for (int i = 2; i < Operands.Length; i++)
 		{
 			LLVMValueRef operand = Operands[i];
+			LLVMTypeRef operandType = operand.TypeOf;
+
+			if (operandType.Kind != LLVMTypeKind.LLVMIntegerTypeKind)
+			{
+				throw new NotSupportedException("Non integer indices are not allowed.");
+			}
+			if (operandType.IntWidth is not 8 and not 16 and not 32 and not 64)
+			{
+				throw new NotSupportedException($"Unsupported index width: {operandType.IntWidth} bits.");
+			}
+
 			if (currentType is TypeDefOrRefSignature structTypeSignature)
 			{
 				TypeDefinition structType = (TypeDefinition)structTypeSignature.ToTypeDefOrRef();
@@ -91,7 +97,10 @@ internal sealed class GetElementPointerInstructionContext : InstructionContext
 					currentType = inlineArray.ElementType;
 					instructions.Add(CilOpCodes.Sizeof, currentType.ToTypeDefOrRef());
 					Module.LoadValue(instructions, operand);
-					instructions.Add(CilOpCodes.Conv_I4);
+					if (operandType is not { IntWidth: 32 })
+					{
+						instructions.Add(CilOpCodes.Conv_I4);
+					}
 					instructions.Add(CilOpCodes.Mul);
 					instructions.Add(CilOpCodes.Add);
 				}
