@@ -425,25 +425,25 @@ internal static unsafe partial class IntrinsicFunctions
 	[MangledName("??2@YAPEAX_K@Z")] // new
 	public static void* Alloc(long size)
 	{
-		return (void*)NativeMemoryHelper.Allocate(size);
+		return NativeMemoryHelper.Allocate(size);
 	}
 
 	[MangledName("realloc")]
 	public static void* ReAlloc(void* ptr, long size)
 	{
-		return (void*)NativeMemoryHelper.Reallocate((nint)ptr, size);
+		return NativeMemoryHelper.Reallocate(ptr, size);
 	}
 
 	[MangledName("free")]
 	public static void Free(void* ptr)
 	{
-		NativeMemoryHelper.Free((IntPtr)ptr);
+		NativeMemoryHelper.Free(ptr);
 	}
 
 	[MangledName("??3@YAXPEAX_K@Z")]
 	public static void Delete(void* ptr, long size)
 	{
-		NativeMemoryHelper.Free((IntPtr)ptr);
+		NativeMemoryHelper.Free(ptr);
 	}
 
 	[MangledName("expand")]

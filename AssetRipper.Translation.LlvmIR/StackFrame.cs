@@ -14,7 +14,7 @@ internal unsafe struct StackFrame
 	{
 		Index = index;
 		Locals = size > 0
-			? unchecked((void*)NativeMemoryHelper.Allocate(size))
+			? NativeMemoryHelper.Allocate(size)
 			: null;
 	}
 
@@ -22,7 +22,7 @@ internal unsafe struct StackFrame
 	{
 		if (Locals != null)
 		{
-			NativeMemoryHelper.Free(unchecked((IntPtr)Locals));
+			NativeMemoryHelper.Free(Locals);
 			Locals = null;
 		}
 	}

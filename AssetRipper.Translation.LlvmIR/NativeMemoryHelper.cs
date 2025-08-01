@@ -2,30 +2,30 @@
 
 namespace AssetRipper.Translation.LlvmIR;
 
-internal static class NativeMemoryHelper
+internal static unsafe class NativeMemoryHelper
 {
-	public static IntPtr Allocate(int size)
+	public static void* Allocate(int size)
 	{
-		return Marshal.AllocHGlobal(size);
+		return Marshal.AllocHGlobal(size).ToPointer();
 	}
 
-	public static IntPtr Allocate(long size)
+	public static void* Allocate(long size)
 	{
-		return Marshal.AllocHGlobal((nint)size);
+		return Marshal.AllocHGlobal((nint)size).ToPointer();
 	}
 
-	public static void Free(IntPtr ptr)
+	public static void Free(void* ptr)
 	{
-		Marshal.FreeHGlobal(ptr);
+		Marshal.FreeHGlobal((nint)ptr);
 	}
 
-	public static IntPtr Reallocate(IntPtr ptr, int newSize)
+	public static void* Reallocate(void* ptr, int newSize)
 	{
-		return Marshal.ReAllocHGlobal(ptr, newSize);
+		return Marshal.ReAllocHGlobal((nint)ptr, newSize).ToPointer();
 	}
 
-	public static IntPtr Reallocate(IntPtr ptr, long newSize)
+	public static void* Reallocate(void* ptr, long newSize)
 	{
-		return Marshal.ReAllocHGlobal(ptr, (nint)newSize);
+		return Marshal.ReAllocHGlobal((nint)ptr, (nint)newSize).ToPointer();
 	}
 }
