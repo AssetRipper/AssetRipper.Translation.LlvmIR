@@ -93,8 +93,7 @@ internal sealed class SwitchBranchInstructionContext : BranchInstructionContext
 			{
 				instructions.Add(CilOpCodes.Ldloc, indexLocal);
 				Module.LoadValue(instructions, Cases[i].Case);
-				instructions.Add(CilOpCodes.Ceq);
-				instructions.Add(CilOpCodes.Brtrue, caseLabels[i]);
+				instructions.Add(CilOpCodes.Beq, caseLabels[i]);
 			}
 		}
 
