@@ -153,7 +153,7 @@ internal abstract class InstructionContext
 
 	public virtual void CreateLocal(CilInstructionCollection instructions)
 	{
-		if (HasResult)
+		if (HasResult && Instruction.IsUsed())
 		{
 			ResultLocal = instructions.AddLocalVariable(ResultTypeSignature);
 		}
@@ -189,8 +189,16 @@ internal abstract class InstructionContext
 
 	public void AddStore(CilInstructionCollection instructions)
 	{
-		Debug.Assert(ResultLocal is not null);
-		instructions.Add(CilOpCodes.Stloc, ResultLocal);
+		if (ResultLocal is not null)
+		{
+			Debug.Assert(Instruction.IsUsed());
+			instructions.Add(CilOpCodes.Stloc, ResultLocal);
+		}
+		else
+		{
+			Debug.Assert(!Instruction.IsUsed());
+			instructions.Add(CilOpCodes.Pop);
+		}
 	}
 
 	protected void AddLoadIfBranchingToPhi(CilInstructionCollection instructions, BasicBlockContext targetBlock)

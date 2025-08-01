@@ -203,6 +203,11 @@ internal static class LLVMExtensions
 		}
 	}
 
+	public static bool IsUsed(this LLVMValueRef value)
+	{
+		return value.FirstUse != default;
+	}
+
 	public static bool IsInstruction(this LLVMValueRef value)
 	{
 		return value.Kind == LLVMValueKind.LLVMInstructionValueKind;
