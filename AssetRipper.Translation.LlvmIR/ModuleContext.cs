@@ -210,6 +210,12 @@ internal sealed partial class ModuleContext
 				continue;
 			}
 
+			function.NeedsStackFrame = function.Function.GetInstructions().Any(i => i.InstructionOpcode is LLVMOpcode.LLVMAlloca);
+			if (!function.NeedsStackFrame)
+			{
+				continue;
+			}
+
 			TypeDefinition typeDefinition = new(
 				null,
 				"LocalVariables",

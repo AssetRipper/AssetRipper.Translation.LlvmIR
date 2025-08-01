@@ -102,7 +102,7 @@ public static unsafe class Translator
 			functionContext.InitializeInstructionData();
 			functionContext.AnalyzeDataFlow();
 
-			if (functionContext.MightThrowAnException)
+			if (functionContext.NeedsStackFrame)
 			{
 				Debug.Assert(functionContext.LocalVariablesType is not null);
 				Debug.Assert(functionContext.StackFrameVariable is not null);

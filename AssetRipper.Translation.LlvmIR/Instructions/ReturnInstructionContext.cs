@@ -23,7 +23,7 @@ internal sealed class ReturnInstructionContext : InstructionContext
 		{
 			Module.LoadValue(instructions, ResultOperand);
 		}
-		if (Function!.MightThrowAnException)
+		if (Function!.NeedsStackFrame)
 		{
 			Debug.Assert(Function.StackFrameVariable is not null);
 			TypeDefinition stackFrameListType = Module.InjectedTypes[typeof(StackFrameList)];

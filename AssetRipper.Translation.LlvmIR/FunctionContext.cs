@@ -115,6 +115,7 @@ internal sealed class FunctionContext : IHasName
 	public Dictionary<LLVMValueRef, ParameterContext> ParameterLookup { get; } = new();
 	public Dictionary<LLVMValueRef, InstructionContext> InstructionLookup { get; } = new();
 	public Dictionary<LLVMBasicBlockRef, BasicBlockContext> BasicBlockLookup { get; } = new();
+	public bool NeedsStackFrame { get; set; }
 	public TypeDefinition? LocalVariablesType { get; set; }
 	public CilLocalVariable? StackFrameVariable { get; set; }
 	private FieldDefinition PointerField { get; set; } = null!;

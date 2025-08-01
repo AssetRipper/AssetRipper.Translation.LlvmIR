@@ -41,6 +41,7 @@ internal sealed class AllocaInstructionContext : InstructionContext
 
 		if (Function.MightThrowAnException)
 		{
+			Debug.Assert(Function.NeedsStackFrame);
 			Debug.Assert(Function.LocalVariablesType is not null);
 			DataField = new FieldDefinition($"Instruction_{Index}", FieldAttributes.Public, DataTypeSignature);
 			Function.LocalVariablesType.Fields.Add(DataField);
