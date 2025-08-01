@@ -142,7 +142,6 @@ internal abstract class InstructionContext
 	public List<InstructionContext> Accessors { get; } = new();
 	public TypeSignature ResultTypeSignature { get; set; }
 	public CilLocalVariable? ResultLocal { get; set; }
-	public FieldDefinition? ResultField { get; set; }
 
 	[MemberNotNullWhen(true, nameof(ResultTypeSignature))]
 	public bool HasResult => ResultTypeSignature is not null and not CorLibTypeSignature { ElementType: ElementType.Void };
@@ -184,41 +183,14 @@ internal abstract class InstructionContext
 
 	public void AddLoad(CilInstructionCollection instructions)
 	{
-		if (ResultLocal is not null)
-		{
-			instructions.Add(CilOpCodes.Ldloc, ResultLocal);
-		}
-		else if (ResultField is not null)
-		{
-			Debug.Assert(Function is not null);
-			Function.AddLocalVariablesRef(instructions);
-			instructions.Add(CilOpCodes.Ldfld, ResultField);
-		}
-		else
-		{
-			Debug.Assert(false, "Result local and field are both null");
-		}
+		Debug.Assert(ResultLocal is not null);
+		instructions.Add(CilOpCodes.Ldloc, ResultLocal);
 	}
 
 	public void AddStore(CilInstructionCollection instructions)
 	{
-		if (ResultLocal is not null)
-		{
-			instructions.Add(CilOpCodes.Stloc, ResultLocal);
-		}
-		else if (ResultField is not null)
-		{
-			Debug.Assert(Function is not null);
-			CilLocalVariable tempLocal = instructions.AddLocalVariable(ResultTypeSignature);
-			instructions.Add(CilOpCodes.Stloc, tempLocal);
-			Function.AddLocalVariablesRef(instructions);
-			instructions.Add(CilOpCodes.Ldloc, tempLocal);
-			instructions.Add(CilOpCodes.Stfld, ResultField);
-		}
-		else
-		{
-			Debug.Assert(false, "Result local and field are both null");
-		}
+		Debug.Assert(ResultLocal is not null);
+		instructions.Add(CilOpCodes.Stloc, ResultLocal);
 	}
 
 	protected void AddLoadIfBranchingToPhi(CilInstructionCollection instructions, BasicBlockContext targetBlock)
