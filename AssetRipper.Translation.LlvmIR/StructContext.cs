@@ -1,4 +1,6 @@
 ﻿using AsmResolver.DotNet;
+using AsmResolver.DotNet.Signatures;
+using AsmResolver.PE.DotNet.Metadata.Tables;
 using LLVMSharp.Interop;
 using System.Diagnostics;
 
@@ -25,12 +27,35 @@ internal sealed class StructContext : IHasName
 
 	public LLVMTypeRef Type { get; }
 
-	public StructContext(ModuleContext module, TypeDefinition definition, LLVMTypeRef type)
+	private StructContext(ModuleContext module, TypeDefinition definition, LLVMTypeRef type)
 	{
 		Module = module;
 		Definition = definition;
 		Type = type;
 		CleanName = ExtractCleanName(MangledName, module.Options.RenamedSymbols);
+	}
+
+	public static StructContext Create(ModuleContext module, LLVMTypeRef type)
+	{
+		TypeDefinition typeDefinition = new(
+			module.Options.GetNamespace("Structures"),
+			type.StructName,
+			TypeAttributes.Public | TypeAttributes.SequentialLayout,
+			module.Definition.DefaultImporter.ImportType(typeof(ValueType)));
+		module.Definition.TopLevelTypes.Add(typeDefinition);
+		StructContext structContext = new(module, typeDefinition, type);
+
+		LLVMTypeRef[] array = type.GetSubtypes();
+		for (int i = 0; i < array.Length; i++)
+		{
+			LLVMTypeRef subType = array[i];
+			TypeSignature fieldType = module.GetTypeSignature(subType);
+			string fieldName = $"field_{i}";
+			FieldDefinition field = new(fieldName, FieldAttributes.Public, fieldType);
+			typeDefinition.Fields.Add(field);
+		}
+
+		return structContext;
 	}
 
 	public void AddNameAttributes() => this.AddNameAttributes(Definition);

@@ -99,9 +99,8 @@ internal sealed class GetElementPointerInstructionContext : InstructionContext
 				{
 					if (operand.Kind == LLVMValueKind.LLVMConstantIntValueKind)
 					{
-						long index = operand.ConstIntSExt;
-						string fieldName = $"field_{index}";
-						FieldDefinition field = structType.Fields.First(t => t.Name == fieldName);
+						int index = (int)operand.ConstIntSExt;
+						FieldDefinition field = structType.GetInstanceField(index);
 						instructions.Add(CilOpCodes.Ldflda, field);
 						currentType = field.Signature!.FieldType;
 					}

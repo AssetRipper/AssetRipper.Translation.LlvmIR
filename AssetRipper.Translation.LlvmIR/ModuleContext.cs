@@ -275,24 +275,8 @@ internal sealed partial class ModuleContext
 				{
 					if (!Structs.TryGetValue(type, out StructContext? structContext))
 					{
-						TypeDefinition typeDefinition = new(
-							Options.GetNamespace("Structures"),
-							type.StructName,
-							TypeAttributes.Public | TypeAttributes.SequentialLayout,
-							Definition.DefaultImporter.ImportType(typeof(ValueType)));
-						Definition.TopLevelTypes.Add(typeDefinition);
-						structContext = new(this, typeDefinition, type);
+						structContext = StructContext.Create(this, type);
 						Structs.Add(type, structContext);
-
-						LLVMTypeRef[] array = type.GetSubtypes();
-						for (int i = 0; i < array.Length; i++)
-						{
-							LLVMTypeRef subType = array[i];
-							TypeSignature fieldType = GetTypeSignature(subType);
-							string fieldName = $"field_{i}";
-							FieldDefinition field = new(fieldName, FieldAttributes.Public, fieldType);
-							typeDefinition.Fields.Add(field);
-						}
 					}
 					return structContext.Definition.ToTypeSignature();
 				}

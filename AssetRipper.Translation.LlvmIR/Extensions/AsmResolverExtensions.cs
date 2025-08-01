@@ -271,4 +271,25 @@ internal static class AsmResolverExtensions
 	{
 		return type.Fields.Single(f => f.Name == name);
 	}
+
+	public static FieldDefinition GetInstanceField(this TypeDefinition type, int index)
+	{
+		ArgumentOutOfRangeException.ThrowIfNegative(index);
+		for (int i = 0; i < type.Fields.Count; i++)
+		{
+			FieldDefinition field = type.Fields[i];
+			if (field.IsStatic)
+			{
+			}
+			else if (index == 0)
+			{
+				return field;
+			}
+			else
+			{
+				index--;
+			}
+		}
+		throw new ArgumentOutOfRangeException(nameof(index), index, null);
+	}
 }
