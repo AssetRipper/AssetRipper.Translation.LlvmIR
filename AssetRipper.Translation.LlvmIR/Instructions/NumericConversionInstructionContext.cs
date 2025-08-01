@@ -38,15 +38,20 @@ internal sealed class NumericConversionInstructionContext : InstructionContext
 	{
 		if (ResultTypeSignature is CorLibTypeSignature { ElementType: ElementType.Boolean })
 		{
-			instructions.AddDefaultValue(SourceTypeSignature);
-			if (SourceTypeSignature is CorLibTypeSignature or PointerTypeSignature)
+			if (SourceTypeSignature is CorLibTypeSignature { ElementType: not ElementType.R4 and not ElementType.R8 })
 			{
+				if (SourceTypeSignature.ElementType is ElementType.I8 or ElementType.U8)
+				{
+					instructions.Add(CilOpCodes.Conv_I4);
+				}
+				instructions.Add(CilOpCodes.Ldc_I4_1);
+				instructions.Add(CilOpCodes.And);
+				instructions.Add(CilOpCodes.Ldc_I4_1);
 				instructions.Add(CilOpCodes.Ceq);
 			}
 			else
 			{
-				MethodDefinition equalityMethod = ResolveTypeSignature(SourceTypeSignature).GetMethodByName("op_Equality");
-				instructions.Add(CilOpCodes.Call, Module.Definition.DefaultImporter.ImportMethod(equalityMethod));
+				throw new NotSupportedException($"Cannot convert {SourceTypeSignature} to boolean.");
 			}
 			return;
 		}

@@ -62,4 +62,19 @@ internal static class ExecutionHelpers
 			GC.Collect();
 		}
 	}
+
+	public static MethodInfo GetMethod(Assembly assembly, string name)
+	{
+		Type? type = assembly.GetType("GlobalMembers");
+		Assert.That(type, Is.Not.Null);
+		MethodInfo? method = type.GetMethod(name, BindingFlags.Public | BindingFlags.Static);
+		Assert.That(method, Is.Not.Null);
+		return method;
+	}
+
+	public static T GetMethod<T>(Assembly assembly, string name) where T : Delegate
+	{
+		MethodInfo method = GetMethod(assembly, name);
+		return method.CreateDelegate<T>();
+	}
 }
