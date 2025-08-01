@@ -109,23 +109,24 @@ internal sealed class GlobalVariableContext : IHasName
 			{
 				return m.Name == nameof(NativeMemoryHelper.Allocate) && m.Parameters[0].ParameterType.ElementType is ElementType.I4;
 			}));
-			instructions.Add(CilOpCodes.Stsfld, PointerField);
-
-			instructions.Add(CilOpCodes.Ldsfld, PointerField);
-			instructions.AddDefaultValue(underlyingType);
-			instructions.AddStoreIndirect(underlyingType);
-
-			instructions.Add(CilOpCodes.Ldsfld, PointerField);
 			instructions.Add(CilOpCodes.Call, Module.InjectedTypes[typeof(PointerIndices)].GetMethodByName(nameof(PointerIndices.Register)));
+			instructions.Add(CilOpCodes.Stsfld, PointerField);
 		}
-
-		PointerInstructionsCount = instructions.Count;
 
 		// Initialize data
 		if (HasSingleOperand)
 		{
+			PointerInstructionsCount = instructions.Count;
+
 			Module.LoadValue(instructions, Operand);
 			instructions.Add(CilOpCodes.Call, DataSetMethod);
+		}
+		else
+		{
+			instructions.AddDefaultValue(underlyingType);
+			instructions.Add(CilOpCodes.Call, DataSetMethod);
+
+			PointerInstructionsCount = instructions.Count;
 		}
 
 		instructions.Add(CilOpCodes.Ret);

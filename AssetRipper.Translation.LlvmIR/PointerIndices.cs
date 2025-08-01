@@ -7,7 +7,7 @@ internal static unsafe class PointerIndices
 	private static readonly Dictionary<int, IntPtr> IndexToPointer = new();
 	private static readonly Dictionary<IntPtr, int> PointerToIndex = new();
 
-	public static void Register(void* ptr)
+	public static void* Register(void* ptr)
 	{
 		ThrowIfNull(ptr);
 
@@ -15,6 +15,8 @@ internal static unsafe class PointerIndices
 
 		IndexToPointer.Add(index, (IntPtr)ptr);
 		PointerToIndex.Add((IntPtr)ptr, index);
+
+		return ptr;
 
 		static void ThrowIfNull(void* value, [CallerArgumentExpression(nameof(value))] string? paramName = null)
 		{

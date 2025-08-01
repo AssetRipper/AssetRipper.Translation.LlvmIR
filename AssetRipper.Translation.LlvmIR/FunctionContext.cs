@@ -29,7 +29,7 @@ internal sealed class FunctionContext : IHasName
 
 	public static FunctionContext Create(LLVMValueRef function, ModuleContext module)
 	{
-		TypeDefinition declaringType = new(module.Options.GetNamespace("GlobalFunctions"), null, TypeAttributes.NotPublic | TypeAttributes.Class | TypeAttributes.Abstract | TypeAttributes.Sealed, module.Definition.CorLibTypeFactory.Object.ToTypeDefOrRef());
+		TypeDefinition declaringType = new(module.Options.GetNamespace("GlobalFunctions"), null, TypeAttributes.NotPublic | TypeAttributes.Class | TypeAttributes.Abstract | TypeAttributes.Sealed | TypeAttributes.BeforeFieldInit, module.Definition.CorLibTypeFactory.Object.ToTypeDefOrRef());
 		module.Definition.TopLevelTypes.Add(declaringType);
 
 		MethodSignature signature = MethodSignature.CreateStatic(null!);
@@ -70,37 +70,10 @@ internal sealed class FunctionContext : IHasName
 		{
 			TypeSignature voidPointerType = module.Definition.CorLibTypeFactory.Void.MakePointerType();
 
-			FieldDefinition pointerField = new("__pointer", FieldAttributes.Private | FieldAttributes.Static, voidPointerType);
+			FieldDefinition pointerField = new("__pointer", FieldAttributes.Public | FieldAttributes.Static | FieldAttributes.InitOnly, voidPointerType);
 			declaringType.Fields.Add(pointerField);
 
-			MethodDefinition getMethod = new("get_Pointer", MethodAttributes.Public | MethodAttributes.Static | MethodAttributes.HideBySig | MethodAttributes.SpecialName, MethodSignature.CreateStatic(voidPointerType));
-			declaringType.Methods.Add(getMethod);
-			getMethod.CilMethodBody = new(getMethod);
-
-			CilInstructionCollection instructions = getMethod.CilMethodBody.Instructions;
-			CilInstructionLabel notNullLabel = new();
-
-			instructions.Add(CilOpCodes.Ldsfld, pointerField);
-			instructions.Add(CilOpCodes.Ldc_I4_0);
-			instructions.Add(CilOpCodes.Conv_U);
-			instructions.Add(CilOpCodes.Bne_Un, notNullLabel);
-
-			instructions.Add(CilOpCodes.Ldftn, definition);
-			instructions.Add(CilOpCodes.Stsfld, pointerField);
-
-			instructions.Add(CilOpCodes.Ldsfld, pointerField);
-			instructions.Add(CilOpCodes.Call, module.InjectedTypes[typeof(PointerIndices)].GetMethodByName(nameof(PointerIndices.Register)));
-
-			notNullLabel.Instruction = instructions.Add(CilOpCodes.Ldsfld, pointerField);
-			instructions.Add(CilOpCodes.Ret);
-
-			PropertyDefinition property = new("Pointer", PropertyAttributes.None, PropertySignature.CreateStatic(voidPointerType));
-			declaringType.Properties.Add(property);
-			property.GetMethod = getMethod;
-
 			context.PointerField = pointerField;
-			context.PointerGetMethod = getMethod;
-			context.PointerProperty = property;
 		}
 
 		return context;
@@ -144,9 +117,7 @@ internal sealed class FunctionContext : IHasName
 	public Dictionary<LLVMBasicBlockRef, BasicBlockContext> BasicBlockLookup { get; } = new();
 	public TypeDefinition? LocalVariablesType { get; set; }
 	public CilLocalVariable? StackFrameVariable { get; set; }
-	private MethodDefinition PointerGetMethod { get; set; } = null!;
 	private FieldDefinition PointerField { get; set; } = null!;
-	private PropertyDefinition PointerProperty { get; set; } = null!;
 	private bool IsPointerFieldUsed { get; set; } = false;
 
 	public void InitializeInstructionData()
@@ -251,7 +222,7 @@ internal sealed class FunctionContext : IHasName
 	public void AddLoadFunctionPointer(CilInstructionCollection instructions)
 	{
 		IsPointerFieldUsed = true;
-		instructions.Add(CilOpCodes.Call, PointerGetMethod);
+		instructions.Add(CilOpCodes.Ldsfld, PointerField);
 	}
 
 	public void RemovePointerFieldIfNotUsed()
@@ -259,11 +230,18 @@ internal sealed class FunctionContext : IHasName
 		if (!IsPointerFieldUsed)
 		{
 			DeclaringType.Fields.Remove(PointerField);
-			DeclaringType.Methods.Remove(PointerGetMethod);
-			DeclaringType.Properties.Remove(PointerProperty);
 			PointerField = null!;
-			PointerGetMethod = null!;
-			PointerProperty = null!;
+		}
+		else
+		{
+			MethodDefinition staticConstructor = DeclaringType.GetOrCreateStaticConstructor();
+			CilInstructionCollection instructions = staticConstructor.CilMethodBody!.Instructions;
+			instructions.Clear();
+
+			instructions.Add(CilOpCodes.Ldftn, Definition);
+			instructions.Add(CilOpCodes.Call, Module.InjectedTypes[typeof(PointerIndices)].GetMethodByName(nameof(PointerIndices.Register)));
+			instructions.Add(CilOpCodes.Stsfld, PointerField);
+			instructions.Add(CilOpCodes.Ret);
 		}
 	}
 
