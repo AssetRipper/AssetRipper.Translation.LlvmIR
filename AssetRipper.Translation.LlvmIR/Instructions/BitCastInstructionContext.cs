@@ -30,5 +30,7 @@ internal sealed class BitCastInstructionContext : InstructionContext
 			.MakeGenericInstanceMethod(SourceTypeSignature, ResultTypeSignature);
 
 		instructions.Add(CilOpCodes.Call, method);
+
+		AddStore(instructions);
 	}
 }
