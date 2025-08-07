@@ -3,6 +3,7 @@ using AsmResolver.DotNet.Code.Cil;
 using AsmResolver.DotNet.Signatures;
 using AsmResolver.PE.DotNet.Cil;
 using AsmResolver.PE.DotNet.Metadata.Tables;
+using AssetRipper.CIL;
 using AssetRipper.Translation.LlvmIR.Extensions;
 using System.Numerics;
 using System.Runtime.CompilerServices;
@@ -107,8 +108,7 @@ internal sealed class InlineArrayContext
 			instructions.Add(CilOpCodes.Ldarg_0);
 			instructions.Add(CilOpCodes.Ldarg_1);
 			instructions.Add(CilOpCodes.Call, equalityOperator);
-			instructions.Add(CilOpCodes.Ldc_I4_0);
-			instructions.Add(CilOpCodes.Ceq);
+			instructions.AddBooleanNot();
 			instructions.Add(CilOpCodes.Ret);
 			arrayType.Methods.Add(inequalityOperator);
 

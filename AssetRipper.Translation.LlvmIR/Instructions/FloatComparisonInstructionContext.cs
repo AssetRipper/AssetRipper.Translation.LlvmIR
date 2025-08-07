@@ -1,6 +1,6 @@
 ﻿using AsmResolver.DotNet.Code.Cil;
 using AsmResolver.PE.DotNet.Cil;
-using AssetRipper.Translation.LlvmIR.Extensions;
+using AssetRipper.CIL;
 using LLVMSharp.Interop;
 
 namespace AssetRipper.Translation.LlvmIR.Instructions;
