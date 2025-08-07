@@ -48,6 +48,7 @@ internal static unsafe class Program
 
 	private static void OptimizeModule(LLVMModuleRef module, LLVMContextRef context)
 	{
+		// https://github.com/llvm/llvm-project/blob/a8d0ae3412bdbbf3248192c31f94f6649a217b3a/llvm/include/llvm/IR/Attributes.td
 		ReadOnlySpan<uint> attributesToAdd =
 		[
 			GetEnumAttributeKindForName("optsize"u8),

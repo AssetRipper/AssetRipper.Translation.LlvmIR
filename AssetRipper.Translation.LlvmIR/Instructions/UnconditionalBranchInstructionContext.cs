@@ -21,6 +21,6 @@ internal sealed class UnconditionalBranchInstructionContext : BranchInstructionC
 		Debug.Assert(TargetBlock is not null);
 
 		AddLoadIfBranchingToPhi(instructions, TargetBlock);
-		instructions.Add(CilOpCodes.Br, Function.BasicBlockLookup[TargetBlockRef].Label);
+		instructions.Add(CilOpCodes.Br, TargetBlock.Label);
 	}
 }
