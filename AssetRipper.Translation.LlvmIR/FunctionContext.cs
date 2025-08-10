@@ -392,6 +392,38 @@ internal sealed class FunctionContext : IHasName
 			{
 				result = NameGenerator.CleanName(typeName ?? "", "Type") + "_Delete";
 			}
+			else if (functionIdentifier.StartsWith("operator", StringComparison.Ordinal))
+			{
+				result = functionIdentifier switch
+				{
+					"operator==" => "Equals",
+					"operator!=" => "NotEquals",
+					"operator<" => "LessThan",
+					"operator>" => "GreaterThan",
+					"operator<=" => "LessThanOrEquals",
+					"operator>=" => "GreaterThanOrEquals",
+					"operator+" => "Add",
+					"operator-" => "Subtract",
+					"operator*" => "Multiply",
+					"operator/" => "Divide",
+					"operator%" => "Modulo",
+					"operator&" => "BitwiseAnd",
+					"operator|" => "BitwiseOr",
+					"operator^" => "BitwiseXor",
+					"operator~" => "BitwiseNot",
+					"operator<<" => "LeftShift",
+					"operator>>" => "RightShift",
+					"operator->" => "PointerDereference",
+					"operator[]" => "Index",
+					"operator()" => "Invoke",
+					"operator bool" => "ToBoolean",
+					"operator new" => "New",
+					"operator delete" => "Delete",
+					"operator new[]" => "NewArray",
+					"operator delete[]" => "DeleteArray",
+					_ => NameGenerator.CleanName(functionIdentifier, "Operator"),
+				};
+			}
 			else
 			{
 				result = NameGenerator.CleanName(functionIdentifier, "Function");
