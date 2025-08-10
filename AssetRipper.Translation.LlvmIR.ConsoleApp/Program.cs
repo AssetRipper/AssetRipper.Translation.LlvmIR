@@ -44,7 +44,7 @@ internal static class Program
 		else
 		{
 			Directory.CreateDirectory(args.DecompileDirectory);
-			new TranslationProjectDecompiler().DecompileProject(moduleDefinition, args.DecompileDirectory, new StringWriter());
+			new TranslationProjectDecompiler().DecompileProject(moduleDefinition, args.DecompileDirectory, TextWriter.Null);
 		}
 		Console.WriteLine("Done!");
 	}
