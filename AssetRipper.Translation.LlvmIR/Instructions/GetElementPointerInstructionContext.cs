@@ -49,20 +49,17 @@ internal sealed class GetElementPointerInstructionContext : InstructionContext
 			{
 				instructions.Add(CilOpCodes.Conv_I);
 			}
+			else if (previousInstruction.IsLoadConstantInteger(out value))
+			{
+				previousInstruction.OpCode = CilOpCodes.Ldc_I4;
+				previousInstruction.Operand = (int)(value * size);
+				instructions.Add(CilOpCodes.Conv_I);
+			}
 			else
 			{
-				if (previousInstruction.IsLoadConstantInteger(out value))
-				{
-					previousInstruction.OpCode = CilOpCodes.Ldc_I4;
-					previousInstruction.Operand = (int)(value * size);
-					instructions.Add(CilOpCodes.Conv_I);
-				}
-				else
-				{
-					instructions.Add(CilOpCodes.Conv_I);
-					instructions.Add(CilOpCodes.Ldc_I4, size);
-					instructions.Add(CilOpCodes.Mul);
-				}
+				instructions.Add(CilOpCodes.Conv_I);
+				instructions.Add(CilOpCodes.Ldc_I4, size);
+				instructions.Add(CilOpCodes.Mul);
 			}
 			instructions.Add(CilOpCodes.Add);
 		}
@@ -80,14 +77,7 @@ internal sealed class GetElementPointerInstructionContext : InstructionContext
 			LLVMValueRef operand = Operands[i];
 			LLVMTypeRef operandType = operand.TypeOf;
 
-			if (operandType.Kind != LLVMTypeKind.LLVMIntegerTypeKind)
-			{
-				throw new NotSupportedException("Non integer indices are not allowed.");
-			}
-			if (operandType.IntWidth is not 8 and not 16 and not 32 and not 64)
-			{
-				throw new NotSupportedException($"Unsupported index width: {operandType.IntWidth} bits.");
-			}
+			operandType.ThrowIfNotCoreLibInteger();
 
 			if (currentType is TypeDefOrRefSignature structTypeSignature)
 			{
@@ -147,9 +137,8 @@ internal sealed class GetElementPointerInstructionContext : InstructionContext
 				}
 				else if (operand.Kind == LLVMValueKind.LLVMConstantIntValueKind)
 				{
-					long index = operand.ConstIntSExt;
-					string fieldName = $"field_{index}";
-					FieldDefinition field = structType.Fields.First(t => t.Name == fieldName);
+					int index = (int)operand.ConstIntSExt;
+					FieldDefinition field = structType.GetInstanceField(index);
 					currentType = field.Signature!.FieldType;
 				}
 				else
