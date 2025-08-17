@@ -126,8 +126,6 @@ internal abstract class BaseCallInstructionContext : InstructionContext
 			.ImportType(typeof(ReadOnlySpan<>))
 			.MakeGenericInstanceType(intPtr);
 
-		IMethodDescriptor getTypeFromHandle = module.Definition.DefaultImporter.ImportMethod(typeof(Type).GetMethod(nameof(Type.GetTypeFromHandle))!);
-
 		MethodSignature getItemSignature = MethodSignature.CreateInstance(new GenericParameterSignature(GenericParameterType.Type, 0).MakeByReferenceType(), module.Definition.CorLibTypeFactory.Int32);
 
 		IMethodDescriptor intPtrSpanGetItem = new MemberReference(intPtrSpan.ToTypeDefOrRef(), "get_Item", getItemSignature);
@@ -163,7 +161,7 @@ internal abstract class BaseCallInstructionContext : InstructionContext
 			instructions.Add(CilOpCodes.Stind_I);
 		}
 
-		CilLocalVariable intPtrReadOnlySpanLocal = instructions.AddLocalVariable(intPtrSpan);
+		CilLocalVariable intPtrReadOnlySpanLocal = instructions.AddLocalVariable(intPtrReadOnlySpan);
 		instructions.Add(CilOpCodes.Ldloc, intPtrSpanLocal);
 		instructions.Add(CilOpCodes.Call, spanToReadOnly.MakeGenericInstanceMethod(intPtr));
 		instructions.Add(CilOpCodes.Stloc, intPtrReadOnlySpanLocal);
