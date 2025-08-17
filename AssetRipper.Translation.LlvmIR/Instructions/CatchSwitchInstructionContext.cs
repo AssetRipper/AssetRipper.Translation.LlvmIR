@@ -45,33 +45,36 @@ internal sealed class CatchSwitchInstructionContext : InstructionContext
 		Debug.Assert(Function.PersonalityFunction.IsVariadic);
 		Debug.Assert(CatchPads.Count > 0);
 
-		CilInstructionLabel? currentLabel = null;
 		for (int i = 0; i < CatchPads.Count; i++)
 		{
 			CatchPadInstructionContext catchPad = CatchPads[i];
-			CilInstructionLabel? previousLabel = currentLabel;
-			currentLabel = new();
-
-			int startIndex = instructions.Count;
+			Debug.Assert(catchPad.BasicBlock is not null, "CatchPad should have a basic block");
 
 			CilLocalVariable argumentsInReadOnlySpan = BaseCallInstructionContext.LoadVariadicArguments(instructions, Module, catchPad.Arguments);
+
 			// Call personality function
 			instructions.Add(CilOpCodes.Ldloc, argumentsInReadOnlySpan);
 			instructions.Add(CilOpCodes.Call, Function.PersonalityFunction.Definition);
-			instructions.Add(CilOpCodes.Brtrue, currentLabel);
-			AddLoadIfBranchingToPhi(instructions, catchPad.BasicBlock!);
-			instructions.Add(CilOpCodes.Br, Function.BasicBlockLookup[catchPad.BasicBlockRef].Label);
 
-			previousLabel?.Instruction = instructions[startIndex];
+			if (TargetBlockStartsWithPhi(catchPad.BasicBlock))
+			{
+				CilInstructionLabel label = new();
+				instructions.Add(CilOpCodes.Brtrue, label);
+				AddLoadIfBranchingToPhi(instructions, catchPad.BasicBlock);
+				instructions.Add(CilOpCodes.Br, catchPad.BasicBlock.Label);
+				label.Instruction = instructions.Add(CilOpCodes.Nop);
+			}
+			else
+			{
+				instructions.Add(CilOpCodes.Brfalse, catchPad.BasicBlock.Label);
+			}
 		}
-
-		int defaultIndex = instructions.Count;
 
 		if (HasDefaultUnwind)
 		{
 			Debug.Assert(DefaultUnwindTarget is not null);
 			AddLoadIfBranchingToPhi(instructions, DefaultUnwindTarget);
-			instructions.Add(CilOpCodes.Br, Function.BasicBlockLookup[DefaultUnwindTargetRef].Label);
+			instructions.Add(CilOpCodes.Br, DefaultUnwindTarget.Label);
 		}
 		else
 		{
@@ -79,8 +82,6 @@ internal sealed class CatchSwitchInstructionContext : InstructionContext
 			instructions.AddDefaultValue(Function.ReturnTypeSignature);
 			instructions.Add(CilOpCodes.Ret);
 		}
-
-		currentLabel?.Instruction = instructions[defaultIndex];
 	}
 
 	private enum ExceptionDisposition
