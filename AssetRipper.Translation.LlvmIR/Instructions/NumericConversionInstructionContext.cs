@@ -111,16 +111,16 @@ internal sealed class NumericConversionInstructionContext : InstructionContext
 					else if (ResultTypeSignature is CorLibTypeSignature && SourceTypeSignature is TypeDefOrRefSignature)
 					{
 						AddFlipToUnsigned(instructions);
-						TypeSignature unsignedSource = GetUnsignedType(SourceTypeSignature);
-						TypeSignature unsignedResult = GetUnsignedType(ResultTypeSignature);
+						TypeSignature unsignedSource = GetUnsignedType(SourceTypeSignature, instructions.Owner.Owner.Module!);
+						TypeSignature unsignedResult = GetUnsignedType(ResultTypeSignature, instructions.Owner.Owner.Module!);
 						MethodDefinition conversionMethod = GetConversionMethod(ResolveTypeSignature(unsignedSource), unsignedSource, unsignedResult, NoUnsignedWrap);
 						instructions.Add(CilOpCodes.Call, Module.Definition.DefaultImporter.ImportMethod(conversionMethod));
 					}
 					else if (ResultTypeSignature is TypeDefOrRefSignature && SourceTypeSignature is CorLibTypeSignature)
 					{
 						AddFlipToUnsigned(instructions);
-						TypeSignature unsignedSource = GetUnsignedType(SourceTypeSignature);
-						TypeSignature unsignedResult = GetUnsignedType(ResultTypeSignature);
+						TypeSignature unsignedSource = GetUnsignedType(SourceTypeSignature, instructions.Owner.Owner.Module!);
+						TypeSignature unsignedResult = GetUnsignedType(ResultTypeSignature, instructions.Owner.Owner.Module!);
 						MethodDefinition conversionMethod = GetConversionMethod(ResolveTypeSignature(unsignedResult), unsignedSource, unsignedResult, NoUnsignedWrap);
 						instructions.Add(CilOpCodes.Call, Module.Definition.DefaultImporter.ImportMethod(conversionMethod));
 
@@ -197,7 +197,7 @@ internal sealed class NumericConversionInstructionContext : InstructionContext
 		else if (SourceTypeSignature is TypeDefOrRefSignature { Namespace: "System", Name: "Int128" })
 		{
 			TypeDefinition sourceTypeDefinition = ResolveTypeSignature(SourceTypeSignature);
-			TypeSignature unsignedType = GetUnsignedType(SourceTypeSignature);
+			TypeSignature unsignedType = GetUnsignedType(SourceTypeSignature, instructions.Owner.Owner.Module!);
 			MethodDefinition conversionMethod = GetConversionMethod(sourceTypeDefinition, SourceTypeSignature, unsignedType);
 			instructions.Add(CilOpCodes.Call, Module.Definition.DefaultImporter.ImportMethod(conversionMethod));
 		}
@@ -235,19 +235,19 @@ internal sealed class NumericConversionInstructionContext : InstructionContext
 		throw new NotSupportedException($"Cannot find conversion method for {typeDefinition.FullName} from {sourceTypeSignature} to {resultTypeSignature}.");
 	}
 
-	private TypeSignature GetUnsignedType(TypeSignature type) => type switch
+	private static TypeSignature GetUnsignedType(TypeSignature type, ModuleDefinition module) => type switch
 	{
 		CorLibTypeSignature c => c.ElementType switch
 		{
-			ElementType.I1 => Module.Definition.CorLibTypeFactory.Byte,
-			ElementType.I2 => Module.Definition.CorLibTypeFactory.UInt16,
-			ElementType.I4 => Module.Definition.CorLibTypeFactory.UInt32,
-			ElementType.I8 => Module.Definition.CorLibTypeFactory.UInt64,
-			ElementType.I => Module.Definition.CorLibTypeFactory.UIntPtr,
+			ElementType.I1 => module.CorLibTypeFactory.Byte,
+			ElementType.I2 => module.CorLibTypeFactory.UInt16,
+			ElementType.I4 => module.CorLibTypeFactory.UInt32,
+			ElementType.I8 => module.CorLibTypeFactory.UInt64,
+			ElementType.I => module.CorLibTypeFactory.UIntPtr,
 			_ => type,
 		},
 		PointerTypeSignature => type,
-		TypeDefOrRefSignature { Namespace: "System", Name: "Int128" } => Module.Definition.DefaultImporter.ImportTypeSignature(typeof(UInt128)),
+		TypeDefOrRefSignature { Namespace: "System", Name: "Int128" } => module.DefaultImporter.ImportTypeSignature(typeof(UInt128)),
 		_ => type,
 	};
 }
