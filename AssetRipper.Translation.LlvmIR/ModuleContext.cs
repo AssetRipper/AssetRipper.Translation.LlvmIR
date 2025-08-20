@@ -450,7 +450,7 @@ internal sealed partial class ModuleContext
 						IMethodDefOrRef spanConstructor = (IMethodDefOrRef)Definition.DefaultImporter
 							.ImportMethod(typeof(ReadOnlySpan<byte>).GetConstructor([typeof(void*), typeof(int)])!);
 
-						FieldDefinition field = AddStoredDataField(data.ToArray());
+						FieldDefinition field = AddStoredDataField(data);
 						instructions.Add(CilOpCodes.Ldsflda, field);
 						instructions.Add(CilOpCodes.Ldc_I4, data.Length);
 						instructions.Add(CilOpCodes.Newobj, spanConstructor);
@@ -461,7 +461,7 @@ internal sealed partial class ModuleContext
 							.ImportMethod(typeof(RuntimeHelpers).GetMethod(nameof(RuntimeHelpers.CreateSpan))!);
 						IMethodDescriptor createSpanInstance = createSpan.MakeGenericInstanceMethod(elementType);
 
-						FieldDefinition field = AddStoredDataField(data.ToArray());
+						FieldDefinition field = AddStoredDataField(data);
 						instructions.Add(CilOpCodes.Ldtoken, field);
 						instructions.Add(CilOpCodes.Call, createSpanInstance);
 					}
@@ -625,7 +625,7 @@ internal sealed partial class ModuleContext
 	/// <param name="fieldName">The name of the field.</param>
 	/// <param name="data">The data contained within the field.</param>
 	/// <returns>The field's <see cref="FieldDefinition"/>.</returns>
-	public FieldDefinition AddStoredDataField(byte[] data)
+	public FieldDefinition AddStoredDataField(ReadOnlySpan<byte> data)
 	{
 		TypeDefinition nestedType = GetOrCreateStaticArrayInitType(data.Length);
 
@@ -640,7 +640,7 @@ internal sealed partial class ModuleContext
 		{
 			privateImplementationField = new FieldDefinition(fieldName, FieldAttributes.Assembly | FieldAttributes.Static, fieldType);
 			privateImplementationField.IsInitOnly = true;
-			privateImplementationField.FieldRva = new DataSegment(data);
+			privateImplementationField.FieldRva = new DataSegment(data.ToArray());
 			privateImplementationField.HasFieldRva = true;
 			AddCompilerGeneratedAttribute(privateImplementationField);
 
@@ -652,7 +652,7 @@ internal sealed partial class ModuleContext
 
 		//This might not be the correct way to choose a field name, but I think the specification allows it.
 		//In any case, ILSpy handles it the way we want, which is all that matters.
-		static string HashDataToBase64(byte[] data)
+		static string HashDataToBase64(ReadOnlySpan<byte> data)
 		{
 			byte[] hash = SHA256.HashData(data);
 			return Convert.ToBase64String(hash, Base64FormattingOptions.None);
