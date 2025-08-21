@@ -662,6 +662,15 @@ internal unsafe readonly struct InstructionLifter
 					StoreResult(instructions, instruction);
 				}
 				break;
+			case LLVMOpcode.LLVMFreeze:
+				{
+					// At runtime, poison and undefined values don't exist, so freeze is a no-op.
+					Debug.Assert(operands.Length == 1, "Freeze instruction should have exactly one operand");
+					Debug.Assert(instruction.TypeOf == operands[0].TypeOf, "Freeze instruction should have the same type as its operand");
+					LoadValue(instructions, operands[0]);
+					StoreResult(instructions, instruction);
+				}
+				break;
 			default:
 				if (BinaryMathInstruction.Supported(opcode))
 				{
