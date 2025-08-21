@@ -4,15 +4,7 @@ namespace AssetRipper.Translation.LlvmIR.Extensions;
 
 internal static class LLVMBasicBlockRefExtensions
 {
-	public static IEnumerable<LLVMValueRef> GetInstructions(this LLVMBasicBlockRef basicBlock)
-	{
-		LLVMValueRef instruction = basicBlock.FirstInstruction;
-		while (instruction.Handle != 0)
-		{
-			yield return instruction;
-			instruction = instruction.NextInstruction;
-		}
-	}
+	public static BasicBlockInstructionsEnumerable GetInstructions(this LLVMBasicBlockRef basicBlock) => new BasicBlockInstructionsEnumerable(basicBlock);
 
 	public static unsafe LLVMBasicBlockRef[] GetSuccessors(this LLVMBasicBlockRef value)
 	{
