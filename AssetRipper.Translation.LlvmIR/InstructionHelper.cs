@@ -30,6 +30,11 @@ internal static class InstructionHelper
 		return result;
 	}
 
+	public static unsafe void* Select(bool condition, void* trueValue, void* falseValue)
+	{
+		return condition ? trueValue : falseValue;
+	}
+
 	public static T Select<T>(bool condition, T trueValue, T falseValue)
 	{
 		return condition ? trueValue : falseValue;

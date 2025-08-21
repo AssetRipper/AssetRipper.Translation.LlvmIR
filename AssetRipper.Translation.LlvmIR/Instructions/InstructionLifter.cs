@@ -273,14 +273,19 @@ internal unsafe readonly struct InstructionLifter
 
 						if (valueTypeSignature is PointerTypeSignature)
 						{
-							throw new NotImplementedException();
+							IMethodDescriptor helperMethod = module.InstructionHelperType.Methods
+								.Single(m => m.Name == nameof(InstructionHelper.Select) && m.GenericParameters.Count is 0);
+
+							Call(instructions, helperMethod);
 						}
+						else
+						{
+							IMethodDescriptor helperMethod = module.InstructionHelperType.Methods
+								.Single(m => m.Name == nameof(InstructionHelper.Select) && m.GenericParameters.Count is 1)
+								.MakeGenericInstanceMethod(valueTypeSignature);
 
-						IMethodDescriptor helperMethod = module.InstructionHelperType.Methods
-							.First(m => m.Name == nameof(InstructionHelper.Select) && m.GenericParameters.Count is 1)
-							.MakeGenericInstanceMethod(valueTypeSignature);
-
-						Call(instructions, helperMethod);
+							Call(instructions, helperMethod);
+						}
 					}
 					else
 					{
@@ -293,18 +298,6 @@ internal unsafe readonly struct InstructionLifter
 			case LLVMOpcode.LLVMPHI:
 				{
 					Debug.Assert(operands.Length > 0, "Phi instruction should have at least one operand");
-
-					// Create a phi instruction with all incoming values
-					/*(IReadOnlyList<Instruction> value, BasicBlock source)[] sources = new (IReadOnlyList<Instruction>, BasicBlock)[operands.Length];
-
-					for (uint i = 0; i < operands.Length; i++)
-					{
-						LLVMValueRef operand = operands[i];
-						List<Instruction> valueInstructions = new();
-						LoadValue(valueInstructions, operand);
-						sources[i] = (valueInstructions, basicBlocks[instruction.GetIncomingBlock(i)]);
-					}
-					instructions.Add(new PhiInstruction(sources));*/
 
 					instructions.Add(PhiPushInstruction.Instance);
 
