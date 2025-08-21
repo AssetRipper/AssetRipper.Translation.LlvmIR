@@ -4,13 +4,26 @@ using AsmResolver.PE.DotNet.Cil;
 
 namespace AssetRipper.Translation.LlvmIR.Instructions;
 
-public sealed class SizeOfInstruction(TypeSignature type) : Instruction
+public sealed record class SizeOfInstruction(TypeSignature Type) : Instruction
 {
-	public TypeSignature Type { get; } = type;
 	public override int PopCount => 0;
 	public override int PushCount => 1;
 	public override void AddInstructions(CilInstructionCollection instructions)
 	{
 		instructions.Add(CilOpCodes.Sizeof, Type.ToTypeDefOrRef());
+	}
+
+	public bool Equals(SizeOfInstruction? other)
+	{
+		if (other is null)
+		{
+			return false;
+		}
+		return SignatureComparer.Default.Equals(Type, other.Type);
+	}
+
+	public override int GetHashCode()
+	{
+		return SignatureComparer.Default.GetHashCode(Type);
 	}
 }

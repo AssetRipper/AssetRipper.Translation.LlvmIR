@@ -3,7 +3,7 @@ using AsmResolver.PE.DotNet.Cil;
 
 namespace AssetRipper.Translation.LlvmIR.Instructions;
 
-internal sealed class UnreachableInstruction : Instruction
+internal sealed record class UnreachableInstruction : Instruction
 {
 	public static UnreachableInstruction Instance { get; } = new();
 	public override int PopCount => 0;

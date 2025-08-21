@@ -7,10 +7,8 @@ using AssetRipper.Translation.LlvmIR.Extensions;
 
 namespace AssetRipper.Translation.LlvmIR.Instructions;
 
-public sealed class SwitchInstruction(TypeSignature indexType, (long Value, BasicBlock Target)[] cases) : Instruction
+public sealed record class SwitchInstruction(TypeSignature IndexType, (long Value, BasicBlock Target)[] Cases) : Instruction
 {
-	public TypeSignature IndexType { get; } = indexType;
-	public (long Value, BasicBlock Target)[] Cases { get; } = cases;
 	public override bool StackHeightDependent => true;
 	public override int PopCount => 1; // Value
 	public override int PushCount => 0;
@@ -72,5 +70,34 @@ public sealed class SwitchInstruction(TypeSignature indexType, (long Value, Basi
 				instructions.Add(CilOpCodes.Beq, Cases[i].Target.Label);
 			}
 		}
+	}
+
+	public bool Equals(SwitchInstruction? other)
+	{
+		if (other is null)
+		{
+			return false;
+		}
+		if (ReferenceEquals(this, other))
+		{
+			return true;
+		}
+		if (!SignatureComparer.Default.Equals(IndexType, other.IndexType) || Cases.Length != other.Cases.Length)
+		{
+			return false;
+		}
+		for (int i = 0; i < Cases.Length; i++)
+		{
+			if (Cases[i].Value != other.Cases[i].Value || !Cases[i].Target.Equals(other.Cases[i].Target))
+			{
+				return false;
+			}
+		}
+		return true;
+	}
+
+	public override int GetHashCode()
+	{
+		return HashCode.Combine(SignatureComparer.Default.GetHashCode(IndexType), Cases.Length);
 	}
 }

@@ -6,9 +6,8 @@ using AssetRipper.Translation.LlvmIR.Extensions;
 
 namespace AssetRipper.Translation.LlvmIR.Instructions;
 
-internal sealed class ReturnDefaultInstruction(TypeSignature type) : Instruction
+internal sealed record class ReturnDefaultInstruction(TypeSignature Type) : Instruction
 {
-	public TypeSignature Type { get; } = type;
 	public override bool StackHeightDependent => true;
 	public override int PopCount => 0;
 	public override int PushCount => 0;
@@ -16,5 +15,19 @@ internal sealed class ReturnDefaultInstruction(TypeSignature type) : Instruction
 	{
 		instructions.AddDefaultValue(Type); // Does nothing if the return type is void
 		instructions.Add(CilOpCodes.Ret);
+	}
+
+	public bool Equals(ReturnDefaultInstruction? other)
+	{
+		if (other is null)
+		{
+			return false;
+		}
+		return SignatureComparer.Default.Equals(Type, other.Type);
+	}
+
+	public override int GetHashCode()
+	{
+		return SignatureComparer.Default.GetHashCode(Type);
 	}
 }

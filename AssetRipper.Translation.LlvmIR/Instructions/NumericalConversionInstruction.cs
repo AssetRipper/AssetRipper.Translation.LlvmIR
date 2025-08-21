@@ -9,7 +9,7 @@ using System.Diagnostics;
 
 namespace AssetRipper.Translation.LlvmIR.Instructions;
 
-internal class NumericalConversionInstruction : Instruction
+internal sealed record class NumericalConversionInstruction : Instruction
 {
 	public override int PopCount => 1;
 	public override int PushCount => 1;

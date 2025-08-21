@@ -7,9 +7,8 @@ using System.Runtime.CompilerServices;
 
 namespace AssetRipper.Translation.LlvmIR.Instructions;
 
-internal sealed class ClearStackFrameInstruction(FunctionContext function) : Instruction
+internal sealed record class ClearStackFrameInstruction(FunctionContext Function) : Instruction
 {
-	public FunctionContext Function { get; } = function;
 	public override int PopCount => 0;
 	public override int PushCount => 0;
 	public override void AddInstructions(CilInstructionCollection instructions)

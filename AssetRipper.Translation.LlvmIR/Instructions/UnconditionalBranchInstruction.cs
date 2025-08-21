@@ -3,9 +3,8 @@ using AsmResolver.PE.DotNet.Cil;
 
 namespace AssetRipper.Translation.LlvmIR.Instructions;
 
-public sealed class UnconditionalBranchInstruction(BasicBlock target) : Instruction
+public sealed record class UnconditionalBranchInstruction(BasicBlock Target) : Instruction
 {
-	public BasicBlock Target { get; } = target;
 	public override bool StackHeightDependent => true;
 	public override int PopCount => 0;
 	public override int PushCount => 0;

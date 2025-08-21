@@ -3,7 +3,7 @@ using AsmResolver.PE.DotNet.Cil;
 
 namespace AssetRipper.Translation.LlvmIR.Instructions;
 
-public sealed class PopInstruction : Instruction
+public sealed record class PopInstruction : Instruction
 {
 	public static PopInstruction Instance { get; } = new();
 	public override int PopCount => 1;

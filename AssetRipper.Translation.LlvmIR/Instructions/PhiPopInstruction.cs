@@ -5,7 +5,7 @@ namespace AssetRipper.Translation.LlvmIR.Instructions;
 /// <summary>
 /// A special instruction to indicate the popping stack effect from the devolution of a phi instruction.
 /// </summary>
-internal sealed class PhiPopInstruction : Instruction
+internal sealed record class PhiPopInstruction : Instruction
 {
 	public static PhiPopInstruction Instance { get; } = new();
 	public override int PopCount => 1;

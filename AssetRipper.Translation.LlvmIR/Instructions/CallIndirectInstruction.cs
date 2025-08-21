@@ -5,9 +5,8 @@ using AsmResolver.PE.DotNet.Cil;
 
 namespace AssetRipper.Translation.LlvmIR.Instructions;
 
-public sealed class CallIndirectInstruction(StandAloneSignature signature) : Instruction
+public sealed record class CallIndirectInstruction(StandAloneSignature Signature) : Instruction
 {
-	public StandAloneSignature Signature { get; } = signature;
 	public MethodSignature MethodSignature => (MethodSignature)Signature.Signature!;
 	public override int PopCount => MethodSignature.ParameterTypes.Count + 1; // +1 for the function pointer
 	public override int PushCount => MethodSignature.ReturnsValue ? 1 : 0;

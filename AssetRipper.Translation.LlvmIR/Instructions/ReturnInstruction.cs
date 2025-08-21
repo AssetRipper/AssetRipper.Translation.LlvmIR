@@ -3,7 +3,7 @@ using AsmResolver.PE.DotNet.Cil;
 
 namespace AssetRipper.Translation.LlvmIR.Instructions;
 
-public abstract class ReturnInstruction : Instruction
+public abstract record class ReturnInstruction : Instruction
 {
 	public static ReturnInstruction Void { get; } = new VoidReturnInstruction();
 	public static ReturnInstruction Value { get; } = new ValueReturnInstruction();
@@ -18,11 +18,11 @@ public abstract class ReturnInstruction : Instruction
 		instructions.Add(CilOpCodes.Ret);
 	}
 
-	private sealed class VoidReturnInstruction : ReturnInstruction
+	private sealed record class VoidReturnInstruction : ReturnInstruction
 	{
 		public override int PopCount => 0;
 	}
-	private sealed class ValueReturnInstruction : ReturnInstruction
+	private sealed record class ValueReturnInstruction : ReturnInstruction
 	{
 		public override int PopCount => 1;
 	}

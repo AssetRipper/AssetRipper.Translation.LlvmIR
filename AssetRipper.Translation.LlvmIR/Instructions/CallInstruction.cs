@@ -1,12 +1,12 @@
 ﻿using AsmResolver.DotNet;
 using AsmResolver.DotNet.Code.Cil;
+using AsmResolver.DotNet.Signatures;
 using AsmResolver.PE.DotNet.Cil;
 
 namespace AssetRipper.Translation.LlvmIR.Instructions;
 
-public sealed class CallInstruction(IMethodDescriptor method) : Instruction
+public sealed record class CallInstruction(IMethodDescriptor Method) : Instruction
 {
-	public IMethodDescriptor Method { get; } = method;
 	public bool IsStatic => !Method.Signature!.HasThis;
 	public int ParameterCount => Method.Signature!.ParameterTypes.Count;
 	public bool ReturnsValue => Method.Signature!.ReturnsValue;
@@ -15,5 +15,19 @@ public sealed class CallInstruction(IMethodDescriptor method) : Instruction
 	public override void AddInstructions(CilInstructionCollection instructions)
 	{
 		instructions.Add(IsStatic ? CilOpCodes.Call : CilOpCodes.Callvirt, Method);
+	}
+
+	public bool Equals(CallInstruction? other)
+	{
+		if (other is null)
+		{
+			return false;
+		}
+		return SignatureComparer.Default.Equals(Method, other.Method);
+	}
+
+	public override int GetHashCode()
+	{
+		return SignatureComparer.Default.GetHashCode(Method);
 	}
 }

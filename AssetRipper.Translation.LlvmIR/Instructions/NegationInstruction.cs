@@ -6,7 +6,7 @@ using AssetRipper.Translation.LlvmIR.Extensions;
 
 namespace AssetRipper.Translation.LlvmIR.Instructions;
 
-public sealed class NegationInstruction : Instruction
+public sealed record class NegationInstruction : Instruction
 {
 	public static NegationInstruction Instance { get; } = new();
 	public override int PopCount => 1;

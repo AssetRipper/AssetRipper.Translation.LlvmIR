@@ -3,7 +3,7 @@ using AsmResolver.PE.DotNet.Cil;
 
 namespace AssetRipper.Translation.LlvmIR.Instructions;
 
-public abstract class Instruction
+public abstract record class Instruction
 {
 	/// <summary>
 	/// If true, optimizations cannot make changes that would affect the stack height coming into this instruction.
@@ -35,7 +35,7 @@ public abstract class Instruction
 		return instruction;
 	}
 
-	private sealed class CilOpCodeInstruction(CilOpCode opCode) : Instruction
+	private sealed record class CilOpCodeInstruction(CilOpCode opCode) : Instruction
 	{
 		public CilOpCode OpCode { get; } = opCode;
 
