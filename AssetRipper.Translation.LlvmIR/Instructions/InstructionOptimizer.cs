@@ -23,6 +23,7 @@ public static class InstructionOptimizer
 	{
 		bool changed = false;
 		changed |= RunPass_MergeIndirect(basicBlock);
+		changed |= RunPass_EliminateUnnessaryInitialization(basicBlock, temporaryVariables);
 		return changed;
 	}
 
@@ -113,6 +114,103 @@ public static class InstructionOptimizer
 					}
 					break;
 			}
+		}
+		return changed;
+	}
+
+	private static bool RunPass_EliminateUnnessaryInitialization(BasicBlock basicBlock, HashSet<IVariable> temporaryVariables)
+	{
+		bool changed = false;
+		for (int i = basicBlock.Count - 1; i >= 0; i--)
+		{
+			if (basicBlock[i] is not InitializeInstruction initialize || !temporaryVariables.Contains(initialize.Variable))
+			{
+				continue;
+			}
+
+			bool shouldContinue = false;
+
+			// Check backwards
+			for (int j = i - 1; j >= 0; j--)
+			{
+				switch (basicBlock[j])
+				{
+					case StoreVariableInstruction store:
+						if (store.Variable == initialize.Variable)
+						{
+							// If the variable has already been stored to, removing the initialization would change its value.
+							shouldContinue = true;
+						}
+						break;
+					case AddressOfInstruction addressOf:
+						if (addressOf.Variable == initialize.Variable)
+						{
+							// If the address of the variable is taken, we cannot remove the initialization.
+							shouldContinue = true;
+						}
+						break;
+				}
+
+				if (shouldContinue)
+				{
+					break;
+				}
+			}
+
+			if (shouldContinue)
+			{
+				continue;
+			}
+
+			// Check forwards
+			for (int j = i + 1; j < basicBlock.Count; j++)
+			{
+				bool shouldStop = false;
+				switch (basicBlock[j])
+				{
+					case LoadVariableInstruction load:
+						if (load.Variable == initialize.Variable)
+						{
+							// If the variable is loaded after initialization, we cannot remove the initialization.
+							shouldContinue = true;
+						}
+						break;
+					case StoreVariableInstruction store:
+						if (store.Variable == initialize.Variable)
+						{
+							// The variable is stored to after initialization, so we can remove the initialization.
+							shouldStop = true;
+						}
+						break;
+					case AddressOfInstruction addressOf:
+						if (addressOf.Variable == initialize.Variable)
+						{
+							// If the address of the variable is taken, we cannot remove the initialization.
+							shouldContinue = true;
+						}
+						break;
+					case InitializeInstruction previousInitialize:
+						if (previousInitialize.Variable == initialize.Variable)
+						{
+							// The variable is stored to after initialization, so we can remove the initialization.
+							shouldStop = true;
+						}
+						break;
+				}
+
+				if (shouldContinue || shouldStop)
+				{
+					break;
+				}
+			}
+
+			if (shouldContinue)
+			{
+				continue;
+			}
+
+			basicBlock.RemoveAt(i);
+			changed = true;
 		}
 		return changed;
 	}
