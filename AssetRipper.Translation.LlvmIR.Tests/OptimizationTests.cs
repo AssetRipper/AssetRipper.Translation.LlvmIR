@@ -43,8 +43,8 @@ internal class OptimizationTests
 	public void StoreIndirect_1()
 	{
 		LocalVariable data = new(Int32);
-		LocalVariable x = new(Int32);
-		LocalVariable y = new(Int32);
+		ImportantVariable x = new(Int32);
+		ImportantVariable y = new(Int32);
 
 		BasicBlock instructions =
 		[
@@ -72,10 +72,10 @@ internal class OptimizationTests
 	public void StoreIndirect_2()
 	{
 		LocalVariable data = new(Int32);
-		LocalVariable x = new(Int32);
-		LocalVariable y = new(Int32);
-		LocalVariable z = new(Int32);
-		LocalVariable w = new(Int32);
+		ImportantVariable x = new(Int32);
+		ImportantVariable y = new(Int32);
+		ImportantVariable z = new(Int32);
+		ImportantVariable w = new(Int32);
 
 		BasicBlock instructions =
 		[
@@ -126,7 +126,7 @@ internal class OptimizationTests
 	public void Initialize_ShouldNotBeRemovedIfAddressStoredBefore()
 	{
 		LocalVariable data = new(Int32);
-		LocalVariable pointer = new(Int32.MakePointerType());
+		ImportantVariable pointer = new(Int32.MakePointerType());
 
 		BasicBlock instructions =
 		[
@@ -151,7 +151,7 @@ internal class OptimizationTests
 	public void Initialize_ShouldNotBeRemovedIfAddressOccursAfter()
 	{
 		LocalVariable data = new(Int32);
-		LocalVariable pointer = new(Int32.MakePointerType());
+		ImportantVariable pointer = new(Int32.MakePointerType());
 
 		BasicBlock instructions =
 		[
@@ -176,8 +176,7 @@ internal class OptimizationTests
 	public void Initialize_ShouldBeRemovedIfStoreOccursAfter_1()
 	{
 		LocalVariable data = new(Int32);
-		LocalVariable x = new(Int32);
-		LocalVariable pointer = new(Int32.MakePointerType());
+		ImportantVariable x = new(Int32);
 
 		BasicBlock instructions =
 		[
@@ -201,8 +200,8 @@ internal class OptimizationTests
 	public void Initialize_ShouldBeRemovedIfStoreOccursAfter_2()
 	{
 		LocalVariable data = new(Int32);
-		LocalVariable x = new(Int32);
-		LocalVariable pointer = new(Int32.MakePointerType());
+		ImportantVariable x = new(Int32);
+		ImportantVariable pointer = new(Int32.MakePointerType());
 
 		BasicBlock instructions =
 		[
@@ -230,7 +229,7 @@ internal class OptimizationTests
 	public void Initialize_ShouldNotBeRemovedIfLoadOccursAfter()
 	{
 		LocalVariable data = new(Int32);
-		LocalVariable x = new(Int32);
+		ImportantVariable x = new(Int32);
 
 		BasicBlock instructions =
 		[
@@ -255,7 +254,7 @@ internal class OptimizationTests
 	public void Initialize_DoubleInitializationShouldBeRemoved()
 	{
 		LocalVariable data = new(Int32);
-		LocalVariable x = new(Int32);
+		ImportantVariable x = new(Int32);
 
 		BasicBlock instructions =
 		[
@@ -278,4 +277,9 @@ internal class OptimizationTests
 	}
 
 	private static void Optimize(BasicBlock instructions) => InstructionOptimizer.Optimize([instructions]);
+
+	private sealed class ImportantVariable(TypeSignature type) : LocalVariable(type), IVariable
+	{
+		bool IVariable.IsTemporary => false;
+	}
 }
