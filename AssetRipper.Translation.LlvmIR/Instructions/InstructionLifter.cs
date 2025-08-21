@@ -19,7 +19,8 @@ internal unsafe readonly struct InstructionLifter
 	/// This can include generated blocks that are not part of the original IL.
 	/// </summary>
 	private readonly List<BasicBlock> basicBlockList = new();
-	private readonly Dictionary<LLVMValueRef, LocalVariable> instructionResults = new();
+	private readonly Dictionary<LLVMValueRef, IVariable> instructionResults = new();
+	private readonly Dictionary<LLVMValueRef, IVariable> allocaData = new();
 	private readonly FunctionContext? function;
 	private readonly ModuleContext module;
 
@@ -50,6 +51,22 @@ internal unsafe readonly struct InstructionLifter
 
 		foreach (LLVMValueRef instruction in function.Function.GetInstructions())
 		{
+			if (instruction.InstructionOpcode is LLVMOpcode.LLVMAlloca)
+			{
+				TypeSignature allocatedType = lifter.GetTypeSignature(LLVM.GetAllocatedType(instruction));
+				LLVMValueRef sizeOperand = instruction.GetOperand(0);
+				long fixedSize = sizeOperand.ConstIntSExt;
+				TypeSignature dataType = fixedSize != 1
+					? lifter.module.GetOrCreateInlineArray(allocatedType, (int)fixedSize).Type.ToTypeSignature()
+					: allocatedType;
+
+				IVariable dataLocal = function is not null && function.MightThrowAnException ? new FunctionFieldVariable(dataType, function) : new LocalVariable(dataType);
+
+				lifter.allocaData.Add(instruction, dataLocal);
+
+				continue;
+			}
+
 			TypeSignature resultType = lifter.GetTypeSignature(instruction);
 			if (resultType is not CorLibTypeSignature { ElementType: ElementType.Void })
 			{
@@ -110,17 +127,7 @@ internal unsafe readonly struct InstructionLifter
 		{
 			case LLVMOpcode.LLVMAlloca:
 				{
-					TypeSignature allocatedType = module.GetTypeSignature(LLVM.GetAllocatedType(instruction));
-					LLVMValueRef sizeOperand = operands[0];
-					long fixedSize = sizeOperand.ConstIntSExt;
-					TypeSignature dataType = fixedSize != 1
-						? module.GetOrCreateInlineArray(allocatedType, (int)fixedSize).Type.ToTypeSignature()
-						: allocatedType;
-
-					IVariable dataLocal = function is not null && function.MightThrowAnException ? new FunctionFieldVariable(dataType, function) : new LocalVariable(dataType);
-					instructions.Add(new InitializeInstruction(dataLocal));
-					instructions.Add(new AddressOfInstruction(dataLocal));
-					instructions.Add(new StoreVariableInstruction(instructionResults[instruction]));
+					instructions.Add(new InitializeInstruction(allocaData[instruction]));
 				}
 				break;
 			case LLVMOpcode.LLVMLoad:
@@ -1061,7 +1068,14 @@ internal unsafe readonly struct InstructionLifter
 				break;
 			case LLVMValueKind.LLVMInstructionValueKind:
 				{
-					LoadVariable(instructions, instructionResults[value]);
+					if (value.InstructionOpcode is LLVMOpcode.LLVMAlloca)
+					{
+						instructions.Add(new AddressOfInstruction(allocaData[value]));
+					}
+					else
+					{
+						LoadVariable(instructions, instructionResults[value]);
+					}
 				}
 				break;
 			case LLVMValueKind.LLVMArgumentValueKind:
@@ -1088,7 +1102,7 @@ internal unsafe readonly struct InstructionLifter
 
 	private void MaybeStoreResult(IList<Instruction> instructions, LLVMValueRef instruction)
 	{
-		if (instructionResults.TryGetValue(instruction, out LocalVariable? result))
+		if (instructionResults.TryGetValue(instruction, out IVariable? result))
 		{
 			instructions.Add(new StoreVariableInstruction(result));
 		}
