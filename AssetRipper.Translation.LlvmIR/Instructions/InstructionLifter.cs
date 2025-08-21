@@ -239,7 +239,7 @@ internal unsafe readonly struct InstructionLifter
 						{
 							targetBlock = basicBlocks[targetBlockRef];
 						}
-						caseTargets[i] = (caseValue.ConstIntSExt, basicBlocks[targetBlockRef]);
+						caseTargets[i] = (caseValue.ConstIntSExt, targetBlock);
 					}
 
 					TypeSignature indexType = module.GetTypeSignature(indexOperand);
