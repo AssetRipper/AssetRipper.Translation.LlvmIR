@@ -22,6 +22,13 @@ public static class InstructionOptimizer
 	private static bool TryOptimize(BasicBlock basicBlock, HashSet<IVariable> temporaryVariables)
 	{
 		bool changed = false;
+		changed |= RunPass_MergeIndirect(basicBlock);
+		return changed;
+	}
+
+	private static bool RunPass_MergeIndirect(BasicBlock basicBlock)
+	{
+		bool changed = false;
 		for (int i = basicBlock.Count - 1; i >= 0; i--)
 		{
 			switch (basicBlock[i])
