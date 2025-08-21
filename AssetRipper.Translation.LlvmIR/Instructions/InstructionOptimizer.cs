@@ -32,7 +32,7 @@ public static class InstructionOptimizer
 						switch (basicBlock[i - 1])
 						{
 							case AddressOfInstruction addressOf:
-								if (SignatureComparer.Default.Equals(addressOf.Variable.VariableType, loadIndirect.Type))
+								if (addressOf.Variable.SupportsLoad && SignatureComparer.Default.Equals(addressOf.Variable.VariableType, loadIndirect.Type))
 								{
 									LoadVariableInstruction replacement = new(addressOf.Variable);
 									basicBlock[i - 1] = replacement;
@@ -51,6 +51,57 @@ public static class InstructionOptimizer
 									i--;
 								}
 								break;
+						}
+					}
+					break;
+				case StoreIndirectInstruction storeIndirect:
+					{
+						// Find the source address of the store.
+						int stackHeight = 2;
+						int index = i - 1;
+						for (; index >= 0; index--)
+						{
+							Instruction current = basicBlock[index];
+							if (current.StackHeightDependent)
+							{
+								break;
+							}
+
+							stackHeight -= current.PushCount;
+
+							if (stackHeight == 0)
+							{
+								switch (current)
+								{
+									case AddressOfInstruction addressOf:
+										if (addressOf.Variable.SupportsLoad && SignatureComparer.Default.Equals(addressOf.Variable.VariableType, storeIndirect.Type))
+										{
+											StoreVariableInstruction replacement = new(addressOf.Variable);
+											basicBlock[i] = replacement;
+											basicBlock.RemoveAt(index);
+											changed = true;
+											i--;
+										}
+										break;
+									case LoadFieldAddressInstruction loadFieldAddress:
+										if (SignatureComparer.Default.Equals(loadFieldAddress.Field.Signature?.FieldType, storeIndirect.Type))
+										{
+											StoreFieldInstruction replacement = new(loadFieldAddress.Field);
+											basicBlock[i] = replacement;
+											basicBlock.RemoveAt(index);
+											changed = true;
+											i--;
+										}
+										break;
+								}
+								break;
+							}
+							else if (stackHeight < 0)
+							{
+								break;
+							}
+
+							stackHeight += current.PopCount;
 						}
 					}
 					break;
