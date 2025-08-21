@@ -22,4 +22,10 @@ internal static class LLVMTypeRefExtensions
 			}
 		}
 	}
+
+	public static unsafe ulong GetABISize(this LLVMTypeRef type, LLVMModuleRef module)
+	{
+		LLVMTargetDataRef targetData = LLVM.GetModuleDataLayout(module);
+		return LLVM.ABISizeOfType(targetData, type);
+	}
 }

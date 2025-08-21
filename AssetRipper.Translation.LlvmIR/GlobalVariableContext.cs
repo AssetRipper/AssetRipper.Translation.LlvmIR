@@ -5,6 +5,8 @@ using AsmResolver.PE.DotNet.Cil;
 using AsmResolver.PE.DotNet.Metadata.Tables;
 using AssetRipper.CIL;
 using AssetRipper.Translation.LlvmIR.Extensions;
+using AssetRipper.Translation.LlvmIR.Instructions;
+using AssetRipper.Translation.LlvmIR.Variables;
 using LLVMSharp.Interop;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
@@ -12,7 +14,7 @@ using System.Diagnostics.CodeAnalysis;
 namespace AssetRipper.Translation.LlvmIR;
 
 [DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
-internal sealed class GlobalVariableContext : IHasName
+internal sealed class GlobalVariableContext : IHasName, IVariable
 {
 	public GlobalVariableContext(LLVMValueRef globalVariable, ModuleContext module)
 	{
@@ -36,6 +38,8 @@ internal sealed class GlobalVariableContext : IHasName
 	public LLVMValueRef Operand => !HasSingleOperand ? default : GlobalVariable.GetOperand(0);
 	public unsafe LLVMTypeRef Type => LLVM.GlobalGetValueType(GlobalVariable);
 	public TypeSignature PointerType => PointerField?.Signature?.FieldType ?? DataGetMethod.Signature!.ReturnType.MakePointerType();
+	TypeSignature IVariable.VariableType => DataGetMethod.Signature!.ReturnType;
+	bool IVariable.SupportsLoadAddress => true;
 	public TypeDefinition DeclaringType { get; set; } = null!;
 	private FieldDefinition PointerField { get; set; } = null!;
 	public MethodDefinition DataGetMethod { get; set; } = null!;
@@ -118,8 +122,9 @@ internal sealed class GlobalVariableContext : IHasName
 		{
 			PointerInstructionsCount = instructions.Count;
 
-			Module.LoadValue(instructions, Operand);
-			instructions.Add(CilOpCodes.Call, DataSetMethod);
+			BasicBlock basicBlock = InstructionLifter.Initialize(this);
+			InstructionOptimizer.Optimize([basicBlock]);
+			basicBlock.AddInstructions(instructions);
 		}
 		else
 		{
@@ -168,7 +173,17 @@ internal sealed class GlobalVariableContext : IHasName
 		this.AddNameAttributes(property);
 	}
 
-	public void AddLoadPointer(CilInstructionCollection instructions)
+	void IVariable.AddLoad(CilInstructionCollection instructions)
+	{
+		instructions.Add(CilOpCodes.Call, DataGetMethod);
+	}
+
+	void IVariable.AddStore(CilInstructionCollection instructions)
+	{
+		instructions.Add(CilOpCodes.Call, DataSetMethod);
+	}
+
+	public void AddLoadAddress(CilInstructionCollection instructions)
 	{
 		PointerIsUsed = true;
 		instructions.Add(CilOpCodes.Ldsfld, PointerField);

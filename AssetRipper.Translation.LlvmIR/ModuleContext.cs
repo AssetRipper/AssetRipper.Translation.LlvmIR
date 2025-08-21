@@ -8,11 +8,8 @@ using AsmResolver.PE.DotNet.Cil;
 using AsmResolver.PE.DotNet.Metadata.Tables;
 using AssetRipper.CIL;
 using AssetRipper.Translation.LlvmIR.Extensions;
-using AssetRipper.Translation.LlvmIR.Instructions;
 using LLVMSharp.Interop;
-using System.Buffers.Binary;
 using System.Diagnostics;
-using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 
@@ -337,272 +334,59 @@ internal sealed partial class ModuleContext
 		}
 	}
 
-	public TypeSignature GetTypeSignature(LLVMValueRef value)
+	public unsafe TypeSignature GetTypeSignature(LLVMValueRef value)
 	{
 		return value.Kind switch
 		{
-			LLVMValueKind.LLVMInstructionValueKind => Methods[value.InstructionParent.Parent].InstructionLookup[value].ResultTypeSignature,
+			LLVMValueKind.LLVMInstructionValueKind or LLVMValueKind.LLVMConstantExprValueKind => value.GetOpcode() switch
+			{
+				LLVMOpcode.LLVMAlloca => GetTypeSignature(LLVM.GetAllocatedType(value)).MakePointerType(),
+				LLVMOpcode.LLVMCatchPad or LLVMOpcode.LLVMCleanupPad => InjectedTypes[typeof(ExceptionInfo)].ToTypeSignature(),
+				LLVMOpcode.LLVMGetElementPtr => GetGEPFinalType(value).MakePointerType(),
+				LLVMOpcode.LLVMRet => Definition.CorLibTypeFactory.Void,
+				LLVMOpcode.LLVMStore => Definition.CorLibTypeFactory.Void,
+				_ => GetTypeSignature(value.TypeOf),
+			},
 			LLVMValueKind.LLVMArgumentValueKind => Methods[value.ParamParent].ParameterLookup[value].Definition.ParameterType,
 			LLVMValueKind.LLVMGlobalVariableValueKind => GlobalVariables[value].PointerType,
 			_ => GetTypeSignature(value.TypeOf),
 		};
 	}
 
-	public void LoadValue(CilInstructionCollection CilInstructions, LLVMValueRef value)
+	private unsafe TypeSignature GetGEPFinalType(LLVMValueRef instruction)
 	{
-		LoadValue(CilInstructions, value, out _);
-	}
-	public void LoadValue(CilInstructionCollection instructions, LLVMValueRef value, out TypeSignature typeSignature)
-	{
-		switch (value.Kind)
+		Debug.Assert(instruction.GetOpcode() is LLVMOpcode.LLVMGetElementPtr);
+
+		ReadOnlySpan<LLVMValueRef> otherIndices = instruction.GetOperands().AsSpan(2);
+
+		LLVMTypeRef sourceElementType = LLVM.GetGEPSourceElementType(instruction);
+		TypeSignature sourceElementTypeSignature = GetTypeSignature(sourceElementType);
+
+		TypeSignature currentType = sourceElementTypeSignature;
+		foreach (LLVMValueRef operand in otherIndices)
 		{
-			case LLVMValueKind.LLVMConstantIntValueKind:
-				{
-					const int BitsPerByte = 8;
-					long integer = value.ConstIntSExt;
-					LLVMTypeRef operandType = value.TypeOf;
-					typeSignature = GetTypeSignature(operandType);
-					if (integer is <= int.MaxValue and >= int.MinValue && operandType is { IntWidth: <= sizeof(int) * BitsPerByte })
-					{
-						instructions.Add(CilOpCodes.Ldc_I4, (int)integer);
-					}
-					else if (operandType is { IntWidth: sizeof(long) * BitsPerByte })
-					{
-						instructions.Add(CilOpCodes.Ldc_I8, integer);
-					}
-					else if (operandType is { IntWidth: 2 * sizeof(long) * BitsPerByte })
-					{
-						instructions.Add(CilOpCodes.Ldc_I8, integer);
-						MethodDefinition conversionMethod = typeSignature.Resolve()!.Methods.First(m =>
-						{
-							return m.Name == "op_Implicit" && m.Parameters.Count == 1 && m.Parameters[0].ParameterType is CorLibTypeSignature { ElementType: ElementType.I8 };
-						});
-						instructions.Add(CilOpCodes.Call, Definition.DefaultImporter.ImportMethod(conversionMethod));
-					}
-					else
-					{
-						throw new NotSupportedException($"Unsupported integer type: {typeSignature}");
-					}
-				}
-				break;
-			case LLVMValueKind.LLVMGlobalVariableValueKind:
-				{
-					GlobalVariableContext global = GlobalVariables[value];
+			LLVMTypeRef operandType = operand.TypeOf;
 
-					global.AddLoadPointer(instructions);
+			operandType.ThrowIfNotCoreLibInteger();
 
-					typeSignature = global.PointerType;
-				}
-				break;
-			case LLVMValueKind.LLVMGlobalAliasValueKind:
-				{
-					LLVMValueRef[] operands = value.GetOperands();
-					if (operands.Length == 1)
-					{
-						LoadValue(instructions, operands[0], out typeSignature);
-					}
-					else
-					{
-						throw new NotSupportedException();
-					}
-				}
-				break;
-			case LLVMValueKind.LLVMConstantFPValueKind:
-				{
-					double floatingPoint = value.GetFloatingPointValue();
-					typeSignature = GetTypeSignature(value.TypeOf);
-					switch (typeSignature)
-					{
-						case CorLibTypeSignature { ElementType: ElementType.R4 }:
-							instructions.Add(CilOpCodes.Ldc_R4, (float)floatingPoint);
-							break;
-						case CorLibTypeSignature { ElementType: ElementType.R8 }:
-							instructions.Add(CilOpCodes.Ldc_R8, floatingPoint);
-							break;
-						default:
-							throw new NotSupportedException();
-					}
-				}
-				break;
-			case LLVMValueKind.LLVMConstantDataArrayValueKind:
-				{
-					typeSignature = GetTypeSignature(value.TypeOf);
+			TypeDefOrRefSignature structTypeSignature = (TypeDefOrRefSignature)currentType;
+			TypeDefinition structType = (TypeDefinition)structTypeSignature.ToTypeDefOrRef();
 
-					TypeDefinition inlineArrayType = (TypeDefinition)typeSignature.ToTypeDefOrRef();
-					InlineArrayTypes[inlineArrayType].GetUltimateElementType(out TypeSignature elementType, out int elementCount);
+			if (InlineArrayTypes.TryGetValue(structType, out InlineArrayContext? inlineArray))
+			{
+				currentType = inlineArray.ElementType;
+			}
+			else
+			{
+				Debug.Assert(operand.Kind == LLVMValueKind.LLVMConstantIntValueKind);
 
-					ReadOnlySpan<byte> data = LibLLVMSharp.ConstantDataArrayGetData(value);
-
-					if (elementType is CorLibTypeSignature { ElementType: ElementType.I2 } && data.TryParseCharacterArray(out string? @string))
-					{
-						elementType = Definition.CorLibTypeFactory.Char;
-
-						IMethodDescriptor toCharacterSpan = SpanHelperType.Methods
-							.Single(m => m.Name == nameof(SpanHelper.ToCharacterSpan));
-
-						instructions.Add(CilOpCodes.Ldstr, @string);
-						instructions.Add(CilOpCodes.Call, toCharacterSpan);
-					}
-					else if (elementType is CorLibTypeSignature { ElementType: ElementType.I1 or ElementType.U1 })
-					{
-						elementType = Definition.CorLibTypeFactory.Byte;
-
-						IMethodDefOrRef spanConstructor = (IMethodDefOrRef)Definition.DefaultImporter
-							.ImportMethod(typeof(ReadOnlySpan<byte>).GetConstructor([typeof(void*), typeof(int)])!);
-
-						FieldDefinition field = AddStoredDataField(data);
-						instructions.Add(CilOpCodes.Ldsflda, field);
-						instructions.Add(CilOpCodes.Ldc_I4, data.Length);
-						instructions.Add(CilOpCodes.Newobj, spanConstructor);
-					}
-					else
-					{
-						IMethodDefOrRef createSpan = (IMethodDefOrRef)Definition.DefaultImporter
-							.ImportMethod(typeof(RuntimeHelpers).GetMethod(nameof(RuntimeHelpers.CreateSpan))!);
-						IMethodDescriptor createSpanInstance = createSpan.MakeGenericInstanceMethod(elementType);
-
-						FieldDefinition field = AddStoredDataField(data);
-						instructions.Add(CilOpCodes.Ldtoken, field);
-						instructions.Add(CilOpCodes.Call, createSpanInstance);
-					}
-
-					Debug.Assert(elementType is not PointerTypeSignature, "Pointers cannot be used as generic type arguments");
-
-					IMethodDescriptor createInlineArray = InlineArrayHelperType.Methods
-						.Single(m => m.Name == nameof(InlineArrayHelper.Create))
-						.MakeGenericInstanceMethod(typeSignature, elementType);
-
-					instructions.Add(CilOpCodes.Call, createInlineArray);
-				}
-				break;
-			case LLVMValueKind.LLVMConstantArrayValueKind:
-				{
-					TypeSignature underlyingType = GetTypeSignature(value.TypeOf);
-
-					LLVMValueRef[] elements = value.GetOperands();
-
-					InlineArrayTypes[(TypeDefinition)underlyingType.ToTypeDefOrRef()].GetElementType(out TypeSignature elementType, out int elementCount);
-
-					if (elementCount != elements.Length)
-					{
-						throw new Exception("Array element count mismatch");
-					}
-
-					Debug.Assert(elementType is not PointerTypeSignature, "Pointers cannot be used as generic type arguments");
-
-					TypeSignature spanType = Definition.DefaultImporter
-						.ImportType(typeof(Span<>))
-						.MakeGenericInstanceType(elementType);
-
-					IMethodDescriptor inlineArrayAsSpan = InlineArrayHelperType.Methods
-						.Single(m => m.Name == nameof(InlineArrayHelper.AsSpan))
-						.MakeGenericInstanceMethod(underlyingType, elementType);
-
-					MethodSignature getItemSignature = MethodSignature.CreateInstance(new GenericParameterSignature(GenericParameterType.Type, 0).MakeByReferenceType(), Definition.CorLibTypeFactory.Int32);
-					IMethodDescriptor getItem = new MemberReference(spanType.ToTypeDefOrRef(), "get_Item", getItemSignature);
-
-					CilLocalVariable bufferLocal = instructions.AddLocalVariable(underlyingType);
-					CilLocalVariable spanLocal = instructions.AddLocalVariable(spanType);
-
-					instructions.AddDefaultValue(underlyingType);
-					instructions.Add(CilOpCodes.Stloc, bufferLocal);
-
-					instructions.Add(CilOpCodes.Ldloca, bufferLocal);
-					instructions.Add(CilOpCodes.Call, inlineArrayAsSpan);
-					instructions.Add(CilOpCodes.Stloc, spanLocal);
-
-					for (int i = 0; i < elements.Length; i++)
-					{
-						LLVMValueRef element = elements[i];
-						instructions.Add(CilOpCodes.Ldloca, spanLocal);
-						instructions.Add(CilOpCodes.Ldc_I4, i);
-						instructions.Add(CilOpCodes.Call, getItem);
-						LoadValue(instructions, element);
-						instructions.AddStoreIndirect(elementType);
-					}
-
-					instructions.Add(CilOpCodes.Ldloc, bufferLocal);
-
-					typeSignature = underlyingType;
-				}
-				break;
-			case LLVMValueKind.LLVMConstantStructValueKind:
-				{
-					typeSignature = GetTypeSignature(value.TypeOf);
-					TypeDefinition typeDefinition = (TypeDefinition)typeSignature.ToTypeDefOrRef();
-
-					LLVMValueRef[] fields = value.GetOperands();
-					if (fields.Length != typeDefinition.Fields.Count)
-					{
-						throw new Exception("Struct field count mismatch");
-					}
-
-					CilLocalVariable resultLocal = instructions.AddLocalVariable(typeSignature);
-
-					instructions.AddDefaultValue(typeSignature);
-					instructions.Add(CilOpCodes.Stloc, resultLocal);
-
-					for (int i = 0; i < fields.Length; i++)
-					{
-						LLVMValueRef field = fields[i];
-						FieldDefinition fieldDefinition = typeDefinition.Fields[i];
-						instructions.Add(CilOpCodes.Ldloca, resultLocal);
-						instructions.Add(CilOpCodes.Ldflda, fieldDefinition);
-						LoadValue(instructions, field);
-						instructions.AddStoreIndirect(fieldDefinition.Signature!.FieldType);
-					}
-
-					instructions.Add(CilOpCodes.Ldloc, resultLocal);
-				}
-				break;
-			case LLVMValueKind.LLVMConstantPointerNullValueKind:
-			case LLVMValueKind.LLVMConstantAggregateZeroValueKind:
-			case LLVMValueKind.LLVMUndefValueValueKind:
-				{
-					typeSignature = GetTypeSignature(value.TypeOf);
-					instructions.AddDefaultValue(typeSignature);
-				}
-				break;
-			case LLVMValueKind.LLVMFunctionValueKind:
-				{
-					typeSignature = GetTypeSignature(value.TypeOf);
-
-					Methods[value].AddLoadFunctionPointer(instructions);
-				}
-				break;
-			case LLVMValueKind.LLVMConstantExprValueKind:
-				{
-					typeSignature = GetTypeSignature(value.TypeOf);
-					InstructionContext expression = InstructionContext.Create(value, this);
-					expression.CreateLocal(instructions);
-					expression.AddInstructions(instructions);
-					expression.AddLoad(instructions);
-				}
-				break;
-			case LLVMValueKind.LLVMInstructionValueKind:
-				{
-					InstructionContext instruction = Methods[value.InstructionParent.Parent].InstructionLookup[value];
-					instruction.AddLoad(instructions);
-					typeSignature = instruction.ResultTypeSignature;
-				}
-				break;
-			case LLVMValueKind.LLVMArgumentValueKind:
-				{
-					Parameter parameter = Methods[value.ParamParent].ParameterLookup[value].Definition;
-					instructions.Add(CilOpCodes.Ldarg, parameter);
-					typeSignature = parameter.ParameterType;
-				}
-				break;
-			case LLVMValueKind.LLVMMetadataAsValueValueKind:
-				{
-					//Metadata is not a real type, so we just use Object. Anywhere metadata is supposed to be loaded, we instead load a null value.
-					instructions.Add(CilOpCodes.Ldnull);
-					typeSignature = Definition.CorLibTypeFactory.Object;
-				}
-				break;
-			default:
-				throw new NotImplementedException(value.Kind.ToString());
+				int index = (int)operand.ConstIntSExt;
+				FieldDefinition field = structType.GetInstanceField(index);
+				currentType = field.Signature!.FieldType;
+			}
 		}
+
+		return currentType;
 	}
 
 	private TypeDefinition CreateStaticType(string name, bool @public)
@@ -682,17 +466,6 @@ internal sealed partial class ModuleContext
 		result.ClassLayout = new ClassLayout(1, (uint)length);
 		AddCompilerGeneratedAttribute(result);
 
-		return result;
-	}
-
-	private static TypeDefinition InjectType(Type type, ModuleDefinition targetModule)
-	{
-		ModuleDefinition executingModule = ModuleDefinition.FromFile(type.Assembly.Location);
-		MemberCloner cloner = new(targetModule);
-		cloner.Include(executingModule.TopLevelTypes.First(t => t.Namespace == type.Namespace && t.Name == type.Name));
-		TypeDefinition result = cloner.Clone().ClonedTopLevelTypes.Single();
-		result.Namespace = null;
-		targetModule.TopLevelTypes.Add(result);
 		return result;
 	}
 }

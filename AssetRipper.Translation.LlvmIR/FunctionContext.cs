@@ -6,7 +6,6 @@ using AsmResolver.PE.DotNet.Cil;
 using AsmResolver.PE.DotNet.Metadata.Tables;
 using AssetRipper.CIL;
 using AssetRipper.Translation.LlvmIR.Extensions;
-using AssetRipper.Translation.LlvmIR.Instructions;
 using LLVMSharp.Interop;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
@@ -110,99 +109,12 @@ internal sealed class FunctionContext : IHasName
 	public MethodDefinition Definition { get; }
 	public TypeDefinition DeclaringType => Definition.DeclaringType!;
 	public ModuleContext Module { get; }
-	public List<BasicBlockContext> BasicBlocks { get; } = new();
-	public List<InstructionContext> Instructions { get; } = new();
 	public Dictionary<LLVMValueRef, ParameterContext> ParameterLookup { get; } = new();
-	public Dictionary<LLVMValueRef, InstructionContext> InstructionLookup { get; } = new();
-	public Dictionary<LLVMBasicBlockRef, BasicBlockContext> BasicBlockLookup { get; } = new();
 	public bool NeedsStackFrame { get; set; }
 	public TypeDefinition? LocalVariablesType { get; set; }
 	public CilLocalVariable? StackFrameVariable { get; set; }
 	private FieldDefinition PointerField { get; set; } = null!;
 	private bool IsPointerFieldUsed { get; set; } = false;
-
-	public void InitializeInstructionData()
-	{
-		foreach (LLVMBasicBlockRef block in Function.GetBasicBlocks())
-		{
-			BasicBlockContext blockContext = BasicBlockContext.Create(block, this);
-			BasicBlocks.Add(blockContext);
-			BasicBlockLookup.Add(block, blockContext);
-			Instructions.AddRange(blockContext.Instructions);
-		}
-		Instructions.EnsureCapacity(Instructions.Count);
-		foreach (InstructionContext instruction in Instructions)
-		{
-			InstructionLookup.Add(instruction.Instruction, instruction);
-		}
-		foreach (BasicBlockContext basicBlock in BasicBlocks)
-		{
-			foreach (LLVMBasicBlockRef successor in basicBlock.Block.GetSuccessors())
-			{
-				BasicBlockContext successorBlock = BasicBlockLookup[successor];
-				basicBlock.Successors.Add(successorBlock);
-				successorBlock.Predecessors.Add(basicBlock);
-			}
-		}
-
-	}
-
-	public void AnalyzeDataFlow()
-	{
-		foreach (InstructionContext instruction in Instructions)
-		{
-			switch (instruction)
-			{
-				case LoadInstructionContext loadInstructionContext:
-					{
-						loadInstructionContext.SourceInstruction = InstructionLookup.TryGetValue(loadInstructionContext.SourceOperand);
-						loadInstructionContext.SourceInstruction?.Loads.Add(loadInstructionContext);
-					}
-					break;
-				case StoreInstructionContext storeInstructionContext:
-					{
-						MaybeAddAccessor(storeInstructionContext, storeInstructionContext.SourceOperand);
-						storeInstructionContext.DestinationInstruction = InstructionLookup.TryGetValue(storeInstructionContext.DestinationOperand);
-						storeInstructionContext.DestinationInstruction?.Stores.Add(storeInstructionContext);
-					}
-					break;
-				case PhiInstructionContext phiInstructionContext:
-					{
-						phiInstructionContext.InitializeIncomingBlocks();
-						MaybeAddAccessors(phiInstructionContext, phiInstructionContext.Operands);
-					}
-					break;
-				default:
-					{
-						MaybeAddAccessors(instruction, instruction.Operands);
-					}
-					break;
-			}
-		}
-
-		void MaybeAddAccessors(InstructionContext instruction, ReadOnlySpan<LLVMValueRef> operands)
-		{
-			foreach (LLVMValueRef operand in operands)
-			{
-				MaybeAddAccessor(instruction, operand);
-			}
-		}
-		void MaybeAddAccessor(InstructionContext instruction, LLVMValueRef operand)
-		{
-			if (InstructionLookup.TryGetValue(operand, out InstructionContext? source))
-			{
-				source.Accessors.Add(instruction);
-			}
-		}
-	}
-
-	public void ClearInstructionData()
-	{
-		Instructions.Clear();
-		BasicBlocks.Clear();
-		InstructionLookup.Clear();
-		BasicBlockLookup.Clear();
-	}
 
 	public void AddLocalVariablesPointer(CilInstructionCollection instructions)
 	{
