@@ -164,7 +164,7 @@ internal unsafe readonly struct InstructionLifter
 					{
 						LoadValue(instructions, operands[0]);
 					}
-					if (function is { MightThrowAnException: true })
+					if (function is { NeedsStackFrame: true })
 					{
 						instructions.Add(new ClearStackFrameInstruction(function));
 					}
