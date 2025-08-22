@@ -9,6 +9,7 @@ namespace AssetRipper.Translation.LlvmIR.Instructions;
 
 internal sealed record class ReturnIfExceptionInfoNotNullInstruction(TypeSignature ReturnType, FieldDefinition Field) : Instruction
 {
+	public override bool StackHeightDependent => true;
 	public override int PopCount => 0;
 	public override int PushCount => 0;
 	public override void AddInstructions(CilInstructionCollection instructions)
