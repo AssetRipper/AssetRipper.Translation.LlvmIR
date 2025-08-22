@@ -24,6 +24,7 @@ public static class InstructionOptimizer
 		bool changed = false;
 		changed |= RunPass_MergeIndirect(basicBlock);
 		changed |= RunPass_EliminateUnnessaryInitialization(basicBlock, temporaryVariables);
+		changed |= RunPass_RemoveUnnecessaryTemporaryVariables(basicBlock, temporaryVariables);
 		return changed;
 	}
 
@@ -113,6 +114,39 @@ public static class InstructionOptimizer
 						}
 					}
 					break;
+				case PopInstruction:
+					{
+						Debug.Assert(i > 0);
+						switch (basicBlock[i - 1])
+						{
+							case AddressOfInstruction:
+							case LoadVariableInstruction:
+							case LoadTokenInstruction:
+								{
+									basicBlock.RemoveRange(i - 1, 2);
+									changed = true;
+									i--;
+								}
+								break;
+							case LoadFieldInstruction loadField:
+								if (loadField.Field.IsStatic)
+								{
+									basicBlock.RemoveRange(i - 1, 2);
+									changed = true;
+									i--;
+								}
+								break;
+							case LoadFieldAddressInstruction loadFieldAddress:
+								if (loadFieldAddress.Field.IsStatic)
+								{
+									basicBlock.RemoveRange(i - 1, 2);
+									changed = true;
+									i--;
+								}
+								break;
+						}
+					}
+					break;
 			}
 		}
 		return changed;
@@ -120,6 +154,11 @@ public static class InstructionOptimizer
 
 	private static bool RunPass_EliminateUnnessaryInitialization(BasicBlock basicBlock, HashSet<IVariable> temporaryVariables)
 	{
+		if (temporaryVariables.Count == 0)
+		{
+			return false;
+		}
+
 		bool changed = false;
 		HashSet<IVariable> protectedVariables = new();
 		for (int i = 0; i < basicBlock.Count; i++)
@@ -210,6 +249,173 @@ public static class InstructionOptimizer
 			basicBlock.RemoveAt(i);
 			changed = true;
 		}
+		return changed;
+	}
+
+	private readonly record struct VariableUsage(int LoadCount, int StoreCount, int LoadIndex, int StoreIndex)
+	{
+		public static VariableUsage Default => new(0, 0, -1, -1);
+		public bool CanBeRemoved => LoadCount == 1 && StoreCount == 1 && LoadIndex > StoreIndex;
+		public VariableUsage WithLoad(int index) => this with { LoadCount = LoadCount + 1, LoadIndex = index };
+		public VariableUsage WithStore(int index) => this with { StoreCount = StoreCount + 1, StoreIndex = index };
+	}
+
+	private static bool RunPass_RemoveUnnecessaryTemporaryVariables(BasicBlock basicBlock, HashSet<IVariable> temporaryVariables)
+	{
+		if (temporaryVariables.Count == 0)
+		{
+			return false;
+		}
+
+		// To prove that a pair of load/store instructions can be removed, we need to show that:
+		// 1. The variable is only used in this block. (Guaranteed by temporaryVariables)
+		// 2. The variable is only loaded and stored once.
+		// 3. The variable store comes before the load.
+		// 4. The stack height is the same before the store as it is after the load.
+		// 5. There are no instructions between the store and load that depend on the exact stack height.
+		// 6. If the store is removed, the value being stored will remain on the stack until the load is reached.
+
+		bool changed = false;
+
+		Dictionary<IVariable, VariableUsage> variableUsages = [];
+		HashSet<IVariable> variablesWithAddressOrInitialization = [];
+		List<int> stackHeightBarriers = [];
+		int[] intraInstructionStackHeight = new int[basicBlock.Count];
+		int stackHeight = 0;
+		for (int i = 0; i < basicBlock.Count; i++)
+		{
+			Instruction instruction = basicBlock[i];
+
+			// Track stack height
+			intraInstructionStackHeight[i] = stackHeight - instruction.PopCount;
+			stackHeight += instruction.StackEffect;
+
+			if (instruction.StackHeightDependent)
+			{
+				stackHeightBarriers.Add(i);
+			}
+
+			switch (instruction)
+			{
+				case LoadVariableInstruction load:
+					if (temporaryVariables.Contains(load.Variable) && !variablesWithAddressOrInitialization.Contains(load.Variable))
+					{
+						if (!variableUsages.TryGetValue(load.Variable, out VariableUsage usage))
+						{
+							usage = VariableUsage.Default;
+						}
+						variableUsages[load.Variable] = usage.WithLoad(i);
+					}
+					break;
+				case StoreVariableInstruction store:
+					if (temporaryVariables.Contains(store.Variable) && !variablesWithAddressOrInitialization.Contains(store.Variable))
+					{
+						if (!variableUsages.TryGetValue(store.Variable, out VariableUsage usage))
+						{
+							usage = VariableUsage.Default;
+						}
+						variableUsages[store.Variable] = usage.WithStore(i);
+					}
+					break;
+				case AddressOfInstruction addressOf:
+					if (temporaryVariables.Contains(addressOf.Variable))
+					{
+						variablesWithAddressOrInitialization.Add(addressOf.Variable);
+						variableUsages.Remove(addressOf.Variable);
+					}
+					break;
+				case InitializeInstruction initialize:
+					if (temporaryVariables.Contains(initialize.Variable))
+					{
+						variablesWithAddressOrInitialization.Add(initialize.Variable);
+						variableUsages.Remove(initialize.Variable);
+					}
+					break;
+			}
+		}
+
+		List<int> indicesToRemove = [];
+		List<IVariable> variableStoresToReplaceWithPop = [];
+		foreach ((IVariable variable, VariableUsage usage) in variableUsages)
+		{
+			if (usage.LoadCount == 0)
+			{
+				// Variable is stored to but never loaded. Remove all stores.
+				Debug.Assert(usage.StoreCount >= 1);
+				Debug.Assert(usage.StoreIndex >= 0);
+
+				basicBlock[usage.StoreIndex] = PopInstruction.Instance;
+				if (usage.StoreCount > 1)
+				{
+					variableStoresToReplaceWithPop.Add(variable);
+				}
+
+				changed = true;
+
+				continue;
+			}
+
+			// Check 2 and 3
+			if (!usage.CanBeRemoved)
+			{
+				continue;
+			}
+
+			// Check 4
+			if (intraInstructionStackHeight[usage.LoadIndex] != intraInstructionStackHeight[usage.StoreIndex])
+			{
+				continue;
+			}
+
+			if (usage.LoadIndex - usage.StoreIndex > 1)
+			{
+				// Check 5
+				bool hasBarrier = false;
+				foreach (int barrierIndex in stackHeightBarriers)
+				{
+					if (barrierIndex > usage.StoreIndex && barrierIndex < usage.LoadIndex)
+					{
+						hasBarrier = true;
+						break;
+					}
+				}
+				if (hasBarrier)
+				{
+					continue;
+				}
+
+				// Check 6
+				bool valueWillRemainOnStack = true;
+				int minimumStackHeight = intraInstructionStackHeight[usage.StoreIndex];
+				for (int i = usage.StoreIndex + 1; i < usage.LoadIndex; i++)
+				{
+					if (intraInstructionStackHeight[i] < minimumStackHeight)
+					{
+						valueWillRemainOnStack = false;
+						break;
+					}
+				}
+				if (!valueWillRemainOnStack)
+				{
+					continue;
+				}
+			}
+
+			// All checks passed, we can remove the load and store.
+			indicesToRemove.Add(usage.LoadIndex);
+			indicesToRemove.Add(usage.StoreIndex);
+		}
+
+		if (indicesToRemove.Count > 0)
+		{
+			indicesToRemove.Sort();
+			for (int i = indicesToRemove.Count - 1; i >= 0; i--)
+			{
+				basicBlock.RemoveAt(indicesToRemove[i]);
+			}
+			changed = true;
+		}
+
 		return changed;
 	}
 

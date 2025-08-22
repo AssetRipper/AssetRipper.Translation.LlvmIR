@@ -82,6 +82,11 @@ public sealed class BasicBlock : IReadOnlyList<Instruction>, IList<Instruction>
 		Instructions.RemoveAt(index);
 	}
 
+	public void RemoveRange(int index, int count)
+	{
+		Instructions.RemoveRange(index, count);
+	}
+
 	IEnumerator IEnumerable.GetEnumerator()
 	{
 		return ((IEnumerable)Instructions).GetEnumerator();

@@ -21,7 +21,7 @@ internal class OptimizationTests
 	[Test]
 	public void LoadIndirect()
 	{
-		LocalVariable data = new(Int32);
+		ImportantVariable data = new(Int32);
 
 		BasicBlock instructions =
 		[
@@ -42,7 +42,7 @@ internal class OptimizationTests
 	[Test]
 	public void StoreIndirect_1()
 	{
-		LocalVariable data = new(Int32);
+		ImportantVariable data = new(Int32);
 		ImportantVariable x = new(Int32);
 		ImportantVariable y = new(Int32);
 
@@ -71,7 +71,7 @@ internal class OptimizationTests
 	[Test]
 	public void StoreIndirect_2()
 	{
-		LocalVariable data = new(Int32);
+		ImportantVariable data = new(Int32);
 		ImportantVariable x = new(Int32);
 		ImportantVariable y = new(Int32);
 		ImportantVariable z = new(Int32);
@@ -96,6 +96,55 @@ internal class OptimizationTests
 			Instruction.FromOpCode(CilOpCodes.Add),
 			new StoreVariableInstruction(w),
 			new StoreVariableInstruction(data),
+		];
+
+		Optimize(instructions);
+
+		Assert.That(instructions, Is.EqualTo(optimizedInstructions));
+	}
+
+	[Test]
+	public void Pop_1()
+	{
+		LocalVariable data = new(Int32);
+		ImportantVariable x = new(Int32);
+		ImportantVariable y = new(Int32);
+
+		BasicBlock instructions =
+		[
+			new LoadVariableInstruction(x),
+			new LoadVariableInstruction(y),
+			Instruction.FromOpCode(CilOpCodes.Add),
+			new StoreVariableInstruction(data),
+		];
+
+		BasicBlock optimizedInstructions =
+		[
+			new LoadVariableInstruction(x),
+			new LoadVariableInstruction(y),
+			Instruction.FromOpCode(CilOpCodes.Add),
+			PopInstruction.Instance,
+		];
+
+		Optimize(instructions);
+
+		Assert.That(instructions, Is.EqualTo(optimizedInstructions));
+	}
+
+	[Test]
+	public void Pop_2()
+	{
+		LocalVariable data = new(Int32);
+		ImportantVariable x = new(Int32);
+
+		BasicBlock instructions =
+		[
+			new LoadVariableInstruction(x),
+			new StoreVariableInstruction(data),
+		];
+
+		BasicBlock optimizedInstructions =
+		[
 		];
 
 		Optimize(instructions);
@@ -183,12 +232,20 @@ internal class OptimizationTests
 			new InitializeInstruction(data),
 			new LoadVariableInstruction(x),
 			new StoreVariableInstruction(data),
+			new LoadVariableInstruction(x),
+			new LoadVariableInstruction(data),
+			Instruction.FromOpCode(CilOpCodes.Add),
+			ReturnInstruction.Value,
 		];
 
 		BasicBlock optimizedInstructions =
 		[
 			new LoadVariableInstruction(x),
 			new StoreVariableInstruction(data),
+			new LoadVariableInstruction(x),
+			new LoadVariableInstruction(data),
+			Instruction.FromOpCode(CilOpCodes.Add),
+			ReturnInstruction.Value,
 		];
 
 		Optimize(instructions);
@@ -269,6 +326,79 @@ internal class OptimizationTests
 			new InitializeInstruction(data),
 			new LoadVariableInstruction(data),
 			new StoreVariableInstruction(x),
+		];
+
+		Optimize(instructions);
+
+		Assert.That(instructions, Is.EqualTo(optimizedInstructions));
+	}
+
+	[Test]
+	public void Temporary_1()
+	{
+		LocalVariable data = new(Int32);
+		ImportantVariable x = new(Int32);
+		ConstantI4 zero = new(0, Module);
+
+		BasicBlock instructions =
+		[
+			new LoadVariableInstruction(zero),
+			new StoreVariableInstruction(data),
+			new LoadVariableInstruction(data),
+			new StoreVariableInstruction(x),
+		];
+
+		BasicBlock optimizedInstructions =
+		[
+			new LoadVariableInstruction(zero),
+			new StoreVariableInstruction(x),
+		];
+
+		Optimize(instructions);
+
+		Assert.That(instructions, Is.EqualTo(optimizedInstructions));
+	}
+
+	[Test]
+	public void Temporary_2()
+	{
+		ImportantVariable x = new(Int32);
+		ImportantVariable y = new(Int32);
+		ImportantVariable z = new(Int32);
+		ImportantVariable w = new(Int32);
+
+		LocalVariable temp1 = new(Int32);
+		LocalVariable temp2 = new(Int32);
+		LocalVariable temp3 = new(Int32);
+
+		BasicBlock instructions =
+		[
+			new LoadVariableInstruction(x),
+			new LoadVariableInstruction(y),
+			Instruction.FromOpCode(CilOpCodes.Add),
+			new StoreVariableInstruction(temp1),
+			new LoadVariableInstruction(z),
+			new LoadVariableInstruction(w),
+			Instruction.FromOpCode(CilOpCodes.Add),
+			new StoreVariableInstruction(temp2),
+			new LoadVariableInstruction(temp1),
+			new LoadVariableInstruction(temp2),
+			Instruction.FromOpCode(CilOpCodes.Add),
+			new StoreVariableInstruction(temp3),
+			new LoadVariableInstruction(temp3),
+			ReturnInstruction.Value,
+		];
+
+		BasicBlock optimizedInstructions =
+		[
+			new LoadVariableInstruction(x),
+			new LoadVariableInstruction(y),
+			Instruction.FromOpCode(CilOpCodes.Add),
+			new LoadVariableInstruction(z),
+			new LoadVariableInstruction(w),
+			Instruction.FromOpCode(CilOpCodes.Add),
+			Instruction.FromOpCode(CilOpCodes.Add),
+			ReturnInstruction.Value,
 		];
 
 		Optimize(instructions);
