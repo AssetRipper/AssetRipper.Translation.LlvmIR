@@ -35,25 +35,33 @@ internal sealed class StructContext : IHasName
 		CleanName = ExtractCleanName(MangledName, module.Options.RenamedSymbols);
 	}
 
-	public static StructContext Create(ModuleContext module, LLVMTypeRef type)
+	public static unsafe StructContext Create(ModuleContext module, LLVMTypeRef type)
 	{
 		TypeDefinition typeDefinition = new(
 			module.Options.GetNamespace("Structures"),
 			type.StructName,
-			TypeAttributes.Public | TypeAttributes.SequentialLayout,
+			TypeAttributes.Public | TypeAttributes.ExplicitLayout,
 			module.Definition.DefaultImporter.ImportType(typeof(ValueType)));
 		module.Definition.TopLevelTypes.Add(typeDefinition);
 		StructContext structContext = new(module, typeDefinition, type);
 
+		LLVMTargetDataRef targetData = LLVM.GetModuleDataLayout(module.Module);
+		ulong size = targetData.ABISizeOfType(type);
+
 		LLVMTypeRef[] array = type.GetSubtypes();
 		for (int i = 0; i < array.Length; i++)
 		{
+			ulong offset = targetData.OffsetOfElement(type, (uint)i);
+
 			LLVMTypeRef subType = array[i];
 			TypeSignature fieldType = module.GetTypeSignature(subType);
 			string fieldName = $"field_{i}";
 			FieldDefinition field = new(fieldName, FieldAttributes.Public, fieldType);
+			field.FieldOffset = (int)offset;
 			typeDefinition.Fields.Add(field);
 		}
+
+		typeDefinition.ClassLayout = new ClassLayout(0, (uint)size);
 
 		return structContext;
 	}
