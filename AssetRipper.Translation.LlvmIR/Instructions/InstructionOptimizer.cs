@@ -121,46 +121,44 @@ public static class InstructionOptimizer
 	private static bool RunPass_EliminateUnnessaryInitialization(BasicBlock basicBlock, HashSet<IVariable> temporaryVariables)
 	{
 		bool changed = false;
-		for (int i = basicBlock.Count - 1; i >= 0; i--)
+		HashSet<IVariable> protectedVariables = new();
+		for (int i = 0; i < basicBlock.Count; i++)
 		{
-			if (basicBlock[i] is not InitializeInstruction initialize || !temporaryVariables.Contains(initialize.Variable))
+			Instruction instruction = basicBlock[i];
+			if (instruction is not InitializeInstruction initialize)
+			{
+				// Check backwards
+				switch (instruction)
+				{
+					case StoreVariableInstruction store:
+						if (temporaryVariables.Contains(store.Variable))
+						{
+							// If the variable has already been stored to, removing the initialization would change its value.
+							protectedVariables.Add(store.Variable);
+						}
+						break;
+					case AddressOfInstruction addressOf:
+						if (temporaryVariables.Contains(addressOf.Variable))
+						{
+							// If the address of the variable is taken, we cannot remove the initialization.
+							protectedVariables.Add(addressOf.Variable);
+						}
+						break;
+				}
+				continue;
+			}
+
+			if (!temporaryVariables.Contains(initialize.Variable))
+			{
+				continue;
+			}
+
+			if (protectedVariables.Contains(initialize.Variable))
 			{
 				continue;
 			}
 
 			bool shouldContinue = false;
-
-			// Check backwards
-			for (int j = i - 1; j >= 0; j--)
-			{
-				switch (basicBlock[j])
-				{
-					case StoreVariableInstruction store:
-						if (store.Variable == initialize.Variable)
-						{
-							// If the variable has already been stored to, removing the initialization would change its value.
-							shouldContinue = true;
-						}
-						break;
-					case AddressOfInstruction addressOf:
-						if (addressOf.Variable == initialize.Variable)
-						{
-							// If the address of the variable is taken, we cannot remove the initialization.
-							shouldContinue = true;
-						}
-						break;
-				}
-
-				if (shouldContinue)
-				{
-					break;
-				}
-			}
-
-			if (shouldContinue)
-			{
-				continue;
-			}
 
 			// Check forwards
 			for (int j = i + 1; j < basicBlock.Count; j++)
