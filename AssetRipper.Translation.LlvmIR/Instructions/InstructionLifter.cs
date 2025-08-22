@@ -1007,27 +1007,6 @@ internal unsafe readonly struct InstructionLifter
 					}
 
 					instructions.Add(new LoadVariableInstruction(bufferLocal));
-
-					/*int byteSize = (int)value.TypeOf.GetABISize(Module);
-
-					byte[] randomData = new byte[byteSize];
-					Random.Shared.NextBytes(randomData);
-					FieldDefinition field = AddStoredDataField(randomData);
-
-					InlineArrayTypes[(TypeDefinition)underlyingType.ToTypeDefOrRef()].GetElementType(out TypeSignature elementType, out int elementCount);
-					IMethodDefOrRef createSpan = (IMethodDefOrRef)Definition.DefaultImporter
-						.ImportMethod(typeof(RuntimeHelpers).GetMethod(nameof(RuntimeHelpers.CreateSpan))!);
-					IMethodDescriptor createSpanInstance = createSpan.MakeGenericInstanceMethod(elementType);
-
-					IMethodDescriptor createInlineArray = InlineArrayHelperType.Methods
-						.Single(m => m.Name == nameof(InlineArrayHelper.Create))
-						.MakeGenericInstanceMethod(underlyingType, elementType);
-
-					instructions.Add(CilOpCodes.Ldtoken, field);
-					instructions.Add(CilOpCodes.Call, createSpanInstance);
-					instructions.Add(CilOpCodes.Call, createInlineArray);
-
-					//instructions.AddDefaultValue(underlyingType);*/
 				}
 				break;
 			case LLVMValueKind.LLVMConstantStructValueKind:
@@ -1057,12 +1036,6 @@ internal unsafe readonly struct InstructionLifter
 					}
 
 					LoadVariable(instructions, resultLocal);
-
-					/*int byteSize = (int)value.TypeOf.GetABISize(Module);
-					byte[] randomData = new byte[byteSize];
-					Random.Shared.NextBytes(randomData);
-					FieldDefinition field = AddStoredDataField(randomData);
-					instructions.AddDefaultValue(typeSignature);*/
 				}
 				break;
 			case LLVMValueKind.LLVMConstantPointerNullValueKind:
