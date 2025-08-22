@@ -99,8 +99,8 @@ public static unsafe class Translator
 
 			CilInstructionCollection instructions = functionContext.Definition.CilMethodBody!.Instructions;
 
-			functionContext.InitializeInstructionData();
-			functionContext.AnalyzeDataFlow();
+			IReadOnlyList<BasicBlock> basicBlocks = InstructionLifter.Lift(functionContext);
+			InstructionOptimizer.Optimize(basicBlocks);
 
 			if (functionContext.NeedsStackFrame)
 			{
@@ -113,30 +113,12 @@ public static unsafe class Translator
 				instructions.Add(CilOpCodes.Stloc, functionContext.StackFrameVariable);
 			}
 
-			// Create local variables for all instructions
-			foreach (InstructionContext instruction in functionContext.Instructions)
+			foreach (BasicBlock basicBlock in basicBlocks)
 			{
-				instruction.CreateLocal(instructions);
-			}
-
-			// Add instructions to the method bodies
-			foreach (BasicBlockContext basicBlock in functionContext.BasicBlocks)
-			{
-				int currentIndex = instructions.Count;
-
-				foreach (InstructionContext instructionContext in basicBlock.Instructions)
-				{
-					instructionContext.AddInstructions(instructions);
-				}
-
-				basicBlock.Label.Instruction = instructions.Count > currentIndex
-					? instructions[currentIndex]
-					: instructions.Add(CilOpCodes.Nop);
+				basicBlock.AddInstructions(instructions);
 			}
 
 			instructions.OptimizeMacros();
-
-			functionContext.ClearInstructionData();
 		}
 
 		foreach (GlobalVariableContext globalVariableContext in moduleContext.GlobalVariables.Values)

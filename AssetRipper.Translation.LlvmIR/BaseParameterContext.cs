@@ -1,9 +1,12 @@
-﻿using AsmResolver.DotNet.Collections;
+﻿using AsmResolver.DotNet.Code.Cil;
+using AsmResolver.DotNet.Collections;
 using AsmResolver.DotNet.Signatures;
+using AsmResolver.PE.DotNet.Cil;
+using AssetRipper.Translation.LlvmIR.Variables;
 
 namespace AssetRipper.Translation.LlvmIR;
 
-internal abstract class BaseParameterContext : IHasName
+internal abstract class BaseParameterContext : IHasName, IVariable
 {
 	public abstract string MangledName { get; }
 	public string? DemangledName => null;
@@ -23,5 +26,24 @@ internal abstract class BaseParameterContext : IHasName
 	{
 		Definition = definition;
 		Function = function;
+	}
+
+	TypeSignature IVariable.VariableType => TypeSignature;
+
+	bool IVariable.SupportsLoadAddress => true;
+
+	void IVariable.AddLoad(CilInstructionCollection instructions)
+	{
+		instructions.Add(CilOpCodes.Ldarg, Definition);
+	}
+
+	void IVariable.AddStore(CilInstructionCollection instructions)
+	{
+		instructions.Add(CilOpCodes.Starg, Definition);
+	}
+
+	void IVariable.AddLoadAddress(CilInstructionCollection instructions)
+	{
+		instructions.Add(CilOpCodes.Ldarga, Definition);
 	}
 }
