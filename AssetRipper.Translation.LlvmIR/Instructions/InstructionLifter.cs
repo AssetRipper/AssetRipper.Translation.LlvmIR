@@ -98,7 +98,7 @@ internal unsafe readonly struct InstructionLifter
 		return instructions;
 	}
 
-	private void AddInstruction(BasicBlock instructions, LLVMValueRef instruction)
+	private void AddInstruction(BasicBlock basicBlock, LLVMValueRef instruction)
 	{
 		if (TryMatchImageOffset(instruction, module, out FunctionContext? function2, out GlobalVariableContext? variable2))
 		{
@@ -106,18 +106,18 @@ internal unsafe readonly struct InstructionLifter
 
 			if (function2 is not null)
 			{
-				LoadVariable(instructions, new FunctionPointerVariable(function2));
+				LoadVariable(basicBlock, new FunctionPointerVariable(function2));
 			}
 			else if (variable2 is not null)
 			{
-				instructions.Add(new AddressOfInstruction(variable2));
+				basicBlock.Add(new AddressOfInstruction(variable2));
 			}
 			else
 			{
 				Debug.Fail("This should be unreachable.");
 			}
-			Call(instructions, getIndexMethod);
-			StoreResult(instructions, instruction);
+			Call(basicBlock, getIndexMethod);
+			StoreResult(basicBlock, instruction);
 			return;
 		}
 
@@ -127,7 +127,7 @@ internal unsafe readonly struct InstructionLifter
 		{
 			case LLVMOpcode.LLVMAlloca:
 				{
-					instructions.Add(new InitializeInstruction(allocaData[instruction]));
+					basicBlock.Add(new InitializeInstruction(allocaData[instruction]));
 				}
 				break;
 			case LLVMOpcode.LLVMLoad:
@@ -135,12 +135,12 @@ internal unsafe readonly struct InstructionLifter
 					Debug.Assert(operands.Length == 1, "Load instruction should have exactly one operand");
 
 					LLVMValueRef sourceOperand = operands[0];
-					LoadValue(instructions, sourceOperand);
+					LoadValue(basicBlock, sourceOperand);
 
 					TypeSignature type = module.GetTypeSignature(instruction);
-					instructions.Add(new LoadIndirectInstruction(type));
+					basicBlock.Add(new LoadIndirectInstruction(type));
 
-					StoreResult(instructions, instruction);
+					StoreResult(basicBlock, instruction);
 				}
 				break;
 			case LLVMOpcode.LLVMStore:
@@ -150,11 +150,11 @@ internal unsafe readonly struct InstructionLifter
 					LLVMValueRef valueOperand = operands[0];
 					LLVMValueRef pointerOperand = operands[1];
 
-					LoadValue(instructions, pointerOperand);
-					LoadValue(instructions, valueOperand);
+					LoadValue(basicBlock, pointerOperand);
+					LoadValue(basicBlock, valueOperand);
 
 					TypeSignature type = module.GetTypeSignature(valueOperand);
-					instructions.Add(new StoreIndirectInstruction(type));
+					basicBlock.Add(new StoreIndirectInstruction(type));
 				}
 				break;
 			case LLVMOpcode.LLVMRet:
@@ -162,23 +162,22 @@ internal unsafe readonly struct InstructionLifter
 					Debug.Assert(operands.Length <= 1, "Return instruction should have at most one operand");
 					if (operands.Length is 1)
 					{
-						LoadValue(instructions, operands[0]);
+						LoadValue(basicBlock, operands[0]);
 					}
 					if (function is { NeedsStackFrame: true })
 					{
-						instructions.Add(new ClearStackFrameInstruction(function));
+						basicBlock.Add(new ClearStackFrameInstruction(function));
 					}
-					instructions.Add(operands.Length == 0 ? ReturnInstruction.Void : ReturnInstruction.Value);
+					basicBlock.Add(operands.Length == 0 ? ReturnInstruction.Void : ReturnInstruction.Value);
 				}
 				break;
 			case LLVMOpcode.LLVMBr:
 				{
-					Debug.Assert(instructions is BasicBlock);
 					if (operands.Length == 1)
 					{
 						LLVMBasicBlockRef targetBlockRef = operands[0].AsBasicBlock();
 
-						Branch(instructions, targetBlockRef);
+						Branch(basicBlock, targetBlockRef);
 					}
 					else if (operands.Length == 3)
 					{
@@ -193,9 +192,9 @@ internal unsafe readonly struct InstructionLifter
 						LLVMBasicBlockRef trueBlock = operands[2].AsBasicBlock();
 						LLVMBasicBlockRef falseBlock = operands[1].AsBasicBlock();
 
-						LoadValue(instructions, condition);
+						LoadValue(basicBlock, condition);
 
-						ConditionalBranch(instructions, trueBlock, falseBlock);
+						ConditionalBranch(basicBlock, trueBlock, falseBlock);
 					}
 					else
 					{
@@ -205,7 +204,6 @@ internal unsafe readonly struct InstructionLifter
 				break;
 			case LLVMOpcode.LLVMSwitch:
 				{
-					Debug.Assert(instructions is BasicBlock);
 					Debug.Assert(operands.Length >= 2);
 					Debug.Assert(operands.Length % 2 == 0);
 
@@ -213,7 +211,7 @@ internal unsafe readonly struct InstructionLifter
 					LLVMBasicBlockRef defaultBlockRef = operands[1].AsBasicBlock();
 					ReadOnlySpan<(LLVMValueRef Case, LLVMValueRef Target)> cases = MemoryMarshal.Cast<LLVMValueRef, (LLVMValueRef Case, LLVMValueRef Target)>(operands.AsSpan(2));
 
-					LoadValue(instructions, indexOperand);
+					LoadValue(basicBlock, indexOperand);
 
 					(long value, BasicBlock target)[] caseTargets = new (long, BasicBlock)[cases.Length];
 					for (int i = 0; i < cases.Length; i++)
@@ -231,7 +229,7 @@ internal unsafe readonly struct InstructionLifter
 							BasicBlock helperBasicBlock = new();
 							basicBlockList.Add(helperBasicBlock);
 
-							Branch(helperBasicBlock, basicBlockRefs[instructions], targetBlockRef);
+							Branch(helperBasicBlock, basicBlockRefs[basicBlock], targetBlockRef);
 
 							targetBlock = helperBasicBlock;
 						}
@@ -243,9 +241,9 @@ internal unsafe readonly struct InstructionLifter
 					}
 
 					TypeSignature indexType = module.GetTypeSignature(indexOperand);
-					instructions.Add(new SwitchInstruction(indexType, caseTargets));
+					basicBlock.Add(new SwitchInstruction(indexType, caseTargets));
 
-					Branch(instructions, defaultBlockRef);
+					Branch(basicBlock, defaultBlockRef);
 				}
 				break;
 			case LLVMOpcode.LLVMSelect:
@@ -261,11 +259,11 @@ internal unsafe readonly struct InstructionLifter
 						throw new NotImplementedException("Non-boolean condition for select instructions");
 					}
 
-					LoadValue(instructions, condition);
+					LoadValue(basicBlock, condition);
 
-					LoadValue(instructions, trueValue);
+					LoadValue(basicBlock, trueValue);
 
-					LoadValue(instructions, falseValue);
+					LoadValue(basicBlock, falseValue);
 
 					if (module.GetTypeSignature(condition) is CorLibTypeSignature { ElementType: ElementType.Boolean })
 					{
@@ -276,7 +274,7 @@ internal unsafe readonly struct InstructionLifter
 							IMethodDescriptor helperMethod = module.InstructionHelperType.Methods
 								.Single(m => m.Name == nameof(InstructionHelper.Select) && m.GenericParameters.Count is 0);
 
-							Call(instructions, helperMethod);
+							Call(basicBlock, helperMethod);
 						}
 						else
 						{
@@ -284,7 +282,7 @@ internal unsafe readonly struct InstructionLifter
 								.Single(m => m.Name == nameof(InstructionHelper.Select) && m.GenericParameters.Count is 1)
 								.MakeGenericInstanceMethod(valueTypeSignature);
 
-							Call(instructions, helperMethod);
+							Call(basicBlock, helperMethod);
 						}
 					}
 					else
@@ -292,59 +290,59 @@ internal unsafe readonly struct InstructionLifter
 						throw new NotImplementedException("Non-boolean condition for select instructions");
 					}
 
-					StoreResult(instructions, instruction);
+					StoreResult(basicBlock, instruction);
 				}
 				break;
 			case LLVMOpcode.LLVMPHI:
 				{
 					Debug.Assert(operands.Length > 0, "Phi instruction should have at least one operand");
 
-					instructions.Add(PhiPushInstruction.Instance);
+					basicBlock.Add(PhiPushInstruction.Instance);
 
-					StoreResult(instructions, instruction);
+					StoreResult(basicBlock, instruction);
 				}
 				break;
 			case LLVMOpcode.LLVMUnreachable:
 				{
-					instructions.Add(UnreachableInstruction.Instance);
+					basicBlock.Add(UnreachableInstruction.Instance);
 				}
 				break;
 			case LLVMOpcode.LLVMICmp:
 				{
 					Debug.Assert(operands.Length == 2);
 
-					LoadValue(instructions, operands[0]);
-					LoadValue(instructions, operands[1]);
+					LoadValue(basicBlock, operands[0]);
+					LoadValue(basicBlock, operands[1]);
 
 					TypeSignature type = module.GetTypeSignature(operands[0]);
-					instructions.Add(NumericalComparison.Create(type, instruction.ICmpPredicate));
+					basicBlock.Add(NumericalComparison.Create(type, instruction.ICmpPredicate));
 
-					StoreResult(instructions, instruction);
+					StoreResult(basicBlock, instruction);
 				}
 				break;
 			case LLVMOpcode.LLVMFCmp:
 				{
 					Debug.Assert(operands.Length == 2);
 
-					LoadValue(instructions, operands[0]);
-					LoadValue(instructions, operands[1]);
+					LoadValue(basicBlock, operands[0]);
+					LoadValue(basicBlock, operands[1]);
 
 					TypeSignature type = module.GetTypeSignature(operands[0]);
-					instructions.Add(NumericalComparison.Create(type, instruction.FCmpPredicate));
+					basicBlock.Add(NumericalComparison.Create(type, instruction.FCmpPredicate));
 
-					StoreResult(instructions, instruction);
+					StoreResult(basicBlock, instruction);
 				}
 				break;
 			case LLVMOpcode.LLVMFNeg:
 				{
 					Debug.Assert(operands.Length == 1, "Unary negation instruction should have exactly one operand");
 
-					LoadValue(instructions, operands[0]);
+					LoadValue(basicBlock, operands[0]);
 
 					TypeSignature type = module.GetTypeSignature(instruction);
-					instructions.Add(NegationInstruction.Create(type, module));
+					basicBlock.Add(NegationInstruction.Create(type, module));
 
-					StoreResult(instructions, instruction);
+					StoreResult(basicBlock, instruction);
 				}
 				break;
 			case LLVMOpcode.LLVMBitCast:
@@ -358,8 +356,8 @@ internal unsafe readonly struct InstructionLifter
 						.First(m => m.Name == nameof(InstructionHelper.BitCast))
 						.MakeGenericInstanceMethod(sourceType, resultType);
 
-					LoadValue(instructions, operands[0]);
-					Call(instructions, method);
+					LoadValue(basicBlock, operands[0]);
+					Call(basicBlock, method);
 				}
 				break;
 			case LLVMOpcode.LLVMVAArg:
@@ -368,21 +366,19 @@ internal unsafe readonly struct InstructionLifter
 
 					Debug.Assert(operands.Length == 1);
 
-					LoadValue(instructions, operands[0]);
+					LoadValue(basicBlock, operands[0]);
 
-					Call(instructions, module.InstructionHelperType.Methods.First(m => m.Name == nameof(InstructionHelper.VAArg)));
+					Call(basicBlock, module.InstructionHelperType.Methods.First(m => m.Name == nameof(InstructionHelper.VAArg)));
 
 					TypeSignature resultType = module.GetTypeSignature(instruction);
-					instructions.Add(new LoadIndirectInstruction(resultType));
+					basicBlock.Add(new LoadIndirectInstruction(resultType));
 
-					StoreResult(instructions, instruction);
+					StoreResult(basicBlock, instruction);
 				}
 				break;
 			case LLVMOpcode.LLVMCatchSwitch:
 				{
 					Debug.Assert(operands.Length >= 1, "Catch switch instruction should have at least one operand");
-
-					Debug.Assert(instructions is BasicBlock);
 
 					Debug.Assert(function is not null);
 					Debug.Assert(function.PersonalityFunction is not null);
@@ -416,11 +412,11 @@ internal unsafe readonly struct InstructionLifter
 						ReadOnlySpan<LLVMValueRef> catchPadArguments = catchPad.GetOperands().AsSpan()[..^1]; // The last operand is the catch switch
 						LLVMBasicBlockRef catchPadBasicBlockRef = catchPad.InstructionParent;
 
-						IVariable argumentsInReadOnlySpan = LoadVariadicArguments(instructions, catchPadArguments, module);
+						IVariable argumentsInReadOnlySpan = LoadVariadicArguments(basicBlock, catchPadArguments, module);
 
 						// Call personality function
-						instructions.Add(new LoadVariableInstruction(argumentsInReadOnlySpan));
-						Call(instructions, function.PersonalityFunction.Definition);
+						basicBlock.Add(new LoadVariableInstruction(argumentsInReadOnlySpan));
+						Call(basicBlock, function.PersonalityFunction.Definition);
 
 						BasicBlock targetBlock;
 						if (catchPadBasicBlockRef.StartsWithPhi())
@@ -428,7 +424,7 @@ internal unsafe readonly struct InstructionLifter
 							BasicBlock helperBasicBlock = new();
 							basicBlockList.Add(helperBasicBlock);
 
-							Branch(helperBasicBlock, basicBlockRefs[instructions], catchPadBasicBlockRef);
+							Branch(helperBasicBlock, basicBlockRefs[basicBlock], catchPadBasicBlockRef);
 
 							targetBlock = helperBasicBlock;
 						}
@@ -437,17 +433,17 @@ internal unsafe readonly struct InstructionLifter
 							targetBlock = basicBlocks[catchPadBasicBlockRef];
 						}
 
-						instructions.Add(new BranchIfFalseInstruction(targetBlock));
+						basicBlock.Add(new BranchIfFalseInstruction(targetBlock));
 					}
 
 					if (hasDefaultUnwind)
 					{
-						Branch(instructions, defaultUnwindTargetRef);
+						Branch(basicBlock, defaultUnwindTargetRef);
 					}
 					else
 					{
 						// Unwind to caller
-						instructions.Add(new ReturnDefaultInstruction(function.Definition.Signature!.ReturnType));
+						basicBlock.Add(new ReturnDefaultInstruction(function.Definition.Signature!.ReturnType));
 					}
 				}
 				break;
@@ -457,17 +453,16 @@ internal unsafe readonly struct InstructionLifter
 					FieldDefinition exceptionInfoField = module.InjectedTypes[typeof(ExceptionInfo)].GetFieldByName(nameof(ExceptionInfo.Current));
 
 					// Store the current exception info in a local variable
-					instructions.Add(new LoadFieldInstruction(exceptionInfoField));
-					StoreResult(instructions, instruction);
+					basicBlock.Add(new LoadFieldInstruction(exceptionInfoField));
+					StoreResult(basicBlock, instruction);
 
 					// Set the current exception info to null
-					LoadVariable(instructions, new DefaultVariable(exceptionInfoField.Signature!.FieldType));
-					instructions.Add(new StoreFieldInstruction(exceptionInfoField));
+					LoadVariable(basicBlock, new DefaultVariable(exceptionInfoField.Signature!.FieldType));
+					basicBlock.Add(new StoreFieldInstruction(exceptionInfoField));
 				}
 				break;
 			case LLVMOpcode.LLVMCatchRet:
 				{
-					Debug.Assert(instructions is BasicBlock);
 					Debug.Assert(operands.Length == 2, "Catch return instruction should have exactly two operands");
 					Debug.Assert(operands[0].IsACatchPadInst != default, "First operand of catch return instruction should be a catch pad");
 					Debug.Assert(operands[1].IsBasicBlock, "Second operand of catch return instruction should be a basic block");
@@ -475,17 +470,16 @@ internal unsafe readonly struct InstructionLifter
 					LLVMValueRef catchPad = operands[0];
 					LLVMBasicBlockRef targetBlockRef = operands[1].AsBasicBlock();
 
-					LoadValue(instructions, catchPad);
+					LoadValue(basicBlock, catchPad);
 
-					Call(instructions, module.InjectedTypes[typeof(ExceptionInfo)].Methods.Single(m => m.Name == nameof(ExceptionInfo.Dispose) && m.IsPublic));
+					Call(basicBlock, module.InjectedTypes[typeof(ExceptionInfo)].Methods.Single(m => m.Name == nameof(ExceptionInfo.Dispose) && m.IsPublic));
 
-					Branch(instructions, targetBlockRef);
+					Branch(basicBlock, targetBlockRef);
 				}
 				break;
 			case LLVMOpcode.LLVMCleanupRet:
 				{
 					Debug.Assert(function is not null);
-					Debug.Assert(instructions is BasicBlock);
 					Debug.Assert(operands.Length is 1 or 2, "Cleanup return instruction should have one or two operands");
 
 					LLVMValueRef cleanupPad = operands[0];
@@ -494,24 +488,23 @@ internal unsafe readonly struct InstructionLifter
 					FieldDefinition exceptionInfoField = module.InjectedTypes[typeof(ExceptionInfo)].GetFieldByName(nameof(ExceptionInfo.Current));
 
 					// Restore the current exception info from the cleanup pad
-					LoadValue(instructions, cleanupPad);
-					instructions.Add(new StoreFieldInstruction(exceptionInfoField));
+					LoadValue(basicBlock, cleanupPad);
+					basicBlock.Add(new StoreFieldInstruction(exceptionInfoField));
 
 					if (unwindsToCaller)
 					{
-						instructions.Add(new ReturnDefaultInstruction(function.Definition.Signature!.ReturnType));
+						basicBlock.Add(new ReturnDefaultInstruction(function.Definition.Signature!.ReturnType));
 					}
 					else
 					{
 						// Unwind to an exception handler switch or another cleanup pad
-						Branch(instructions, operands[1].AsBasicBlock());
+						Branch(basicBlock, operands[1].AsBasicBlock());
 					}
 				}
 				break;
 			case LLVMOpcode.LLVMCall:
 			case LLVMOpcode.LLVMInvoke:
 				{
-					Debug.Assert(instructions is BasicBlock);
 					Debug.Assert(function is not null);
 
 					LLVMValueRef functionOperand = operands[^1];
@@ -525,10 +518,10 @@ internal unsafe readonly struct InstructionLifter
 					{
 						foreach (LLVMValueRef argumentOperand in argumentOperands)
 						{
-							LoadValue(instructions, argumentOperand);
+							LoadValue(basicBlock, argumentOperand);
 						}
 
-						LoadValue(instructions, functionOperand);
+						LoadValue(basicBlock, functionOperand);
 
 						TypeSignature[] parameterTypes = new TypeSignature[argumentOperands.Length];
 						for (int i = 0; i < argumentOperands.Length; i++)
@@ -539,7 +532,7 @@ internal unsafe readonly struct InstructionLifter
 						TypeSignature resultTypeSignature = module.GetTypeSignature(instruction);
 						MethodSignature methodSignature = MethodSignature.CreateStatic(resultTypeSignature, parameterTypes);
 
-						instructions.Add(new CallIndirectInstruction(methodSignature));
+						basicBlock.Add(new CallIndirectInstruction(methodSignature));
 					}
 					else if (IsInvisibleFunction(functionCalled))
 					{
@@ -552,11 +545,11 @@ internal unsafe readonly struct InstructionLifter
 						Debug.Assert(functionCalled.IsVoidReturn && functionCalled.NormalParameters.Length is 1 && functionCalled.VariadicParameter is null, "VA start function should have one parameter and a void return type");
 						Debug.Assert(argumentOperands.Length == 1, "VA start function should have one argument");
 
-						LoadValue(instructions, argumentOperands[0]);
+						LoadValue(basicBlock, argumentOperands[0]);
 
-						instructions.Add(new LoadVariableInstruction(function.VariadicParameter));
+						basicBlock.Add(new LoadVariableInstruction(function.VariadicParameter));
 
-						Call(instructions, module.InstructionHelperType.GetMethodByName(nameof(InstructionHelper.VAStart)));
+						Call(basicBlock, module.InstructionHelperType.GetMethodByName(nameof(InstructionHelper.VAStart)));
 					}
 					else
 					{
@@ -568,40 +561,40 @@ internal unsafe readonly struct InstructionLifter
 
 							foreach (LLVMValueRef argumentOperand in argumentOperands)
 							{
-								LoadValue(instructions, argumentOperand);
+								LoadValue(basicBlock, argumentOperand);
 							}
 						}
 						else if (variadicParameterCount == 0)
 						{
 							for (int i = 0; i < functionCalled.NormalParameters.Length; i++)
 							{
-								LoadValue(instructions, argumentOperands[i]);
+								LoadValue(basicBlock, argumentOperands[i]);
 							}
 							TypeSignature variadicArrayType = functionCalled.Definition.Signature!.ParameterTypes[^1];
-							instructions.Add(new LoadVariableInstruction(new DefaultVariable(variadicArrayType)));
+							basicBlock.Add(new LoadVariableInstruction(new DefaultVariable(variadicArrayType)));
 						}
 						else
 						{
-							IVariable intPtrReadOnlySpanLocal = LoadVariadicArguments(instructions, argumentOperands[functionCalled.NormalParameters.Length..], module);
+							IVariable intPtrReadOnlySpanLocal = LoadVariadicArguments(basicBlock, argumentOperands[functionCalled.NormalParameters.Length..], module);
 
 							// Push the arguments onto the stack
 							for (int i = 0; i < functionCalled.NormalParameters.Length; i++)
 							{
-								LoadValue(instructions, argumentOperands[i]);
+								LoadValue(basicBlock, argumentOperands[i]);
 							}
-							instructions.Add(new LoadVariableInstruction(intPtrReadOnlySpanLocal));
+							basicBlock.Add(new LoadVariableInstruction(intPtrReadOnlySpanLocal));
 						}
 
-						Call(instructions, functionCalled.Definition);
+						Call(basicBlock, functionCalled.Definition);
 					}
 
-					MaybeStoreResult(instructions, instruction);
+					MaybeStoreResult(basicBlock, instruction);
 
 					if (opcode is LLVMOpcode.LLVMCall)
 					{
 						if (functionCalled is null or { MightThrowAnException: true } && function.MightThrowAnException)
 						{
-							instructions.Add(ReturnIfExceptionInfoNotNullInstruction.Create(function.Definition.Signature!.ReturnType, module));
+							basicBlock.Add(ReturnIfExceptionInfoNotNullInstruction.Create(function.Definition.Signature!.ReturnType, module));
 						}
 					}
 					else if (opcode is LLVMOpcode.LLVMInvoke)
@@ -609,8 +602,8 @@ internal unsafe readonly struct InstructionLifter
 						LLVMBasicBlockRef catchBlockRef = operands[^2].AsBasicBlock();
 						LLVMBasicBlockRef defaultBlockRef = operands[^3].AsBasicBlock();
 
-						instructions.Add(new LoadFieldInstruction(module.InjectedTypes[typeof(ExceptionInfo)].GetFieldByName(nameof(ExceptionInfo.Current))));
-						ConditionalBranch(instructions, catchBlockRef, defaultBlockRef);
+						basicBlock.Add(new LoadFieldInstruction(module.InjectedTypes[typeof(ExceptionInfo)].GetFieldByName(nameof(ExceptionInfo.Current))));
+						ConditionalBranch(basicBlock, catchBlockRef, defaultBlockRef);
 					}
 
 					static bool IsInvisibleFunction(FunctionContext functionCalled)
@@ -630,8 +623,8 @@ internal unsafe readonly struct InstructionLifter
 					LLVMTypeRef sourceElementType = LLVM.GetGEPSourceElementType(instruction);
 					TypeSignature sourceElementTypeSignature = module.GetTypeSignature(sourceElementType);
 
-					LoadValue(instructions, source);
-					LoadArrayOffset(instructions, initialIndex, sourceElementTypeSignature);
+					LoadValue(basicBlock, source);
+					LoadArrayOffset(basicBlock, initialIndex, sourceElementTypeSignature);
 
 					TypeSignature currentType = sourceElementTypeSignature;
 					foreach (LLVMValueRef operand in otherIndices)
@@ -645,7 +638,7 @@ internal unsafe readonly struct InstructionLifter
 
 						if (module.InlineArrayTypes.TryGetValue(structType, out InlineArrayContext? inlineArray))
 						{
-							LoadArrayOffset(instructions, operand, inlineArray.ElementType);
+							LoadArrayOffset(basicBlock, operand, inlineArray.ElementType);
 							currentType = inlineArray.ElementType;
 						}
 						else
@@ -654,12 +647,12 @@ internal unsafe readonly struct InstructionLifter
 
 							int index = (int)operand.ConstIntSExt;
 							FieldDefinition field = structType.GetInstanceField(index);
-							instructions.Add(new LoadFieldAddressInstruction(field));
+							basicBlock.Add(new LoadFieldAddressInstruction(field));
 							currentType = field.Signature!.FieldType;
 						}
 					}
 
-					StoreResult(instructions, instruction);
+					StoreResult(basicBlock, instruction);
 				}
 				break;
 			case LLVMOpcode.LLVMFreeze:
@@ -667,8 +660,8 @@ internal unsafe readonly struct InstructionLifter
 					// At runtime, poison and undefined values don't exist, so freeze is a no-op.
 					Debug.Assert(operands.Length == 1, "Freeze instruction should have exactly one operand");
 					Debug.Assert(instruction.TypeOf == operands[0].TypeOf, "Freeze instruction should have the same type as its operand");
-					LoadValue(instructions, operands[0]);
-					StoreResult(instructions, instruction);
+					LoadValue(basicBlock, operands[0]);
+					StoreResult(basicBlock, instruction);
 				}
 				break;
 			default:
@@ -679,22 +672,22 @@ internal unsafe readonly struct InstructionLifter
 					// Potential optimization: map "xor v1 0" to "not v1"
 					// LLVM doesn't have a not instruction, so it uses xor with zero instead.
 
-					LoadValue(instructions, operands[0]);
-					LoadValue(instructions, operands[1]);
+					LoadValue(basicBlock, operands[0]);
+					LoadValue(basicBlock, operands[1]);
 
-					instructions.Add(BinaryMathInstruction.Create(instruction, module));
+					basicBlock.Add(BinaryMathInstruction.Create(instruction, module));
 
-					StoreResult(instructions, instruction);
+					StoreResult(basicBlock, instruction);
 				}
 				else if (NumericalConversionInstruction.Supported(opcode))
 				{
 					Debug.Assert(operands.Length == 1, "Numerical conversion instruction should have exactly one operand");
 
-					LoadValue(instructions, operands[0]);
+					LoadValue(basicBlock, operands[0]);
 
-					instructions.Add(NumericalConversionInstruction.Create(instruction, module));
+					basicBlock.Add(NumericalConversionInstruction.Create(instruction, module));
 
-					StoreResult(instructions, instruction);
+					StoreResult(basicBlock, instruction);
 				}
 				else
 				{
@@ -730,7 +723,7 @@ internal unsafe readonly struct InstructionLifter
 		CollidedUnwind,
 	}
 
-	private void LoadArrayOffset(BasicBlock instructions, LLVMValueRef index, TypeSignature elementTypeSignature)
+	private void LoadArrayOffset(BasicBlock basicBlock, LLVMValueRef index, TypeSignature elementTypeSignature)
 	{
 		bool isConstant = index.IsAConstantInt != default;
 		long constantValue = index.ConstIntSExt;
@@ -746,39 +739,39 @@ internal unsafe readonly struct InstructionLifter
 			if (isConstant)
 			{
 				int offset = (int)(constantValue * size);
-				LoadVariable(instructions, new ConstantI4(offset, module.Definition));
-				instructions.Add(Instruction.FromOpCode(CilOpCodes.Conv_I));
+				LoadVariable(basicBlock, new ConstantI4(offset, module.Definition));
+				basicBlock.Add(Instruction.FromOpCode(CilOpCodes.Conv_I));
 			}
 			else if (size == 1)
 			{
-				LoadValue(instructions, index);
-				instructions.Add(Instruction.FromOpCode(CilOpCodes.Conv_I));
+				LoadValue(basicBlock, index);
+				basicBlock.Add(Instruction.FromOpCode(CilOpCodes.Conv_I));
 			}
 			else
 			{
-				LoadValue(instructions, index);
-				instructions.Add(Instruction.FromOpCode(CilOpCodes.Conv_I));
-				LoadVariable(instructions, new ConstantI4(size, module.Definition));
-				instructions.Add(Instruction.FromOpCode(CilOpCodes.Mul));
+				LoadValue(basicBlock, index);
+				basicBlock.Add(Instruction.FromOpCode(CilOpCodes.Conv_I));
+				LoadVariable(basicBlock, new ConstantI4(size, module.Definition));
+				basicBlock.Add(Instruction.FromOpCode(CilOpCodes.Mul));
 			}
-			instructions.Add(Instruction.FromOpCode(CilOpCodes.Add));
+			basicBlock.Add(Instruction.FromOpCode(CilOpCodes.Add));
 		}
 		else if (isConstant && constantValue == 1)
 		{
-			instructions.Add(new SizeOfInstruction(elementTypeSignature));
-			instructions.Add(Instruction.FromOpCode(CilOpCodes.Add));
+			basicBlock.Add(new SizeOfInstruction(elementTypeSignature));
+			basicBlock.Add(Instruction.FromOpCode(CilOpCodes.Add));
 		}
 		else
 		{
-			LoadValue(instructions, index);
-			instructions.Add(Instruction.FromOpCode(CilOpCodes.Conv_I));
-			instructions.Add(new SizeOfInstruction(elementTypeSignature));
-			instructions.Add(Instruction.FromOpCode(CilOpCodes.Mul));
-			instructions.Add(Instruction.FromOpCode(CilOpCodes.Add));
+			LoadValue(basicBlock, index);
+			basicBlock.Add(Instruction.FromOpCode(CilOpCodes.Conv_I));
+			basicBlock.Add(new SizeOfInstruction(elementTypeSignature));
+			basicBlock.Add(Instruction.FromOpCode(CilOpCodes.Mul));
+			basicBlock.Add(Instruction.FromOpCode(CilOpCodes.Add));
 		}
 	}
 
-	private IVariable LoadVariadicArguments(BasicBlock instructions, ReadOnlySpan<LLVMValueRef> variadicArguments, ModuleContext module)
+	private IVariable LoadVariadicArguments(BasicBlock basicBlock, ReadOnlySpan<LLVMValueRef> variadicArguments, ModuleContext module)
 	{
 		CorLibTypeSignature intPtr = module.Definition.CorLibTypeFactory.IntPtr;
 
@@ -801,36 +794,36 @@ internal unsafe readonly struct InstructionLifter
 		MethodDefinition spanToReadOnly = module.SpanHelperType.Methods.Single(m => m.Name == nameof(SpanHelper.ToReadOnly));
 
 		LocalVariable intPtrBufferLocal = new LocalVariable(intPtrBuffer.ToTypeSignature());
-		instructions.Add(new InitializeInstruction(intPtrBufferLocal));
+		basicBlock.Add(new InitializeInstruction(intPtrBufferLocal));
 
 		LocalVariable[] variadicLocals = new LocalVariable[variadicArguments.Length];
 		for (int i = 0; i < variadicArguments.Length; i++)
 		{
 			LLVMValueRef variadicArgument = variadicArguments[i];
-			LoadValue(instructions, variadicArgument);
+			LoadValue(basicBlock, variadicArgument);
 			LocalVariable local = new LocalVariable(module.GetTypeSignature(variadicArgument));
-			instructions.Add(new StoreVariableInstruction(local));
+			basicBlock.Add(new StoreVariableInstruction(local));
 			variadicLocals[i] = local;
 		}
 
 		LocalVariable intPtrSpanLocal = new LocalVariable(intPtrSpan);
-		instructions.Add(new AddressOfInstruction(intPtrBufferLocal));
-		Call(instructions, inlineArrayAsSpan.MakeGenericInstanceMethod(intPtrBuffer.ToTypeSignature(), intPtr));
-		instructions.Add(new StoreVariableInstruction(intPtrSpanLocal));
+		basicBlock.Add(new AddressOfInstruction(intPtrBufferLocal));
+		Call(basicBlock, inlineArrayAsSpan.MakeGenericInstanceMethod(intPtrBuffer.ToTypeSignature(), intPtr));
+		basicBlock.Add(new StoreVariableInstruction(intPtrSpanLocal));
 
 		for (int i = 0; i < variadicLocals.Length; i++)
 		{
-			instructions.Add(new AddressOfInstruction(intPtrSpanLocal));
-			instructions.Add(new LoadVariableInstruction(new ConstantI4(i, module.Definition)));
-			instructions.Add(new CallInstruction(intPtrSpanGetItem));
-			instructions.Add(new AddressOfInstruction(variadicLocals[i]));
-			instructions.Add(new StoreIndirectInstruction(intPtr));
+			basicBlock.Add(new AddressOfInstruction(intPtrSpanLocal));
+			basicBlock.Add(new LoadVariableInstruction(new ConstantI4(i, module.Definition)));
+			basicBlock.Add(new CallInstruction(intPtrSpanGetItem));
+			basicBlock.Add(new AddressOfInstruction(variadicLocals[i]));
+			basicBlock.Add(new StoreIndirectInstruction(intPtr));
 		}
 
 		LocalVariable intPtrReadOnlySpanLocal = new LocalVariable(intPtrReadOnlySpan);
-		instructions.Add(new LoadVariableInstruction(intPtrSpanLocal));
-		instructions.Add(new CallInstruction(spanToReadOnly.MakeGenericInstanceMethod(intPtr)));
-		instructions.Add(new StoreVariableInstruction(intPtrReadOnlySpanLocal));
+		basicBlock.Add(new LoadVariableInstruction(intPtrSpanLocal));
+		basicBlock.Add(new CallInstruction(spanToReadOnly.MakeGenericInstanceMethod(intPtr)));
+		basicBlock.Add(new StoreVariableInstruction(intPtrReadOnlySpanLocal));
 
 		return intPtrReadOnlySpanLocal;
 	}
@@ -839,7 +832,7 @@ internal unsafe readonly struct InstructionLifter
 
 	private TypeSignature GetTypeSignature(LLVMTypeRef type) => module.GetTypeSignature(type);
 
-	private void LoadValue(BasicBlock instructions, LLVMValueRef value)
+	private void LoadValue(BasicBlock basicBlock, LLVMValueRef value)
 	{
 		switch (value.Kind)
 		{
@@ -851,20 +844,20 @@ internal unsafe readonly struct InstructionLifter
 					TypeSignature typeSignature = module.GetTypeSignature(operandType);
 					if (integer is <= int.MaxValue and >= int.MinValue && operandType is { IntWidth: <= sizeof(int) * BitsPerByte })
 					{
-						LoadVariable(instructions, new ConstantI4((int)integer, module.Definition));
+						LoadVariable(basicBlock, new ConstantI4((int)integer, module.Definition));
 					}
 					else if (operandType is { IntWidth: sizeof(long) * BitsPerByte })
 					{
-						LoadVariable(instructions, new ConstantI8(integer, module.Definition));
+						LoadVariable(basicBlock, new ConstantI8(integer, module.Definition));
 					}
 					else if (operandType is { IntWidth: 2 * sizeof(long) * BitsPerByte })
 					{
-						LoadVariable(instructions, new ConstantI8(integer, module.Definition));
+						LoadVariable(basicBlock, new ConstantI8(integer, module.Definition));
 						MethodDefinition conversionMethod = typeSignature.Resolve()!.Methods.First(m =>
 						{
 							return m.Name == "op_Implicit" && m.Parameters.Count == 1 && m.Parameters[0].ParameterType is CorLibTypeSignature { ElementType: ElementType.I8 };
 						});
-						Call(instructions, module.Definition.DefaultImporter.ImportMethod(conversionMethod));
+						Call(basicBlock, module.Definition.DefaultImporter.ImportMethod(conversionMethod));
 					}
 					else
 					{
@@ -875,7 +868,7 @@ internal unsafe readonly struct InstructionLifter
 			case LLVMValueKind.LLVMGlobalVariableValueKind:
 				{
 					GlobalVariableContext global = module.GlobalVariables[value];
-					instructions.Add(new AddressOfInstruction(global));
+					basicBlock.Add(new AddressOfInstruction(global));
 				}
 				break;
 			case LLVMValueKind.LLVMGlobalAliasValueKind:
@@ -883,7 +876,7 @@ internal unsafe readonly struct InstructionLifter
 					LLVMValueRef[] operands = value.GetOperands();
 					if (operands.Length == 1)
 					{
-						LoadValue(instructions, operands[0]);
+						LoadValue(basicBlock, operands[0]);
 					}
 					else
 					{
@@ -898,10 +891,10 @@ internal unsafe readonly struct InstructionLifter
 					switch (typeSignature)
 					{
 						case CorLibTypeSignature { ElementType: ElementType.R4 }:
-							LoadVariable(instructions, new ConstantR4((float)floatingPoint, module.Definition));
+							LoadVariable(basicBlock, new ConstantR4((float)floatingPoint, module.Definition));
 							break;
 						case CorLibTypeSignature { ElementType: ElementType.R8 }:
-							LoadVariable(instructions, new ConstantR8(floatingPoint, module.Definition));
+							LoadVariable(basicBlock, new ConstantR8(floatingPoint, module.Definition));
 							break;
 						default:
 							throw new NotSupportedException();
@@ -924,8 +917,8 @@ internal unsafe readonly struct InstructionLifter
 						IMethodDescriptor toCharacterSpan = module.SpanHelperType.Methods
 							.Single(m => m.Name == nameof(SpanHelper.ToCharacterSpan));
 
-						LoadVariable(instructions, new ConstantString(@string, module.Definition));
-						Call(instructions, toCharacterSpan);
+						LoadVariable(basicBlock, new ConstantString(@string, module.Definition));
+						Call(basicBlock, toCharacterSpan);
 					}
 					else if (elementType is CorLibTypeSignature { ElementType: ElementType.I1 or ElementType.U1 })
 					{
@@ -936,9 +929,9 @@ internal unsafe readonly struct InstructionLifter
 
 						FieldDefinition field = module.AddStoredDataField(data);
 
-						instructions.Add(new LoadFieldAddressInstruction(field));
-						instructions.Add(new LoadVariableInstruction(new ConstantI4(data.Length, module.Definition)));
-						instructions.Add(new NewObjectInstruction(spanConstructor));
+						basicBlock.Add(new LoadFieldAddressInstruction(field));
+						basicBlock.Add(new LoadVariableInstruction(new ConstantI4(data.Length, module.Definition)));
+						basicBlock.Add(new NewObjectInstruction(spanConstructor));
 					}
 					else
 					{
@@ -948,8 +941,8 @@ internal unsafe readonly struct InstructionLifter
 
 						FieldDefinition field = module.AddStoredDataField(data);
 
-						instructions.Add(new LoadTokenInstruction(field));
-						instructions.Add(new CallInstruction(createSpanInstance));
+						basicBlock.Add(new LoadTokenInstruction(field));
+						basicBlock.Add(new CallInstruction(createSpanInstance));
 					}
 
 					Debug.Assert(elementType is not PointerTypeSignature, "Pointers cannot be used as generic type arguments");
@@ -958,7 +951,7 @@ internal unsafe readonly struct InstructionLifter
 						.Single(m => m.Name == nameof(InlineArrayHelper.Create))
 						.MakeGenericInstanceMethod(typeSignature, elementType);
 
-					Call(instructions, createInlineArray);
+					Call(basicBlock, createInlineArray);
 				}
 				break;
 			case LLVMValueKind.LLVMConstantArrayValueKind:
@@ -990,23 +983,23 @@ internal unsafe readonly struct InstructionLifter
 					LocalVariable bufferLocal = new(underlyingType);
 					LocalVariable spanLocal = new(spanType);
 
-					instructions.Add(new InitializeInstruction(spanLocal));
+					basicBlock.Add(new InitializeInstruction(spanLocal));
 
-					instructions.Add(new AddressOfInstruction(bufferLocal));
-					instructions.Add(new CallInstruction(inlineArrayAsSpan));
-					instructions.Add(new StoreVariableInstruction(spanLocal));
+					basicBlock.Add(new AddressOfInstruction(bufferLocal));
+					basicBlock.Add(new CallInstruction(inlineArrayAsSpan));
+					basicBlock.Add(new StoreVariableInstruction(spanLocal));
 
 					for (int i = 0; i < elements.Length; i++)
 					{
 						LLVMValueRef element = elements[i];
-						instructions.Add(new AddressOfInstruction(spanLocal));
-						LoadVariable(instructions, new ConstantI4(i, module.Definition));
-						Call(instructions, getItem);
-						LoadValue(instructions, element);
-						instructions.Add(new StoreIndirectInstruction(elementType));
+						basicBlock.Add(new AddressOfInstruction(spanLocal));
+						LoadVariable(basicBlock, new ConstantI4(i, module.Definition));
+						Call(basicBlock, getItem);
+						LoadValue(basicBlock, element);
+						basicBlock.Add(new StoreIndirectInstruction(elementType));
 					}
 
-					instructions.Add(new LoadVariableInstruction(bufferLocal));
+					basicBlock.Add(new LoadVariableInstruction(bufferLocal));
 				}
 				break;
 			case LLVMValueKind.LLVMConstantStructValueKind:
@@ -1022,20 +1015,20 @@ internal unsafe readonly struct InstructionLifter
 
 					LocalVariable resultLocal = new(typeSignature);
 
-					instructions.Add(new InitializeInstruction(resultLocal));
+					basicBlock.Add(new InitializeInstruction(resultLocal));
 
 					for (int i = 0; i < fields.Length; i++)
 					{
 						LLVMValueRef field = fields[i];
 						FieldDefinition fieldDefinition = typeDefinition.Fields[i];
 
-						instructions.Add(new AddressOfInstruction(resultLocal));
-						instructions.Add(new LoadFieldAddressInstruction(fieldDefinition));
-						LoadValue(instructions, field);
-						instructions.Add(new StoreIndirectInstruction(fieldDefinition.Signature!.FieldType));
+						basicBlock.Add(new AddressOfInstruction(resultLocal));
+						basicBlock.Add(new LoadFieldAddressInstruction(fieldDefinition));
+						LoadValue(basicBlock, field);
+						basicBlock.Add(new StoreIndirectInstruction(fieldDefinition.Signature!.FieldType));
 					}
 
-					LoadVariable(instructions, resultLocal);
+					LoadVariable(basicBlock, resultLocal);
 				}
 				break;
 			case LLVMValueKind.LLVMConstantPointerNullValueKind:
@@ -1043,12 +1036,12 @@ internal unsafe readonly struct InstructionLifter
 			case LLVMValueKind.LLVMUndefValueValueKind:
 				{
 					TypeSignature typeSignature = GetTypeSignature(value.TypeOf);
-					LoadVariable(instructions, new DefaultVariable(typeSignature));
+					LoadVariable(basicBlock, new DefaultVariable(typeSignature));
 				}
 				break;
 			case LLVMValueKind.LLVMFunctionValueKind:
 				{
-					LoadVariable(instructions, new FunctionPointerVariable(module.Methods[value]));
+					LoadVariable(basicBlock, new FunctionPointerVariable(module.Methods[value]));
 				}
 				break;
 			case LLVMValueKind.LLVMConstantExprValueKind:
@@ -1058,8 +1051,8 @@ internal unsafe readonly struct InstructionLifter
 					{
 						LocalVariable resultVariable = new(resultType);
 						instructionResults.Add(value, resultVariable);
-						AddInstruction(instructions, value);
-						LoadVariable(instructions, resultVariable);
+						AddInstruction(basicBlock, value);
+						LoadVariable(basicBlock, resultVariable);
 						instructionResults.Remove(value);
 					}
 					else
@@ -1072,24 +1065,24 @@ internal unsafe readonly struct InstructionLifter
 				{
 					if (value.InstructionOpcode is LLVMOpcode.LLVMAlloca)
 					{
-						instructions.Add(new AddressOfInstruction(allocaData[value]));
+						basicBlock.Add(new AddressOfInstruction(allocaData[value]));
 					}
 					else
 					{
-						LoadVariable(instructions, instructionResults[value]);
+						LoadVariable(basicBlock, instructionResults[value]);
 					}
 				}
 				break;
 			case LLVMValueKind.LLVMArgumentValueKind:
 				{
-					LoadVariable(instructions, module.Methods[value.ParamParent].ParameterLookup[value]);
+					LoadVariable(basicBlock, module.Methods[value.ParamParent].ParameterLookup[value]);
 				}
 				break;
 			case LLVMValueKind.LLVMMetadataAsValueValueKind:
 				{
 					//Metadata is not a real type, so we just use Object. Anywhere metadata is supposed to be loaded, we instead load a null value.
 					TypeSignature typeSignature = module.Definition.CorLibTypeFactory.Object;
-					LoadVariable(instructions, new DefaultVariable(typeSignature));
+					LoadVariable(basicBlock, new DefaultVariable(typeSignature));
 				}
 				break;
 			default:
@@ -1097,25 +1090,25 @@ internal unsafe readonly struct InstructionLifter
 		}
 	}
 
-	private void StoreResult(IList<Instruction> instructions, LLVMValueRef instruction)
+	private void StoreResult(BasicBlock basicBlock, LLVMValueRef instruction)
 	{
-		instructions.Add(new StoreVariableInstruction(instructionResults[instruction]));
+		basicBlock.Add(new StoreVariableInstruction(instructionResults[instruction]));
 	}
 
-	private void MaybeStoreResult(IList<Instruction> instructions, LLVMValueRef instruction)
+	private void MaybeStoreResult(BasicBlock basicBlock, LLVMValueRef instruction)
 	{
 		if (instructionResults.TryGetValue(instruction, out IVariable? result))
 		{
-			instructions.Add(new StoreVariableInstruction(result));
+			basicBlock.Add(new StoreVariableInstruction(result));
 		}
 	}
 
-	private static void LoadVariable(IList<Instruction> instructions, IVariable variable)
+	private static void LoadVariable(BasicBlock basicBlock, IVariable variable)
 	{
-		instructions.Add(new LoadVariableInstruction(variable));
+		basicBlock.Add(new LoadVariableInstruction(variable));
 	}
 
-	private static void Call(IList<Instruction> instructions, IMethodDescriptor method)
+	private static void Call(BasicBlock instructions, IMethodDescriptor method)
 	{
 		instructions.Add(new CallInstruction(method));
 	}
@@ -1150,24 +1143,24 @@ internal unsafe readonly struct InstructionLifter
 	/// <summary>
 	/// Includes handling for phi instructions in the target blocks.
 	/// </summary>
-	private void ConditionalBranch(BasicBlock instructions, LLVMBasicBlockRef trueBlock, LLVMBasicBlockRef falseBlock)
+	private void ConditionalBranch(BasicBlock basicBlock, LLVMBasicBlockRef trueBlock, LLVMBasicBlockRef falseBlock)
 	{
 		if (!trueBlock.StartsWithPhi())
 		{
 			// The true block does not start with a phi instruction.
 			// The false block might or might not start with a phi instruction.
 
-			instructions.Add(new BranchIfTrueInstruction(basicBlocks[trueBlock]));
+			basicBlock.Add(new BranchIfTrueInstruction(basicBlocks[trueBlock]));
 
-			Branch(instructions, falseBlock);
+			Branch(basicBlock, falseBlock);
 		}
 		else if (!falseBlock.StartsWithPhi())
 		{
 			// Only the true block starts with a phi instruction.
 
-			instructions.Add(new BranchIfFalseInstruction(basicBlocks[falseBlock]));
+			basicBlock.Add(new BranchIfFalseInstruction(basicBlocks[falseBlock]));
 
-			Branch(instructions, trueBlock);
+			Branch(basicBlock, trueBlock);
 		}
 		else
 		{
@@ -1177,11 +1170,11 @@ internal unsafe readonly struct InstructionLifter
 			BasicBlock helperBasicBlock = new();
 			basicBlockList.Add(helperBasicBlock);
 
-			instructions.Add(new BranchIfTrueInstruction(helperBasicBlock));
+			basicBlock.Add(new BranchIfTrueInstruction(helperBasicBlock));
 
-			Branch(instructions, falseBlock);
+			Branch(basicBlock, falseBlock);
 
-			Branch(helperBasicBlock, basicBlockRefs[instructions], trueBlock);
+			Branch(helperBasicBlock, basicBlockRefs[basicBlock], trueBlock);
 		}
 	}
 
