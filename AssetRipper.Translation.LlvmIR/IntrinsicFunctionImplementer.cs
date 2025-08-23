@@ -3,6 +3,7 @@ using AsmResolver.DotNet.Code.Cil;
 using AsmResolver.DotNet.Collections;
 using AsmResolver.DotNet.Signatures;
 using AsmResolver.PE.DotNet.Cil;
+using AssetRipper.Translation.LlvmIR.Attributes;
 using System.Diagnostics.CodeAnalysis;
 using System.Text.RegularExpressions;
 

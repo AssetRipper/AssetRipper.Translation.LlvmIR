@@ -1,12 +1,9 @@
 ﻿using AsmResolver;
 using AsmResolver.DotNet;
-using AsmResolver.DotNet.Cloning;
-using AsmResolver.DotNet.Code.Cil;
-using AsmResolver.DotNet.Collections;
 using AsmResolver.DotNet.Signatures;
-using AsmResolver.PE.DotNet.Cil;
 using AsmResolver.PE.DotNet.Metadata.Tables;
 using AssetRipper.CIL;
+using AssetRipper.Translation.LlvmIR.Attributes;
 using AssetRipper.Translation.LlvmIR.Extensions;
 using LLVMSharp.Interop;
 using System.Diagnostics;

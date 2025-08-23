@@ -1,5 +1,6 @@
 ﻿using AsmResolver.DotNet;
 using AsmResolver.DotNet.Signatures;
+using AssetRipper.Translation.LlvmIR.Attributes;
 using AssetRipper.Translation.LlvmIR.Extensions;
 
 namespace AssetRipper.Translation.LlvmIR;
