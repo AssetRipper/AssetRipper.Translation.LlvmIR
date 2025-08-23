@@ -656,6 +656,66 @@ internal unsafe readonly struct InstructionLifter
 					StoreResult(basicBlock, instruction);
 				}
 				break;
+			case LLVMOpcode.LLVMExtractElement:
+				{
+					Debug.Assert(operands.Length == 2, "ExtractElement instruction should have exactly two operands");
+					LLVMValueRef vectorOperand = operands[0];
+					LLVMValueRef indexOperand = operands[1];
+					TypeSignature arrayType = module.GetTypeSignature(vectorOperand);
+					TypeSignature elementType = module.InlineArrayTypes[(TypeDefinition)arrayType.ToTypeDefOrRef()].ElementType;
+					TypeSignature indexType = module.GetTypeSignature(indexOperand);
+
+					LoadValue(basicBlock, vectorOperand);
+					LoadValue(basicBlock, indexOperand);
+					if (indexType is not CorLibTypeSignature)
+					{
+						throw new NotSupportedException();
+					}
+					else if (indexType.ElementType is ElementType.I8 or ElementType.U8)
+					{
+						basicBlock.Add(Instruction.FromOpCode(CilOpCodes.Conv_I4));
+					}
+
+					IMethodDescriptor method = module.InstructionHelperType.Methods
+						.First(m => m.Name == nameof(InstructionHelper.ExtractElement))
+						.MakeGenericInstanceMethod(arrayType, elementType);
+					Call(basicBlock, method);
+
+					StoreResult(basicBlock, instruction);
+				}
+				break;
+			case LLVMOpcode.LLVMInsertElement:
+				{
+					Debug.Assert(operands.Length == 3);
+					LLVMValueRef vectorOperand = operands[0];
+					LLVMValueRef valueOperand = operands[1];
+					LLVMValueRef indexOperand = operands[2];
+
+					TypeSignature arrayType = module.GetTypeSignature(vectorOperand);
+					TypeSignature elementType = module.InlineArrayTypes[(TypeDefinition)arrayType.ToTypeDefOrRef()].ElementType;
+					TypeSignature indexType = module.GetTypeSignature(indexOperand);
+					Debug.Assert(SignatureComparer.Default.Equals(elementType, module.GetTypeSignature(valueOperand)), "Value operand should have the same type as the array element type");
+
+					LoadValue(basicBlock, vectorOperand);
+					LoadValue(basicBlock, valueOperand);
+					LoadValue(basicBlock, indexOperand);
+					if (indexType is not CorLibTypeSignature)
+					{
+						throw new NotSupportedException();
+					}
+					else if (indexType.ElementType is ElementType.I8 or ElementType.U8)
+					{
+						basicBlock.Add(Instruction.FromOpCode(CilOpCodes.Conv_I4));
+					}
+
+					IMethodDescriptor method = module.InstructionHelperType.Methods
+						.First(m => m.Name == nameof(InstructionHelper.InsertElement))
+						.MakeGenericInstanceMethod(arrayType, elementType);
+					Call(basicBlock, method);
+
+					StoreResult(basicBlock, instruction);
+				}
+				break;
 			case LLVMOpcode.LLVMFreeze:
 				{
 					// At runtime, poison and undefined values don't exist, so freeze is a no-op.

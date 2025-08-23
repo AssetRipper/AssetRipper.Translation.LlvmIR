@@ -64,4 +64,17 @@ internal static class InstructionHelper
 
 		return result;
 	}
+
+	public static TElement ExtractElement<TBuffer, TElement>(this TBuffer buffer, int index)
+		where TBuffer : struct, IInlineArray<TElement>
+	{
+		return buffer.AsReadOnlySpan<TBuffer, TElement>()[index];
+	}
+
+	public static TBuffer InsertElement<TBuffer, TElement>(this TBuffer buffer, TElement value, int index)
+		where TBuffer : struct, IInlineArray<TElement>
+	{
+		buffer.AsSpan<TBuffer, TElement>()[index] = value;
+		return buffer;
+	}
 }
