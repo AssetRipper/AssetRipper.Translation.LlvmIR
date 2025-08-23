@@ -42,4 +42,8 @@ sealed partial class Arguments
 	[CommandLineArgument(DefaultValue = true)]
 	[Description("If true, name attributes will be included in the output.")]
 	public bool EmitNameAttributes { get; set; }
+
+	[CommandLineArgument]
+	[Description("If true, constant structs and arrays will be initialized from precomputed binary data.")]
+	public bool PrecomputeInitializers { get; set; }
 }

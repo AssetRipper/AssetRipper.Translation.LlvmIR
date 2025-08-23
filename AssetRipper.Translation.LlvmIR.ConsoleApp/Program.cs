@@ -30,6 +30,7 @@ internal static class Program
 			ClassName = args.ClassName,
 			ParseDemangledSymbols = args.ParseDemangledSymbols,
 			EmitNameAttributes = args.EmitNameAttributes,
+			PrecomputeInitializers = args.PrecomputeInitializers,
 		};
 		for (int i = 0; i < mangledNames.Length; i++)
 		{

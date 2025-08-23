@@ -6,6 +6,7 @@ using AssetRipper.Translation.LlvmIR.Extensions;
 using AssetRipper.Translation.LlvmIR.Variables;
 using LLVMSharp.Interop;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
@@ -832,6 +833,156 @@ internal unsafe readonly struct InstructionLifter
 
 	private TypeSignature GetTypeSignature(LLVMTypeRef type) => module.GetTypeSignature(type);
 
+	private unsafe bool TryWriteConstant(LLVMValueRef value, BinaryWriter writer)
+	{
+		switch (value.Kind)
+		{
+			case LLVMValueKind.LLVMConstantIntValueKind:
+				{
+					const int BitsPerByte = 8;
+					long integer = value.ConstIntSExt;
+					LLVMTypeRef operandType = value.TypeOf;
+					switch (operandType.IntWidth)
+					{
+						case sizeof(sbyte) * BitsPerByte:
+							writer.Write((sbyte)integer);
+							break;
+						case sizeof(short) * BitsPerByte:
+							writer.Write((short)integer);
+							break;
+						case sizeof(int) * BitsPerByte:
+							writer.Write((int)integer);
+							break;
+						case sizeof(long) * BitsPerByte:
+							writer.Write(integer);
+							break;
+						default:
+							return false;
+					}
+				}
+				break;
+			case LLVMValueKind.LLVMConstantFPValueKind:
+				{
+					double floatingPoint = value.GetFloatingPointValue();
+					switch (value.TypeOf.Kind)
+					{
+						case LLVMTypeKind.LLVMFloatTypeKind:
+							writer.Write((float)floatingPoint);
+							break;
+						case LLVMTypeKind.LLVMDoubleTypeKind:
+							writer.Write(floatingPoint);
+							break;
+						default:
+							return false;
+					}
+				}
+				break;
+			case LLVMValueKind.LLVMConstantDataArrayValueKind:
+				{
+					ReadOnlySpan<byte> data = LibLLVMSharp.ConstantDataArrayGetData(value);
+					writer.Write(data);
+				}
+				break;
+			case LLVMValueKind.LLVMConstantArrayValueKind:
+				{
+					LLVMTargetDataRef targetData = LLVM.GetModuleDataLayout(module.Module);
+					int size = (int)targetData.ABISizeOfType(value.TypeOf);
+
+					writer.Flush();
+					long arrayStartPosition = writer.BaseStream.Position;
+
+					LLVMValueRef[] elements = value.GetOperands();
+					foreach (LLVMValueRef element in elements)
+					{
+						if (!TryWriteConstant(element, writer))
+						{
+							return false;
+						}
+					}
+
+					writer.Flush();
+					long arrayEndPosition = writer.BaseStream.Position;
+
+					Debug.Assert(arrayEndPosition - arrayStartPosition == size, "Array size should match the expected size");
+				}
+				break;
+			case LLVMValueKind.LLVMConstantStructValueKind:
+				{
+					LLVMTargetDataRef targetData = LLVM.GetModuleDataLayout(module.Module);
+					ulong size = targetData.ABISizeOfType(value.TypeOf);
+
+					// Write zeroes in case of padding
+					writer.Flush();
+					long structStartPosition = writer.BaseStream.Position;
+					WriteZeroes(writer, (int)size);
+					writer.Flush();
+					long structEndPosition = writer.BaseStream.Position;
+					writer.BaseStream.Position = structStartPosition;
+
+					// Write each field
+					LLVMValueRef[] fields = value.GetOperands();
+					for (int i = 0; i < fields.Length; i++)
+					{
+						LLVMValueRef field = fields[i];
+						ulong fieldOffset = targetData.OffsetOfElement(value.TypeOf, (uint)i);
+						writer.BaseStream.Position = structStartPosition + (long)fieldOffset;
+						if (!TryWriteConstant(field, writer))
+						{
+							return false;
+						}
+					}
+
+					// Navigate to the end of the struct
+					writer.Flush();
+					writer.BaseStream.Position = structEndPosition;
+				}
+				break;
+			case LLVMValueKind.LLVMConstantPointerNullValueKind:
+			case LLVMValueKind.LLVMConstantAggregateZeroValueKind:
+			case LLVMValueKind.LLVMUndefValueValueKind:
+				{
+					// Write zeroes
+					LLVMTargetDataRef targetData = LLVM.GetModuleDataLayout(module.Module);
+					ulong size = targetData.ABISizeOfType(value.TypeOf);
+					WriteZeroes(writer, (int)size);
+				}
+				break;
+			default:
+				return false;
+		}
+		return true;
+
+		static void WriteZeroes(BinaryWriter writer, int count)
+		{
+			const int StackAllocSize = 256;
+			Span<byte> buffer = stackalloc byte[StackAllocSize];
+			buffer.Clear();
+			while (count > 0)
+			{
+				int writeCount = int.Min(count, StackAllocSize);
+				writer.Write(buffer[..writeCount]);
+				count -= writeCount;
+			}
+		}
+	}
+
+	private bool TryWriteConstant(LLVMValueRef value, [NotNullWhen(true)] out byte[]? data)
+	{
+		using MemoryStream memoryStream = new();
+		using BinaryWriter writer = new(memoryStream);
+		if (TryWriteConstant(value, writer))
+		{
+			writer.Flush();
+			data = memoryStream.ToArray();
+			return true;
+		}
+		else
+		{
+			data = null;
+			return false;
+		}
+	}
+
 	private void LoadValue(BasicBlock basicBlock, LLVMValueRef value)
 	{
 		switch (value.Kind)
@@ -903,64 +1054,28 @@ internal unsafe readonly struct InstructionLifter
 				break;
 			case LLVMValueKind.LLVMConstantDataArrayValueKind:
 				{
-					TypeSignature typeSignature = GetTypeSignature(value.TypeOf);
-
-					TypeDefinition inlineArrayType = (TypeDefinition)typeSignature.ToTypeDefOrRef();
-					module.InlineArrayTypes[inlineArrayType].GetUltimateElementType(out TypeSignature elementType, out int elementCount);
-
 					ReadOnlySpan<byte> data = LibLLVMSharp.ConstantDataArrayGetData(value);
 
-					if (elementType is CorLibTypeSignature { ElementType: ElementType.I2 } && data.TryParseCharacterArray(out string? @string))
-					{
-						elementType = module.Definition.CorLibTypeFactory.Char;
+					TypeSignature arrayType = GetTypeSignature(value.TypeOf);
 
-						IMethodDescriptor toCharacterSpan = module.SpanHelperType.Methods
-							.Single(m => m.Name == nameof(SpanHelper.ToCharacterSpan));
+					module.InlineArrayTypes[(TypeDefinition)arrayType.ToTypeDefOrRef()].GetUltimateElementType(out TypeSignature elementType, out int elementCount);
 
-						LoadVariable(basicBlock, new ConstantString(@string, module.Definition));
-						Call(basicBlock, toCharacterSpan);
-					}
-					else if (elementType is CorLibTypeSignature { ElementType: ElementType.I1 or ElementType.U1 })
-					{
-						elementType = module.Definition.CorLibTypeFactory.Byte;
-
-						IMethodDefOrRef spanConstructor = (IMethodDefOrRef)module.Definition.DefaultImporter
-							.ImportMethod(typeof(ReadOnlySpan<byte>).GetConstructor([typeof(void*), typeof(int)])!);
-
-						FieldDefinition field = module.AddStoredDataField(data);
-
-						basicBlock.Add(new LoadFieldAddressInstruction(field));
-						basicBlock.Add(new LoadVariableInstruction(new ConstantI4(data.Length, module.Definition)));
-						basicBlock.Add(new NewObjectInstruction(spanConstructor));
-					}
-					else
-					{
-						IMethodDefOrRef createSpan = (IMethodDefOrRef)module.Definition.DefaultImporter
-							.ImportMethod(typeof(RuntimeHelpers).GetMethod(nameof(RuntimeHelpers.CreateSpan))!);
-						IMethodDescriptor createSpanInstance = createSpan.MakeGenericInstanceMethod(elementType);
-
-						FieldDefinition field = module.AddStoredDataField(data);
-
-						basicBlock.Add(new LoadTokenInstruction(field));
-						basicBlock.Add(new CallInstruction(createSpanInstance));
-					}
-
-					Debug.Assert(elementType is not PointerTypeSignature, "Pointers cannot be used as generic type arguments");
-
-					IMethodDescriptor createInlineArray = module.InlineArrayHelperType.Methods
-						.Single(m => m.Name == nameof(InlineArrayHelper.Create))
-						.MakeGenericInstanceMethod(typeSignature, elementType);
-
-					Call(basicBlock, createInlineArray);
+					LoadArrayFromByteSpan(basicBlock, arrayType, elementType, data);
 				}
 				break;
 			case LLVMValueKind.LLVMConstantArrayValueKind:
 				{
 					TypeSignature underlyingType = GetTypeSignature(value.TypeOf);
 
-					LLVMValueRef[] elements = value.GetOperands();
-
 					module.InlineArrayTypes[(TypeDefinition)underlyingType.ToTypeDefOrRef()].GetElementType(out TypeSignature elementType, out int elementCount);
+
+					if (module.Options.PrecomputeInitializers && TryWriteConstant(value, out byte[]? data))
+					{
+						LoadArrayFromByteSpan(basicBlock, underlyingType, elementType, data);
+						return;
+					}
+
+					LLVMValueRef[] elements = value.GetOperands();
 
 					if (elementCount != elements.Length)
 					{
@@ -1005,6 +1120,27 @@ internal unsafe readonly struct InstructionLifter
 			case LLVMValueKind.LLVMConstantStructValueKind:
 				{
 					TypeSignature typeSignature = GetTypeSignature(value.TypeOf);
+
+					if (module.Options.PrecomputeInitializers && TryWriteConstant(value, out byte[]? data))
+					{
+						IMethodDefOrRef spanConstructor = (IMethodDefOrRef)module.Definition.DefaultImporter
+							.ImportMethod(typeof(ReadOnlySpan<byte>).GetConstructor([typeof(void*), typeof(int)])!);
+
+						FieldDefinition field = module.AddStoredDataField(data);
+
+						basicBlock.Add(new LoadFieldAddressInstruction(field));
+						basicBlock.Add(new LoadVariableInstruction(new ConstantI4(data.Length, module.Definition)));
+						basicBlock.Add(new NewObjectInstruction(spanConstructor));
+
+						IMethodDefOrRef read = (IMethodDefOrRef)module.Definition.DefaultImporter
+							.ImportMethod(typeof(MemoryMarshal).GetMethod(nameof(MemoryMarshal.Read))!);
+						IMethodDescriptor readInstance = read.MakeGenericInstanceMethod(typeSignature);
+
+						Call(basicBlock, readInstance);
+
+						return;
+					}
+
 					TypeDefinition typeDefinition = (TypeDefinition)typeSignature.ToTypeDefOrRef();
 
 					LLVMValueRef[] fields = value.GetOperands();
@@ -1088,6 +1224,69 @@ internal unsafe readonly struct InstructionLifter
 			default:
 				throw new NotImplementedException(value.Kind.ToString());
 		}
+	}
+
+	private void LoadArrayFromByteSpan(BasicBlock basicBlock, TypeSignature arrayType, TypeSignature elementType, ReadOnlySpan<byte> data)
+	{
+		if (elementType is CorLibTypeSignature { ElementType: ElementType.I2 } && data.TryParseCharacterArray(out string? @string))
+		{
+			elementType = module.Definition.CorLibTypeFactory.Char;
+
+			IMethodDescriptor toCharacterSpan = module.SpanHelperType.Methods
+				.Single(m => m.Name == nameof(SpanHelper.ToCharacterSpan));
+
+			LoadVariable(basicBlock, new ConstantString(@string, module.Definition));
+			Call(basicBlock, toCharacterSpan);
+		}
+		else if (elementType is CorLibTypeSignature { ElementType: ElementType.I1 or ElementType.U1 })
+		{
+			elementType = module.Definition.CorLibTypeFactory.Byte;
+
+			IMethodDefOrRef spanConstructor = (IMethodDefOrRef)module.Definition.DefaultImporter
+				.ImportMethod(typeof(ReadOnlySpan<byte>).GetConstructor([typeof(void*), typeof(int)])!);
+
+			FieldDefinition field = module.AddStoredDataField(data);
+
+			basicBlock.Add(new LoadFieldAddressInstruction(field));
+			basicBlock.Add(new LoadVariableInstruction(new ConstantI4(data.Length, module.Definition)));
+			basicBlock.Add(new NewObjectInstruction(spanConstructor));
+		}
+		else if (elementType is CorLibTypeSignature)
+		{
+			IMethodDefOrRef createSpan = (IMethodDefOrRef)module.Definition.DefaultImporter
+				.ImportMethod(typeof(RuntimeHelpers).GetMethod(nameof(RuntimeHelpers.CreateSpan))!);
+			IMethodDescriptor createSpanInstance = createSpan.MakeGenericInstanceMethod(elementType);
+
+			FieldDefinition field = module.AddStoredDataField(data);
+
+			basicBlock.Add(new LoadTokenInstruction(field));
+			basicBlock.Add(new CallInstruction(createSpanInstance));
+		}
+		else
+		{
+			IMethodDefOrRef spanConstructor = (IMethodDefOrRef)module.Definition.DefaultImporter
+				.ImportMethod(typeof(ReadOnlySpan<byte>).GetConstructor([typeof(void*), typeof(int)])!);
+
+			FieldDefinition field = module.AddStoredDataField(data);
+
+			basicBlock.Add(new LoadFieldAddressInstruction(field));
+			basicBlock.Add(new LoadVariableInstruction(new ConstantI4(data.Length, module.Definition)));
+			basicBlock.Add(new NewObjectInstruction(spanConstructor));
+
+			IMethodDescriptor castMethod = module.SpanHelperType.Methods
+				.Single(m => m.Name == nameof(SpanHelper.Cast))
+				.MakeGenericInstanceMethod(module.Definition.CorLibTypeFactory.Byte, elementType);
+
+			Call(basicBlock, castMethod);
+		}
+
+		Debug.Assert(elementType is not PointerTypeSignature, "Pointers cannot be used as generic type arguments");
+
+		IMethodDescriptor createInlineArray = module.InlineArrayHelperType.Methods
+			.Single(m => m.Name == nameof(InlineArrayHelper.Create))
+			.MakeGenericInstanceMethod(arrayType, elementType);
+
+		Call(basicBlock, createInlineArray);
 	}
 
 	private void StoreResult(BasicBlock basicBlock, LLVMValueRef instruction)

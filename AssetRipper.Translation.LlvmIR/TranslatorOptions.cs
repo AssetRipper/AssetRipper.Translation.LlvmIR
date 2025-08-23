@@ -29,6 +29,11 @@ public sealed record class TranslatorOptions
 	/// </summary>
 	public bool EmitNameAttributes { get; set; }
 
+	/// <summary>
+	/// If true, constant structs and arrays will be initialized from precomputed binary data.
+	/// </summary>
+	public bool PrecomputeInitializers { get; set; }
+
 	public string? GetNamespace(string? subNamespace)
 	{
 		if (string.IsNullOrEmpty(Namespace))
