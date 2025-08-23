@@ -831,6 +831,17 @@ internal unsafe readonly struct InstructionLifter
 					StoreResult(basicBlock, instruction);
 				}
 				break;
+			case LLVMOpcode.LLVMFence:
+				{
+					// There's likely no direct equivalent to LLVM fence in CIL.
+					// The closest might be Thread.MemoryBarrier and the volatile keyword.
+					// https://learn.microsoft.com/en-us/dotnet/api/system.threading.thread.memorybarrier
+					// https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/keywords/volatile
+					// https://learn.microsoft.com/en-us/dotnet/api/system.reflection.emit.opcodes.volatile
+					// However, we currently don't do anything except warn.
+					Console.WriteLine($"Warning: LLVM fence instruction is not currently supported; it is being ignored inside {function?.Name}.");
+				}
+				break;
 			default:
 				if (BinaryMathInstruction.Supported(opcode))
 				{
