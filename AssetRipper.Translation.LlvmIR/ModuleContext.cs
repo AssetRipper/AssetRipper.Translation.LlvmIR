@@ -96,6 +96,11 @@ internal sealed partial class ModuleContext
 		return arrayType;
 	}
 
+	public InlineArrayContext GetContextForInlineArray(TypeSignature arrayType)
+	{
+		return InlineArrayTypes[(TypeDefinition)arrayType.ToTypeDefOrRef()];
+	}
+
 	public void CreateFunctions()
 	{
 		foreach (LLVMValueRef function in Module.GetFunctions())
