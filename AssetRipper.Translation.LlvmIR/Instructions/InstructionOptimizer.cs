@@ -41,7 +41,7 @@ public static class InstructionOptimizer
 						switch (basicBlock[i - 1])
 						{
 							case AddressOfInstruction addressOf:
-								if (addressOf.Variable.SupportsLoad && SignatureComparer.Default.Equals(addressOf.Variable.VariableType, loadIndirect.Type))
+								if (addressOf.Variable.SupportsLoad && AreCompatible(addressOf.Variable.VariableType, loadIndirect.Type))
 								{
 									LoadVariableInstruction replacement = new(addressOf.Variable);
 									basicBlock[i - 1] = replacement;
@@ -51,7 +51,7 @@ public static class InstructionOptimizer
 								}
 								break;
 							case LoadFieldAddressInstruction loadFieldAddress:
-								if (SignatureComparer.Default.Equals(loadFieldAddress.Field.Signature?.FieldType, loadIndirect.Type))
+								if (AreCompatible(loadFieldAddress.Field.Signature?.FieldType, loadIndirect.Type))
 								{
 									LoadFieldInstruction replacement = new(loadFieldAddress.Field);
 									basicBlock[i - 1] = replacement;
@@ -83,7 +83,7 @@ public static class InstructionOptimizer
 								switch (current)
 								{
 									case AddressOfInstruction addressOf:
-										if (addressOf.Variable.SupportsLoad && SignatureComparer.Default.Equals(addressOf.Variable.VariableType, storeIndirect.Type))
+										if (addressOf.Variable.SupportsLoad && AreCompatible(addressOf.Variable.VariableType, storeIndirect.Type))
 										{
 											StoreVariableInstruction replacement = new(addressOf.Variable);
 											basicBlock[i] = replacement;
@@ -93,7 +93,7 @@ public static class InstructionOptimizer
 										}
 										break;
 									case LoadFieldAddressInstruction loadFieldAddress:
-										if (SignatureComparer.Default.Equals(loadFieldAddress.Field.Signature?.FieldType, storeIndirect.Type))
+										if (AreCompatible(loadFieldAddress.Field.Signature?.FieldType, storeIndirect.Type))
 										{
 											StoreFieldInstruction replacement = new(loadFieldAddress.Field);
 											basicBlock[i] = replacement;
@@ -454,5 +454,14 @@ public static class InstructionOptimizer
 			}
 		}
 		return variableBlockMap.Keys;
+	}
+
+	private static bool AreCompatible(TypeSignature? type1, TypeSignature? type2)
+	{
+		if (type1 is PointerTypeSignature)
+		{
+			return type2 is PointerTypeSignature;
+		}
+		return SignatureComparer.Default.Equals(type1, type2);
 	}
 }
