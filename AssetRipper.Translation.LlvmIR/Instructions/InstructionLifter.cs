@@ -656,6 +656,85 @@ internal unsafe readonly struct InstructionLifter
 					StoreResult(basicBlock, instruction);
 				}
 				break;
+			case LLVMOpcode.LLVMExtractValue:
+				{
+					Debug.Assert(operands.Length is 1);
+					LLVMValueRef source = operands[0];
+					
+					ReadOnlySpan<uint> indices = new(LLVM.GetIndices(instruction), (int)LLVM.GetNumIndices(instruction));
+
+					LoadValue(basicBlock, source);
+
+					TypeSignature sourceType = module.GetTypeSignature(source);
+					LocalVariable sourceLocal = new(sourceType);
+					basicBlock.Add(new StoreVariableInstruction(sourceLocal));
+
+					basicBlock.Add(new AddressOfInstruction(sourceLocal));
+					TypeSignature currentType = sourceType;
+					foreach (uint index in indices)
+					{
+						TypeDefOrRefSignature structTypeSignature = (TypeDefOrRefSignature)currentType;
+						TypeDefinition structType = (TypeDefinition)structTypeSignature.ToTypeDefOrRef();
+
+						if (module.InlineArrayTypes.TryGetValue(structType, out InlineArrayContext? inlineArray))
+						{
+							LoadArrayOffset(basicBlock, (int)index, inlineArray.ElementType);
+							currentType = inlineArray.ElementType;
+						}
+						else
+						{
+							FieldDefinition field = structType.GetInstanceField((int)index);
+							basicBlock.Add(new LoadFieldAddressInstruction(field));
+							currentType = field.Signature!.FieldType;
+						}
+					}
+					basicBlock.Add(new LoadIndirectInstruction(currentType));
+
+					StoreResult(basicBlock, instruction);
+				}
+				break;
+			case LLVMOpcode.LLVMInsertValue:
+				{
+					Debug.Assert(operands.Length is 2);
+					LLVMValueRef source = operands[0];
+					LLVMValueRef value = operands[1];
+
+					ReadOnlySpan<uint> indices = new(LLVM.GetIndices(instruction), (int)LLVM.GetNumIndices(instruction));
+
+					LoadValue(basicBlock, source);
+
+					TypeSignature sourceType = module.GetTypeSignature(source);
+					LocalVariable sourceLocal = new(sourceType);
+					basicBlock.Add(new StoreVariableInstruction(sourceLocal));
+
+					basicBlock.Add(new AddressOfInstruction(sourceLocal));
+					TypeSignature currentType = sourceType;
+					foreach (uint index in indices)
+					{
+						TypeDefOrRefSignature structTypeSignature = (TypeDefOrRefSignature)currentType;
+						TypeDefinition structType = (TypeDefinition)structTypeSignature.ToTypeDefOrRef();
+
+						if (module.InlineArrayTypes.TryGetValue(structType, out InlineArrayContext? inlineArray))
+						{
+							LoadArrayOffset(basicBlock, (int)index, inlineArray.ElementType);
+							currentType = inlineArray.ElementType;
+						}
+						else
+						{
+							FieldDefinition field = structType.GetInstanceField((int)index);
+							basicBlock.Add(new LoadFieldAddressInstruction(field));
+							currentType = field.Signature!.FieldType;
+						}
+					}
+
+					LoadValue(basicBlock, value);
+
+					basicBlock.Add(new StoreIndirectInstruction(currentType));
+
+					LoadVariable(basicBlock, sourceLocal);
+					StoreResult(basicBlock, instruction);
+				}
+				break;
 			case LLVMOpcode.LLVMExtractElement:
 				{
 					Debug.Assert(operands.Length == 2, "ExtractElement instruction should have exactly two operands");
@@ -852,6 +931,36 @@ internal unsafe readonly struct InstructionLifter
 		else
 		{
 			LoadValue(basicBlock, index);
+			basicBlock.Add(Instruction.FromOpCode(CilOpCodes.Conv_I));
+			basicBlock.Add(new SizeOfInstruction(elementTypeSignature));
+			basicBlock.Add(Instruction.FromOpCode(CilOpCodes.Mul));
+			basicBlock.Add(Instruction.FromOpCode(CilOpCodes.Add));
+		}
+	}
+
+	private void LoadArrayOffset(BasicBlock basicBlock, int index, TypeSignature elementTypeSignature)
+	{
+		if (index == 0)
+		{
+			// Skip loading zero offset
+			return;
+		}
+
+		if (elementTypeSignature.TryGetSize(out int size))
+		{
+			int offset = index * size;
+			LoadVariable(basicBlock, new ConstantI4(offset, module.Definition));
+			basicBlock.Add(Instruction.FromOpCode(CilOpCodes.Conv_I));
+			basicBlock.Add(Instruction.FromOpCode(CilOpCodes.Add));
+		}
+		else if (index == 1)
+		{
+			basicBlock.Add(new SizeOfInstruction(elementTypeSignature));
+			basicBlock.Add(Instruction.FromOpCode(CilOpCodes.Add));
+		}
+		else
+		{
+			LoadVariable(basicBlock, new ConstantI4(index, module.Definition));
 			basicBlock.Add(Instruction.FromOpCode(CilOpCodes.Conv_I));
 			basicBlock.Add(new SizeOfInstruction(elementTypeSignature));
 			basicBlock.Add(Instruction.FromOpCode(CilOpCodes.Mul));

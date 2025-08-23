@@ -302,7 +302,7 @@ public partial class SimpleTests
 	[SavesSuccessfully]
 	[DecompilesSuccessfully]
 	private const string VectorExtractElement = """
-		define linkonce_odr dso_local noundef i32 @insert(<4 x i32> noundef %0) {
+		define linkonce_odr dso_local noundef i32 @extract(<4 x i32> noundef %0) {
 		  %3 = extractelement <4 x i32> %0, i64 2
 		  ret i32 %3
 		}
@@ -314,6 +314,24 @@ public partial class SimpleTests
 		define linkonce_odr dso_local noundef <4 x i32> @insert(<4 x i32> noundef %0, i32 noundef %1) {
 		  %3 = insertelement <4 x i32> %0, i32 %1, i16 2
 		  ret <4 x i32> %3
+		}
+		""";
+
+	[SavesSuccessfully]
+	[DecompilesSuccessfully]
+	private const string ArrayExtractValue = """
+		define linkonce_odr dso_local noundef i32 @extract([4 x i32] noundef %0) {
+		  %3 = extractvalue [4 x i32] %0, 2
+		  ret i32 %3
+		}
+		""";
+
+	[SavesSuccessfully]
+	[DecompilesSuccessfully]
+	private const string ArrayInsertValue = """
+		define linkonce_odr dso_local noundef [4 x i32] @insert([4 x i32] noundef %0, i32 noundef %1) {
+		  %3 = insertvalue [4 x i32] %0, i32 %1, 2
+		  ret [4 x i32] %3
 		}
 		""";
 
