@@ -716,6 +716,33 @@ internal unsafe readonly struct InstructionLifter
 					StoreResult(basicBlock, instruction);
 				}
 				break;
+			case LLVMOpcode.LLVMShuffleVector:
+				{
+					Debug.Assert(operands.Length == 3);
+					LLVMValueRef vector1Operand = operands[0];
+					LLVMValueRef vector2Operand = operands[1];
+					LLVMValueRef maskOperand = operands[2];
+
+					TypeSignature vectorArrayType = module.GetTypeSignature(vector1Operand);
+					TypeSignature vectorElementType = module.GetContextForInlineArray(vectorArrayType).ElementType;
+					Debug.Assert(SignatureComparer.Default.Equals(vectorArrayType, module.GetTypeSignature(vector2Operand)), "Both vector operands should have the same type");
+
+					TypeSignature maskArrayType = module.GetTypeSignature(maskOperand);
+					Debug.Assert(module.GetContextForInlineArray(maskArrayType).ElementType is CorLibTypeSignature { ElementType: ElementType.I4 });
+
+					TypeSignature resultArrayType = module.GetTypeSignature(instruction);
+					Debug.Assert(SignatureComparer.Default.Equals(vectorElementType, module.GetContextForInlineArray(resultArrayType).ElementType), "Result array should have the same element type as the vector operands");
+
+					LoadValue(basicBlock, vector1Operand);
+					LoadValue(basicBlock, vector2Operand);
+					LoadValue(basicBlock, maskOperand);
+					IMethodDescriptor method = module.InstructionHelperType.Methods
+						.First(m => m.Name == nameof(InstructionHelper.ShuffleVector))
+						.MakeGenericInstanceMethod(vectorArrayType, vectorElementType);
+					Call(basicBlock, method);
+					StoreResult(basicBlock, instruction);
+				}
+				break;
 			case LLVMOpcode.LLVMFreeze:
 				{
 					// At runtime, poison and undefined values don't exist, so freeze is a no-op.

@@ -77,4 +77,31 @@ internal static class InstructionHelper
 		buffer.AsSpan<TBuffer, TElement>()[index] = value;
 		return buffer;
 	}
+
+	public static TResult ShuffleVector<TVector, TIndex, TResult, TElement>(TVector vector1, TVector vector2, TIndex indices)
+		where TVector : struct, IInlineArray<TElement>
+		where TIndex : struct, IInlineArray<int>
+		where TResult : struct, IInlineArray<TElement>
+		where TElement : unmanaged
+	{
+		ArgumentOutOfRangeException.ThrowIfNotEqual(TResult.Length, TIndex.Length);
+
+		ReadOnlySpan<TElement> vector1Span = vector1.AsReadOnlySpan<TVector, TElement>();
+		ReadOnlySpan<TElement> vector2Span = vector2.AsReadOnlySpan<TVector, TElement>();
+		ReadOnlySpan<int> indexSpan = indices.AsReadOnlySpan<TIndex, int>();
+
+		TResult result = default;
+		Span<TElement> resultSpan = result.AsSpan<TResult, TElement>();
+
+		for (int i = 0; i < TIndex.Length; i++)
+		{
+			int index = indexSpan[i];
+			ArgumentOutOfRangeException.ThrowIfNegative(index);
+			ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(index, TVector.Length * 2);
+
+			resultSpan[i] = index < TVector.Length ? vector1Span[index] : vector2Span[index - TVector.Length];
+		}
+
+		return result;
+	}
 }
