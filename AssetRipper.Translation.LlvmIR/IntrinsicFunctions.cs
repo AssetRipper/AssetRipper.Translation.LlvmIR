@@ -1,4 +1,5 @@
-﻿using System.Buffers;
+﻿using AssetRipper.Translation.LlvmIR.Attributes;
+using System.Buffers;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
