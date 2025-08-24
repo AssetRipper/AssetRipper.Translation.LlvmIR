@@ -881,8 +881,29 @@ internal unsafe readonly struct InstructionLifter
 					// https://learn.microsoft.com/en-us/dotnet/api/system.threading.thread.memorybarrier
 					// https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/keywords/volatile
 					// https://learn.microsoft.com/en-us/dotnet/api/system.reflection.emit.opcodes.volatile
+					// https://llvm.org/docs/LangRef.html#fence-instruction
 					// However, we currently don't do anything except warn.
 					Console.WriteLine($"Warning: LLVM fence instruction is not currently supported; it is being ignored inside {function?.Name}.");
+				}
+				break;
+			case LLVMOpcode.LLVMAtomicRMW:
+				{
+					// These are not currently supported.
+					// https://llvm.org/docs/LangRef.html#atomicrmw-instruction
+					TypeSignature type = module.GetTypeSignature(instruction);
+					LoadVariable(basicBlock, new DefaultVariable(type));
+					StoreResult(basicBlock, instruction);
+					Console.WriteLine($"Warning: LLVM AtomicRMW instruction is not currently supported; it is being ignored inside {function?.Name}.");
+				}
+				break;
+			case LLVMOpcode.LLVMAtomicCmpXchg:
+				{
+					// These are not currently supported.
+					// https://llvm.org/docs/LangRef.html#cmpxchg-instruction
+					TypeSignature type = module.GetTypeSignature(instruction);
+					LoadVariable(basicBlock, new DefaultVariable(type));
+					StoreResult(basicBlock, instruction);
+					Console.WriteLine($"Warning: LLVM CmpXchg instruction is not currently supported; it is being ignored inside {function?.Name}.");
 				}
 				break;
 			default:
