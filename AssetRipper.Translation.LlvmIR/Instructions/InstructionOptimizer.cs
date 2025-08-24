@@ -383,6 +383,18 @@ public static class InstructionOptimizer
 				{
 					continue;
 				}
+				foreach (int index in indicesToRemove)
+				{
+					if (index > usage.StoreIndex && index < usage.LoadIndex)
+					{
+						hasBarrier = true;
+						break;
+					}
+				}
+				if (hasBarrier)
+				{
+					continue;
+				}
 
 				// Check 6
 				bool valueWillRemainOnStack = true;

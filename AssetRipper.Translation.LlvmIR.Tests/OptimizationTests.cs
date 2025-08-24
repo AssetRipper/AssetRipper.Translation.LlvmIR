@@ -10,7 +10,9 @@ namespace AssetRipper.Translation.LlvmIR.Tests;
 internal class OptimizationTests
 {
 	public ModuleDefinition Module { get; private set; }
+	public TypeSignature Void => Module.CorLibTypeFactory.Void;
 	public TypeSignature Int32 => Module.CorLibTypeFactory.Int32;
+	public TypeSignature Int64 => Module.CorLibTypeFactory.Int64;
 
 	[SetUp]
 	public void SetUp()
@@ -96,6 +98,31 @@ internal class OptimizationTests
 			Instruction.FromOpCode(CilOpCodes.Add),
 			new StoreVariableInstruction(w),
 			new StoreVariableInstruction(data),
+		];
+
+		Optimize(instructions);
+
+		Assert.That(instructions, Is.EqualTo(optimizedInstructions));
+	}
+
+	[Test]
+	public void StoreIndirect_3()
+	{
+		ImportantVariable data = new(Int64);
+		ImportantVariable x = new(Int32);
+
+		BasicBlock instructions =
+		[
+			new AddressOfInstruction(data),
+			new LoadVariableInstruction(x),
+			new StoreIndirectInstruction(Int32),
+		];
+
+		BasicBlock optimizedInstructions =
+		[
+			new AddressOfInstruction(data),
+			new LoadVariableInstruction(x),
+			new StoreIndirectInstruction(Int32),
 		];
 
 		Optimize(instructions);
@@ -404,6 +431,124 @@ internal class OptimizationTests
 		Optimize(instructions);
 
 		Assert.That(instructions, Is.EqualTo(optimizedInstructions));
+	}
+
+	[Test]
+	public void Temporary_3()
+	{
+		ImportantVariable x = new(Int32);
+		ImportantVariable y = new(Int32);
+
+		LocalVariable temp1 = new(Int32);
+		LocalVariable temp2 = new(Int32);
+
+		BasicBlock instructions =
+		[
+			new LoadVariableInstruction(x),
+			new StoreVariableInstruction(temp1),
+			new LoadVariableInstruction(y),
+			new StoreVariableInstruction(temp2),
+			new LoadVariableInstruction(temp2),
+			new LoadVariableInstruction(temp1),
+			Instruction.FromOpCode(CilOpCodes.Add),
+			ReturnInstruction.Value,
+		];
+
+		BasicBlock optimizedInstructions =
+		[
+			new LoadVariableInstruction(x),
+			new StoreVariableInstruction(temp1),
+			new LoadVariableInstruction(y),
+			new LoadVariableInstruction(temp1),
+			Instruction.FromOpCode(CilOpCodes.Add),
+			ReturnInstruction.Value,
+		];
+
+		Optimize(instructions);
+
+		Assert.That(instructions, Is.EqualTo(optimizedInstructions));
+	}
+
+	[Test]
+	public void Temporary_4()
+	{
+		ImportantVariable x = new(Int32);
+		ImportantVariable y = new(Int32);
+
+		LocalVariable temp1 = new(Int32);
+		LocalVariable temp2 = new(Int32);
+
+		BasicBlock instructions =
+		[
+			new LoadVariableInstruction(x),
+			new StoreVariableInstruction(temp1),
+			new LoadVariableInstruction(y),
+			new StoreVariableInstruction(temp2),
+			new LoadVariableInstruction(temp1),
+			new LoadVariableInstruction(temp2),
+			Instruction.FromOpCode(CilOpCodes.Add),
+			ReturnInstruction.Value,
+		];
+
+		BasicBlock optimizedInstructions =
+		[
+			new LoadVariableInstruction(x),
+			new LoadVariableInstruction(y),
+			Instruction.FromOpCode(CilOpCodes.Add),
+			ReturnInstruction.Value,
+		];
+
+		Optimize(instructions);
+
+		Assert.That(instructions, Is.EqualTo(optimizedInstructions));
+	}
+
+	[Test]
+	public void Temporary_5()
+	{
+		ImportantVariable x = new(Int32);
+		ImportantVariable y = new(Int32);
+		ImportantVariable z = new(Int32);
+		ImportantVariable w = new(Int32);
+
+		LocalVariable temp1 = new(Int32);
+		LocalVariable temp2 = new(Int32);
+
+		BasicBlock instructions =
+		[
+			new LoadVariableInstruction(x),
+			new StoreVariableInstruction(temp1),
+			new LoadVariableInstruction(y),
+			new StoreVariableInstruction(temp2),
+			new LoadVariableInstruction(temp1),
+			new StoreVariableInstruction(z),
+			new LoadVariableInstruction(temp2),
+			new StoreVariableInstruction(w),
+		];
+
+		// Both of these are semantically equivalent to the original, so either is valid.
+		BasicBlock optimizedInstructions_1 =
+		[
+			new LoadVariableInstruction(x),
+			new LoadVariableInstruction(y),
+			new StoreVariableInstruction(temp2),
+			new StoreVariableInstruction(z),
+			new LoadVariableInstruction(temp2),
+			new StoreVariableInstruction(w),
+		];
+		BasicBlock optimizedInstructions_2 =
+		[
+			new LoadVariableInstruction(x),
+			new StoreVariableInstruction(temp1),
+			new LoadVariableInstruction(y),
+			new LoadVariableInstruction(temp1),
+			new StoreVariableInstruction(z),
+			new StoreVariableInstruction(w),
+		];
+
+		Optimize(instructions);
+
+		Assert.That(instructions, Is.EqualTo(optimizedInstructions_1).Or.EqualTo(optimizedInstructions_2));
 	}
 
 	private static void Optimize(BasicBlock instructions) => InstructionOptimizer.Optimize([instructions]);
