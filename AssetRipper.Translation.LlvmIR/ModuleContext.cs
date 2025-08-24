@@ -31,6 +31,7 @@ internal sealed partial class ModuleContext
 			typeof(MangledNameAttribute),
 			typeof(DemangledNameAttribute),
 			typeof(CleanNameAttribute),
+			typeof(InlineAssemblyAttribute),
 			typeof(MightThrowAttribute),
 			typeof(ExceptionInfo),
 			typeof(StackFrame),
@@ -38,6 +39,7 @@ internal sealed partial class ModuleContext
 			typeof(FatalException),
 			typeof(PointerIndices),
 			typeof(NativeMemoryHelper),
+			typeof(AssemblyFunctions),
 		]);
 
 		Module = module;

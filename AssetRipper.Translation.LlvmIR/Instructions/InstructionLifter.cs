@@ -2,6 +2,7 @@
 using AsmResolver.DotNet.Signatures;
 using AsmResolver.PE.DotNet.Cil;
 using AsmResolver.PE.DotNet.Metadata.Tables;
+using AssetRipper.Translation.LlvmIR.Attributes;
 using AssetRipper.Translation.LlvmIR.Extensions;
 using AssetRipper.Translation.LlvmIR.Variables;
 using LLVMSharp.Interop;
@@ -522,8 +523,6 @@ internal unsafe readonly struct InstructionLifter
 							LoadValue(basicBlock, argumentOperand);
 						}
 
-						LoadValue(basicBlock, functionOperand);
-
 						TypeSignature[] parameterTypes = new TypeSignature[argumentOperands.Length];
 						for (int i = 0; i < argumentOperands.Length; i++)
 						{
@@ -533,7 +532,51 @@ internal unsafe readonly struct InstructionLifter
 						TypeSignature resultTypeSignature = module.GetTypeSignature(instruction);
 						MethodSignature methodSignature = MethodSignature.CreateStatic(resultTypeSignature, parameterTypes);
 
-						basicBlock.Add(new CallIndirectInstruction(methodSignature));
+						if (functionOperand.Kind is LLVMValueKind.LLVMInlineAsmValueKind)
+						{
+							LLVMInlineAsmDialect dialect = LLVM.GetInlineAsmDialect(functionOperand);
+							LLVMTypeRef inlineAssemblyFunctionType = LLVM.GetInlineAsmFunctionType(functionOperand);
+							Debug.Assert(calledFunctionType == inlineAssemblyFunctionType);
+							int canUnwind = LLVM.GetInlineAsmCanUnwind(functionOperand);
+							string assemblyString;
+							{
+								nuint length = 0;
+								sbyte* assemblyStringPtr = LLVM.GetInlineAsmAsmString(functionOperand, &length);
+								assemblyString = Marshal.PtrToStringAnsi((nint)assemblyStringPtr, (int)length) ?? string.Empty;
+							}
+							string constraintString;
+							{
+								nuint length = 0;
+								sbyte* constraintStringPtr = LLVM.GetInlineAsmConstraintString(functionOperand, &length);
+								constraintString = Marshal.PtrToStringAnsi((nint)constraintStringPtr, (int)length) ?? string.Empty;
+							}
+
+							TypeDefinition declaringType = module.InjectedTypes[typeof(AssemblyFunctions)];
+							MethodDefinition method = new($"M{declaringType.Methods.Count}", MethodAttributes.Public | MethodAttributes.Static | MethodAttributes.HideBySig, methodSignature);
+							declaringType.Methods.Add(method);
+
+							method.CilMethodBody = new(method);
+							method.CilMethodBody.Instructions.Add(CilOpCodes.Ldnull);
+							method.CilMethodBody.Instructions.Add(CilOpCodes.Throw);
+
+							// Attribute
+							{
+								MethodDefinition constructor = module.InjectedTypes[typeof(InlineAssemblyAttribute)].GetMethodByName(".ctor");
+								CustomAttributeSignature signature = new();
+								signature.FixedArguments.Add(new(module.Definition.CorLibTypeFactory.String, assemblyString));
+								signature.FixedArguments.Add(new(module.Definition.CorLibTypeFactory.String, constraintString));
+								CustomAttribute attribute = new(constructor, signature);
+								method.CustomAttributes.Add(attribute);
+							}
+
+							Call(basicBlock, method);
+						}
+						else
+						{
+							LoadValue(basicBlock, functionOperand);
+
+							basicBlock.Add(new CallIndirectInstruction(methodSignature));
+						}
 					}
 					else if (IsInvisibleFunction(functionCalled))
 					{
