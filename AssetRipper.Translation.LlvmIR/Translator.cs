@@ -2,6 +2,7 @@
 using AsmResolver.DotNet.Code.Cil;
 using AsmResolver.DotNet.Signatures;
 using AsmResolver.PE.DotNet.Cil;
+using AssetRipper.Translation.LlvmIR.Attributes;
 using AssetRipper.Translation.LlvmIR.Extensions;
 using AssetRipper.Translation.LlvmIR.Instructions;
 using LLVMSharp.Interop;
@@ -129,6 +130,12 @@ public static unsafe class Translator
 		foreach (FunctionContext functionContext in moduleContext.Methods.Values)
 		{
 			functionContext.RemovePointerFieldIfNotUsed();
+		}
+
+		if (moduleContext.InjectedTypes[typeof(AssemblyFunctions)].Methods.Count == 0)
+		{
+			moduleDefinition.TopLevelTypes.Remove(moduleContext.InjectedTypes[typeof(AssemblyFunctions)]);
+			moduleDefinition.TopLevelTypes.Remove(moduleContext.InjectedTypes[typeof(InlineAssemblyAttribute)]);
 		}
 
 		// Structs are discovered dynamically, so we need to assign names after all methods are created.
