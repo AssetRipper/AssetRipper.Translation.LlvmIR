@@ -27,7 +27,6 @@ internal sealed partial class ModuleContext
 			typeof(InstructionHelper),
 			typeof(NumericHelper),
 			typeof(InlineArrayNumericHelper),
-			typeof(InstructionNotSupportedException),
 			typeof(NameAttribute),
 			typeof(MangledNameAttribute),
 			typeof(DemangledNameAttribute),
@@ -63,7 +62,6 @@ internal sealed partial class ModuleContext
 	public TypeDefinition InstructionHelperType => InjectedTypes[typeof(InstructionHelper)];
 	public TypeDefinition NumericHelperType => InjectedTypes[typeof(NumericHelper)];
 	public TypeDefinition InlineArrayNumericHelperType => InjectedTypes[typeof(InlineArrayNumericHelper)];
-	public TypeDefinition InstructionNotSupportedExceptionType => InjectedTypes[typeof(InstructionNotSupportedException)];
 
 	public LLVMModuleRef Module { get; }
 	public ModuleDefinition Definition { get; }
