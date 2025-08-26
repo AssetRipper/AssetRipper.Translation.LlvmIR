@@ -216,11 +216,12 @@ internal sealed class InlineArrayContext
 			const string methodName = $"get_{propertyName}";
 			MethodSignature methodSignature = MethodSignature.CreateStatic(Module.Definition.CorLibTypeFactory.Int32);
 
-			GenericInstanceTypeSignature interfaceType = Module.InlineArrayInterface.MakeGenericInstanceType(elementType);
+			GenericInstanceTypeSignature interfaceType1 = Module.InjectedTypes[typeof(IInlineArray<>)].MakeGenericInstanceType(elementType);
+			GenericInstanceTypeSignature interfaceType2 = Module.InjectedTypes[typeof(IInlineArray<,>)].MakeGenericInstanceType(Type.ToTypeSignature(), elementType);
 
-			Type.Interfaces.Add(new InterfaceImplementation(interfaceType.ToTypeDefOrRef()));
+			Type.Interfaces.Add(new InterfaceImplementation(interfaceType2.ToTypeDefOrRef()));
 
-			MemberReference interfaceMethod = new(interfaceType.ToTypeDefOrRef(), methodName, methodSignature);
+			MemberReference interfaceMethod = new(interfaceType1.ToTypeDefOrRef(), methodName, methodSignature);
 
 			if (@explicit && Length == length)
 			{
@@ -232,8 +233,8 @@ internal sealed class InlineArrayContext
 			MethodAttributes attributes;
 			if (@explicit)
 			{
-				string @namespace = interfaceType.Namespace is { Length: > 0 }
-					? interfaceType.Namespace + "."
+				string @namespace = interfaceType1.Namespace is { Length: > 0 }
+					? interfaceType1.Namespace + "."
 					: string.Empty;
 				prefix = $"{@namespace}{nameof(IInlineArray<>)}<{elementType.FullName}>.";
 				attributes = MethodAttributes.Private | MethodAttributes.HideBySig | MethodAttributes.SpecialName | MethodAttributes.Static;

@@ -22,6 +22,7 @@ internal sealed partial class ModuleContext
 			typeof(IntrinsicFunctions),
 			typeof(InlineArrayHelper),
 			typeof(IInlineArray<>),
+			typeof(IInlineArray<,>),
 			typeof(SpanHelper),
 			typeof(InstructionHelper),
 			typeof(NumericHelper),
@@ -58,7 +59,6 @@ internal sealed partial class ModuleContext
 	public IReadOnlyDictionary<Type, TypeDefinition> InjectedTypes { get; }
 	public TypeDefinition IntrinsicsType => InjectedTypes[typeof(IntrinsicFunctions)];
 	public TypeDefinition InlineArrayHelperType => InjectedTypes[typeof(InlineArrayHelper)];
-	public TypeDefinition InlineArrayInterface => InjectedTypes[typeof(IInlineArray<>)];
 	public TypeDefinition SpanHelperType => InjectedTypes[typeof(SpanHelper)];
 	public TypeDefinition InstructionHelperType => InjectedTypes[typeof(InstructionHelper)];
 	public TypeDefinition NumericHelperType => InjectedTypes[typeof(NumericHelper)];
