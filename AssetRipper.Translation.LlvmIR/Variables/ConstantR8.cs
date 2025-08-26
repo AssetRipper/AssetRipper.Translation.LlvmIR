@@ -11,4 +11,8 @@ public sealed class ConstantR8(double value, ModuleDefinition module) : Constant
 	{
 		instructions.Add(CilOpCodes.Ldc_R8, Value);
 	}
+	public override string ToString()
+	{
+		return $"ConstantR8 {{ {Value} }}";
+	}
 }

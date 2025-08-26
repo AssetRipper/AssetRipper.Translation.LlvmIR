@@ -11,4 +11,8 @@ public sealed class ConstantR4(float value, ModuleDefinition module) : ConstantV
 	{
 		instructions.Add(CilOpCodes.Ldc_R4, Value);
 	}
+	public override string ToString()
+	{
+		return $"ConstantR4 {{ {Value} }}";
+	}
 }

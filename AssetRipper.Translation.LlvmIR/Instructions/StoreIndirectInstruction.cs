@@ -27,4 +27,9 @@ public sealed record class StoreIndirectInstruction(TypeSignature Type) : Instru
 	{
 		return SignatureComparer.Default.GetHashCode(Type);
 	}
+
+	protected override string ToStringImplementation()
+	{
+		return $"StoreIndirect {{ {Type} }}";
+	}
 }

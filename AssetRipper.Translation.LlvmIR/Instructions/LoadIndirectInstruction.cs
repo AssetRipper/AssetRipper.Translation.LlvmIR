@@ -27,4 +27,9 @@ public sealed record class LoadIndirectInstruction(TypeSignature Type) : Instruc
 	{
 		return SignatureComparer.Default.GetHashCode(Type);
 	}
+
+	protected override string ToStringImplementation()
+	{
+		return $"LoadIndirect {{ {Type} }}";
+	}
 }

@@ -26,4 +26,9 @@ public sealed record class SizeOfInstruction(TypeSignature Type) : Instruction
 	{
 		return SignatureComparer.Default.GetHashCode(Type);
 	}
+
+	protected override string ToStringImplementation()
+	{
+		return $"SizeOf {{ {Type} }}";
+	}
 }

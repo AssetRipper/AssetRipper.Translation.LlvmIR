@@ -11,4 +11,8 @@ public sealed record class LoadVariableInstruction(IVariable Variable) : Instruc
 	{
 		Variable.AddLoad(instructions);
 	}
+	protected override string ToStringImplementation()
+	{
+		return $"LoadVariable {{ {Variable} }}";
+	}
 }

@@ -11,4 +11,8 @@ public sealed class ConstantI4(int value, ModuleDefinition module) : ConstantVar
 	{
 		instructions.Add(CilOpCodes.Ldc_I4, Value);
 	}
+	public override string ToString()
+	{
+		return $"ConstantI4 {{ {Value} }}";
+	}
 }

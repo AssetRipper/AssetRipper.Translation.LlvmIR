@@ -30,4 +30,9 @@ public sealed record class CallInstruction(IMethodDescriptor Method) : Instructi
 	{
 		return SignatureComparer.Default.GetHashCode(Method);
 	}
+
+	protected override string ToStringImplementation()
+	{
+		return $"CallInstruction {{ {Method} }}";
+	}
 }

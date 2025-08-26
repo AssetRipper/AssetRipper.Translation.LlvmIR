@@ -11,4 +11,8 @@ public sealed record class StoreVariableInstruction(IVariable Variable) : Instru
 	{
 		Variable.AddStore(instructions);
 	}
+	protected override string ToStringImplementation()
+	{
+		return $"StoreVariable {{ {Variable} }}";
+	}
 }

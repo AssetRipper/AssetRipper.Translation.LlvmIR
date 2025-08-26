@@ -11,4 +11,8 @@ public sealed class ConstantI8(long value, ModuleDefinition module) : ConstantVa
 	{
 		instructions.Add(CilOpCodes.Ldc_I8, Value);
 	}
+	public override string ToString()
+	{
+		return $"ConstantI8 {{ {Value} }}";
+	}
 }

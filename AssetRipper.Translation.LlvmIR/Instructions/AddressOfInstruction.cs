@@ -11,4 +11,8 @@ public sealed record class AddressOfInstruction(IVariable Variable) : Instructio
 	{
 		Variable.AddLoadAddress(instructions);
 	}
+	protected override string ToStringImplementation()
+	{
+		return $"AddressOf {{ {Variable} }}";
+	}
 }

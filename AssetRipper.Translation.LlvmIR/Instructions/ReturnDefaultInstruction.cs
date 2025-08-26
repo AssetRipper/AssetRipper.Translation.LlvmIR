@@ -30,4 +30,9 @@ internal sealed record class ReturnDefaultInstruction(TypeSignature Type) : Inst
 	{
 		return SignatureComparer.Default.GetHashCode(Type);
 	}
+
+	protected override string ToStringImplementation()
+	{
+		return $"ReturnDefault {{ {Type} }}";
+	}
 }

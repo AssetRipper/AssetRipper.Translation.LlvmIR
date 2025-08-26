@@ -29,4 +29,6 @@ public class LocalVariable(TypeSignature variableType) : IVariable
 		Variable ??= instructions.AddLocalVariable(VariableType);
 		instructions.Add(CilOpCodes.Ldloca, Variable);
 	}
+
+	public override string ToString() => $"Local {{ {VariableType} }}";
 }

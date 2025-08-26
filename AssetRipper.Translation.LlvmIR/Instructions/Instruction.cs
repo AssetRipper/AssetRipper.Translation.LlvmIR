@@ -13,11 +13,12 @@ public abstract record class Instruction
 	public abstract int PushCount { get; }
 	public int StackEffect => PushCount - PopCount;
 	public abstract void AddInstructions(CilInstructionCollection instructions);
+	protected virtual string ToStringImplementation() => GetType().Name;
+	public sealed override string ToString() => ToStringImplementation();
 
-	private static readonly Dictionary<CilOpCode, CilOpCodeInstruction> OpCodeCache = new();
 	public static Instruction FromOpCode(CilOpCode opCode)
 	{
-		if (OpCodeCache.TryGetValue(opCode, out CilOpCodeInstruction? instruction))
+		if (CilOpCodeInstruction.Cache.TryGetValue(opCode, out CilOpCodeInstruction? instruction))
 		{
 			return instruction;
 		}
@@ -31,13 +32,13 @@ public abstract record class Instruction
 		_ = instruction.PopCount; // Ensure PopCount is known
 		_ = instruction.PushCount; // Ensure PushCount is known
 
-		OpCodeCache[opCode] = instruction;
+		CilOpCodeInstruction.Cache[opCode] = instruction;
 		return instruction;
 	}
 
-	private sealed record class CilOpCodeInstruction(CilOpCode opCode) : Instruction
+	private sealed record class CilOpCodeInstruction(CilOpCode OpCode) : Instruction
 	{
-		public CilOpCode OpCode { get; } = opCode;
+		internal static readonly Dictionary<CilOpCode, CilOpCodeInstruction> Cache = new();
 
 		public override int PopCount => OpCode.StackBehaviourPop switch
 		{
@@ -60,7 +61,7 @@ public abstract record class Instruction
 		{
 			instructions.Add(OpCode);
 		}
-	}
 
-	public override string ToString() => GetType().Name;
+		protected override string ToStringImplementation() => OpCode.Code.ToString();
+	}
 }
