@@ -1355,34 +1355,21 @@ internal unsafe readonly struct InstructionLifter
 
 					Debug.Assert(elementType is not PointerTypeSignature, "Pointers cannot be used as generic type arguments");
 
-					TypeSignature spanType = module.Definition.DefaultImporter
-						.ImportType(typeof(Span<>))
-						.MakeGenericInstanceType(elementType);
-
-					IMethodDescriptor inlineArrayAsSpan = module.InlineArrayHelperType.Methods
-						.Single(m => m.Name == nameof(InlineArrayHelper.AsSpan))
+					IMethodDescriptor inlineArraySetElement = module.InlineArrayHelperType.Methods
+						.Single(m => m.Name == nameof(InlineArrayHelper.SetElement))
 						.MakeGenericInstanceMethod(underlyingType, elementType);
 
-					MethodSignature getItemSignature = MethodSignature.CreateInstance(new GenericParameterSignature(GenericParameterType.Type, 0).MakeByReferenceType(), module.Definition.CorLibTypeFactory.Int32);
-					IMethodDescriptor getItem = new MemberReference(spanType.ToTypeDefOrRef(), "get_Item", getItemSignature);
-
 					LocalVariable bufferLocal = new(underlyingType);
-					LocalVariable spanLocal = new(spanType);
 
 					basicBlock.Add(new InitializeInstruction(bufferLocal));
-
-					basicBlock.Add(new AddressOfInstruction(bufferLocal));
-					basicBlock.Add(new CallInstruction(inlineArrayAsSpan));
-					basicBlock.Add(new StoreVariableInstruction(spanLocal));
 
 					for (int i = 0; i < elements.Length; i++)
 					{
 						LLVMValueRef element = elements[i];
-						basicBlock.Add(new AddressOfInstruction(spanLocal));
+						basicBlock.Add(new AddressOfInstruction(bufferLocal));
 						LoadVariable(basicBlock, new ConstantI4(i, module.Definition));
-						Call(basicBlock, getItem);
 						LoadValue(basicBlock, element);
-						basicBlock.Add(new StoreIndirectInstruction(elementType));
+						Call(basicBlock, inlineArraySetElement);
 					}
 
 					basicBlock.Add(new LoadVariableInstruction(bufferLocal));
