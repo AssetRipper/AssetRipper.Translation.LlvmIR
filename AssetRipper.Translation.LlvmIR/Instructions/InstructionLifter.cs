@@ -1369,7 +1369,7 @@ internal unsafe readonly struct InstructionLifter
 					LocalVariable bufferLocal = new(underlyingType);
 					LocalVariable spanLocal = new(spanType);
 
-					basicBlock.Add(new InitializeInstruction(spanLocal));
+					basicBlock.Add(new InitializeInstruction(bufferLocal));
 
 					basicBlock.Add(new AddressOfInstruction(bufferLocal));
 					basicBlock.Add(new CallInstruction(inlineArrayAsSpan));
