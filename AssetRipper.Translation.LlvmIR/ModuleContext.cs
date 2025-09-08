@@ -21,6 +21,7 @@ internal sealed partial class ModuleContext
 		[
 			typeof(IntrinsicFunctions),
 			typeof(InlineArrayHelper),
+			typeof(InlineArrayBuilder<,>),
 			typeof(IInlineArray<>),
 			typeof(IInlineArray<,>),
 			typeof(SpanHelper),

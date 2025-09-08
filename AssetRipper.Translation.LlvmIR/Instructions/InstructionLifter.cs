@@ -1353,26 +1353,41 @@ internal unsafe readonly struct InstructionLifter
 						throw new Exception("Array element count mismatch");
 					}
 
+					if (elements.Length == 0)
+					{
+						// Shouldn't be possible, but no elements, so just load the default value
+						LoadVariable(basicBlock, new DefaultVariable(underlyingType));
+						return;
+					}
+
 					Debug.Assert(elementType is not PointerTypeSignature, "Pointers cannot be used as generic type arguments");
 
-					IMethodDescriptor inlineArraySetElement = module.InlineArrayHelperType.Methods
-						.Single(m => m.Name == nameof(InlineArrayHelper.SetElement))
-						.MakeGenericInstanceMethod(underlyingType, elementType);
+					GenericInstanceTypeSignature builderType = module.InjectedTypes[typeof(InlineArrayBuilder<,>)].MakeGenericInstanceType(underlyingType, elementType);
 
-					LocalVariable bufferLocal = new(underlyingType);
+					MethodSignature addSignature = MethodSignature.CreateInstance(module.Definition.CorLibTypeFactory.Void, new GenericParameterSignature(GenericParameterType.Type, 1));
+					IMethodDescriptor add = new MemberReference(builderType.ToTypeDefOrRef(), nameof(InlineArrayBuilder<,>.Add), addSignature);
 
-					basicBlock.Add(new InitializeInstruction(bufferLocal));
+					MethodSignature toInlineArraySignature = MethodSignature.CreateInstance(new GenericParameterSignature(GenericParameterType.Type, 0));
+					IMethodDescriptor toInlineArray = new MemberReference(builderType.ToTypeDefOrRef(), nameof(InlineArrayBuilder<,>.ToInlineArray), toInlineArraySignature);
+
+					LocalVariable builderLocal = new(builderType);
+
+					// This can be made slightly smaller by using the duplicate instruction, so that the address of the builder is only loaded once.
+					// However, that doesn't decompile as nicely, so for now we just load it multiple times.
+					// This ensures that the decompiled code uses the collection initializer syntax, which is prettier.
+
+					basicBlock.Add(new AddressOfInstruction(builderLocal));
+					basicBlock.Add(new InitializeObjectInstruction(builderType));
 
 					for (int i = 0; i < elements.Length; i++)
 					{
-						LLVMValueRef element = elements[i];
-						basicBlock.Add(new AddressOfInstruction(bufferLocal));
-						LoadVariable(basicBlock, new ConstantI4(i, module.Definition));
-						LoadValue(basicBlock, element);
-						Call(basicBlock, inlineArraySetElement);
+						basicBlock.Add(new AddressOfInstruction(builderLocal));
+						LoadValue(basicBlock, elements[i]);
+						Call(basicBlock, add);
 					}
 
-					basicBlock.Add(new LoadVariableInstruction(bufferLocal));
+					basicBlock.Add(new AddressOfInstruction(builderLocal));
+					Call(basicBlock, toInlineArray);
 				}
 				break;
 			case LLVMValueKind.LLVMConstantStructValueKind:
