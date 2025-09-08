@@ -1418,16 +1418,29 @@ internal unsafe readonly struct InstructionLifter
 						throw new Exception("Struct field count mismatch");
 					}
 
+					if (fields.Length == 0)
+					{
+						// Shouldn't be possible, but no fields, so just load the default value
+						LoadVariable(basicBlock, new DefaultVariable(typeSignature));
+						return;
+					}
+
 					LocalVariable resultLocal = new(typeSignature);
 
-					basicBlock.Add(new InitializeInstruction(resultLocal));
+					basicBlock.Add(new AddressOfInstruction(resultLocal));
+					basicBlock.Add(DuplicateInstruction.Instance);
+					basicBlock.Add(new InitializeObjectInstruction(typeSignature));
 
 					for (int i = 0; i < fields.Length; i++)
 					{
 						LLVMValueRef field = fields[i];
 						FieldDefinition fieldDefinition = typeDefinition.Fields[i];
 
-						basicBlock.Add(new AddressOfInstruction(resultLocal));
+						if (i != fields.Length - 1)
+						{
+							// Duplicate the address for the next field, except for the last field where we can just use the existing address
+							basicBlock.Add(DuplicateInstruction.Instance);
+						}
 						basicBlock.Add(new LoadFieldAddressInstruction(fieldDefinition));
 						LoadValue(basicBlock, field);
 						basicBlock.Add(new StoreIndirectInstruction(fieldDefinition.Signature!.FieldType));
