@@ -3,6 +3,7 @@ using AsmResolver.DotNet.Signatures;
 using AsmResolver.PE.DotNet.Cil;
 using AssetRipper.CIL;
 using AssetRipper.Translation.LlvmIR.Extensions;
+using System.Diagnostics.CodeAnalysis;
 
 namespace AssetRipper.Translation.LlvmIR.Variables;
 
@@ -14,20 +15,40 @@ public class LocalVariable(TypeSignature variableType) : IVariable
 
 	public void AddLoad(CilInstructionCollection instructions)
 	{
-		Variable ??= instructions.AddLocalVariable(VariableType);
+		EnsureVariableCreated(instructions);
 		instructions.Add(CilOpCodes.Ldloc, Variable);
 	}
 
 	public void AddStore(CilInstructionCollection instructions)
 	{
-		Variable ??= instructions.AddLocalVariable(VariableType);
+		EnsureVariableCreated(instructions);
 		instructions.Add(CilOpCodes.Stloc, Variable);
 	}
 
 	public void AddLoadAddress(CilInstructionCollection instructions)
 	{
-		Variable ??= instructions.AddLocalVariable(VariableType);
+		EnsureVariableCreated(instructions);
 		instructions.Add(CilOpCodes.Ldloca, Variable);
+	}
+
+	public void AddStoreDefault(CilInstructionCollection instructions)
+	{
+		if (VariableType is CorLibTypeSignature)
+		{
+			instructions.AddDefaultValue(VariableType);
+			AddStore(instructions);
+		}
+		else
+		{
+			EnsureVariableCreated(instructions);
+			instructions.InitializeDefaultValue(Variable);
+		}
+	}
+
+	[MemberNotNull(nameof(Variable))]
+	private void EnsureVariableCreated(CilInstructionCollection instructions)
+	{
+		Variable ??= instructions.AddLocalVariable(VariableType);
 	}
 
 	public override string ToString() => $"Local {{ {VariableType} }}";
