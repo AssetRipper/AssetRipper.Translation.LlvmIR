@@ -1372,21 +1372,17 @@ internal unsafe readonly struct InstructionLifter
 
 					LocalVariable builderLocal = new(builderType);
 
-					// This can be made slightly smaller by using the duplicate instruction, so that the address of the builder is only loaded once.
-					// However, that doesn't decompile as nicely, so for now we just load it multiple times.
-					// This ensures that the decompiled code uses the collection initializer syntax, which is prettier.
-
 					basicBlock.Add(new AddressOfInstruction(builderLocal));
+					basicBlock.Add(DuplicateInstruction.Instance);
 					basicBlock.Add(new InitializeObjectInstruction(builderType));
 
 					for (int i = 0; i < elements.Length; i++)
 					{
-						basicBlock.Add(new AddressOfInstruction(builderLocal));
+						basicBlock.Add(DuplicateInstruction.Instance);
 						LoadValue(basicBlock, elements[i]);
 						Call(basicBlock, add);
 					}
 
-					basicBlock.Add(new AddressOfInstruction(builderLocal));
 					Call(basicBlock, toInlineArray);
 				}
 				break;
