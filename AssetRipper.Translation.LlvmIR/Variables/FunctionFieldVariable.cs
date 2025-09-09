@@ -53,6 +53,22 @@ internal class FunctionFieldVariable(TypeSignature variableType, FunctionContext
 		instructions.Add(CilOpCodes.Conv_U);
 	}
 
+	public void AddStoreDefault(CilInstructionCollection instructions)
+	{
+		if (VariableType is not CorLibTypeSignature and ({ IsValueType: true } or GenericParameterSignature))
+		{
+			Function.AddLocalVariablesPointer(instructions);
+			instructions.Add(CilOpCodes.Ldflda, GetOrCreateField());
+			instructions.Add(CilOpCodes.Initobj, VariableType.ToTypeDefOrRef());
+		}
+		else
+		{
+			Function.AddLocalVariablesPointer(instructions);
+			instructions.AddDefaultValue(VariableType);
+			instructions.Add(CilOpCodes.Stfld, GetOrCreateField());
+		}
+	}
+
 	public static LocalVariable CreateFromInstruction(LLVMValueRef instruction, ModuleContext module)
 	{
 		return new(module.GetTypeSignature(instruction));

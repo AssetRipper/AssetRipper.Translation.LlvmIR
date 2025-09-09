@@ -33,16 +33,8 @@ public class LocalVariable(TypeSignature variableType) : IVariable
 
 	public void AddStoreDefault(CilInstructionCollection instructions)
 	{
-		if (VariableType is CorLibTypeSignature)
-		{
-			instructions.AddDefaultValue(VariableType);
-			AddStore(instructions);
-		}
-		else
-		{
-			EnsureVariableCreated(instructions);
-			instructions.InitializeDefaultValue(Variable);
-		}
+		EnsureVariableCreated(instructions);
+		instructions.InitializeDefaultValue(Variable);
 	}
 
 	[MemberNotNull(nameof(Variable))]
