@@ -26,13 +26,9 @@ internal struct InlineArrayBuilder<TBuffer, TElement> : IEnumerable<TElement>
 		}
 	}
 
-	public readonly TBuffer ToInlineArray()
+	public static implicit operator TBuffer(InlineArrayBuilder<TBuffer, TElement> builder)
 	{
-		if (_index != TBuffer.Length)
-		{
-			throw new InvalidOperationException($"Expected {_index} elements, but got {TBuffer.Length}.");
-		}
-		return _buffer;
+		return builder._buffer;
 	}
 
 	IEnumerator IEnumerable.GetEnumerator()

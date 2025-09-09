@@ -1367,8 +1367,10 @@ internal unsafe readonly struct InstructionLifter
 					MethodSignature addSignature = MethodSignature.CreateInstance(module.Definition.CorLibTypeFactory.Void, new GenericParameterSignature(GenericParameterType.Type, 1));
 					IMethodDescriptor add = new MemberReference(builderType.ToTypeDefOrRef(), nameof(InlineArrayBuilder<,>.Add), addSignature);
 
-					MethodSignature toInlineArraySignature = MethodSignature.CreateInstance(new GenericParameterSignature(GenericParameterType.Type, 0));
-					IMethodDescriptor toInlineArray = new MemberReference(builderType.ToTypeDefOrRef(), nameof(InlineArrayBuilder<,>.ToInlineArray), toInlineArraySignature);
+					MethodSignature conversionSignature = MethodSignature.CreateStatic(
+						new GenericParameterSignature(GenericParameterType.Type, 0),
+						module.InjectedTypes[typeof(InlineArrayBuilder<,>)].MakeGenericInstanceType(new GenericParameterSignature(GenericParameterType.Type, 0), new GenericParameterSignature(GenericParameterType.Type, 1)));
+					IMethodDescriptor conversion = new MemberReference(builderType.ToTypeDefOrRef(), "op_Implicit", conversionSignature);
 
 					LocalVariable builderLocal = new(builderType);
 
@@ -1378,12 +1380,17 @@ internal unsafe readonly struct InstructionLifter
 
 					for (int i = 0; i < elements.Length; i++)
 					{
-						basicBlock.Add(DuplicateInstruction.Instance);
+						if (i != elements.Length - 1)
+						{
+							// Duplicate the address for the next Add, except for the last Add where we can just use the existing address
+							basicBlock.Add(DuplicateInstruction.Instance);
+						}
 						LoadValue(basicBlock, elements[i]);
 						Call(basicBlock, add);
 					}
 
-					Call(basicBlock, toInlineArray);
+					LoadVariable(basicBlock, builderLocal);
+					Call(basicBlock, conversion);
 				}
 				break;
 			case LLVMValueKind.LLVMConstantStructValueKind:
