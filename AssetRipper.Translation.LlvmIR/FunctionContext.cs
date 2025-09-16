@@ -33,7 +33,7 @@ internal sealed class FunctionContext : IHasName
 
 		MethodSignature signature = MethodSignature.CreateStatic(null!);
 		MethodDefinition definition = new("Invoke", MethodAttributes.Public | MethodAttributes.Static | MethodAttributes.HideBySig, signature);
-		definition.CilMethodBody = new(definition);
+		definition.CilMethodBody = new();
 		declaringType.Methods.Add(definition);
 
 		Debug.Assert(definition.Signature is not null);
@@ -170,7 +170,7 @@ internal sealed class FunctionContext : IHasName
 		{
 			newMethod = new(Name, method.Attributes, MethodSignature.CreateStatic(returnTypeSignature, method.Signature.ParameterTypes.Skip(1)));
 			Module.GlobalMembersType.Methods.Add(newMethod);
-			newMethod.CilMethodBody = new(newMethod);
+			newMethod.CilMethodBody = new();
 
 			instructions = newMethod.CilMethodBody.Instructions;
 			returnLocal = instructions.AddLocalVariable(returnTypeSignature);
@@ -195,7 +195,7 @@ internal sealed class FunctionContext : IHasName
 		{
 			newMethod = new(Name, method.Attributes, MethodSignature.CreateStatic(method.Signature.ReturnType, method.Signature.ParameterTypes));
 			Module.GlobalMembersType.Methods.Add(newMethod);
-			newMethod.CilMethodBody = new(newMethod);
+			newMethod.CilMethodBody = new();
 
 			instructions = newMethod.CilMethodBody.Instructions;
 

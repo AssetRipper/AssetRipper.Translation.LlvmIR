@@ -555,7 +555,7 @@ internal unsafe readonly struct InstructionLifter
 							MethodDefinition method = new($"M{declaringType.Methods.Count}", MethodAttributes.Public | MethodAttributes.Static | MethodAttributes.HideBySig, methodSignature);
 							declaringType.Methods.Add(method);
 
-							method.CilMethodBody = new(method);
+							method.CilMethodBody = new();
 							method.CilMethodBody.Instructions.Add(CilOpCodes.Ldnull);
 							method.CilMethodBody.Instructions.Add(CilOpCodes.Throw);
 

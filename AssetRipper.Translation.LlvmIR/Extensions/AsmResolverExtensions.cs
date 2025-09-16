@@ -183,16 +183,16 @@ internal static class AsmResolverExtensions
 		{
 			opposite = corLibTypeSignature.ElementType switch
 			{
-				ElementType.I1 => corLibTypeSignature.Module?.CorLibTypeFactory.Byte,
-				ElementType.U1 => corLibTypeSignature.Module?.CorLibTypeFactory.SByte,
-				ElementType.I2 => corLibTypeSignature.Module?.CorLibTypeFactory.UInt16,
-				ElementType.U2 => corLibTypeSignature.Module?.CorLibTypeFactory.Int16,
-				ElementType.I4 => corLibTypeSignature.Module?.CorLibTypeFactory.UInt32,
-				ElementType.U4 => corLibTypeSignature.Module?.CorLibTypeFactory.Int32,
-				ElementType.I8 => corLibTypeSignature.Module?.CorLibTypeFactory.UInt64,
-				ElementType.U8 => corLibTypeSignature.Module?.CorLibTypeFactory.Int64,
-				ElementType.I => corLibTypeSignature.Module?.CorLibTypeFactory.UIntPtr,
-				ElementType.U => corLibTypeSignature.Module?.CorLibTypeFactory.IntPtr,
+				ElementType.I1 => corLibTypeSignature.ContextModule?.CorLibTypeFactory.Byte,
+				ElementType.U1 => corLibTypeSignature.ContextModule?.CorLibTypeFactory.SByte,
+				ElementType.I2 => corLibTypeSignature.ContextModule?.CorLibTypeFactory.UInt16,
+				ElementType.U2 => corLibTypeSignature.ContextModule?.CorLibTypeFactory.Int16,
+				ElementType.I4 => corLibTypeSignature.ContextModule?.CorLibTypeFactory.UInt32,
+				ElementType.U4 => corLibTypeSignature.ContextModule?.CorLibTypeFactory.Int32,
+				ElementType.I8 => corLibTypeSignature.ContextModule?.CorLibTypeFactory.UInt64,
+				ElementType.U8 => corLibTypeSignature.ContextModule?.CorLibTypeFactory.Int64,
+				ElementType.I => corLibTypeSignature.ContextModule?.CorLibTypeFactory.UIntPtr,
+				ElementType.U => corLibTypeSignature.ContextModule?.CorLibTypeFactory.IntPtr,
 				_ => null,
 			};
 			return opposite is not null;
@@ -212,15 +212,15 @@ internal static class AsmResolverExtensions
 			return corLibTypeSignature.ElementType switch
 			{
 				ElementType.I1 => corLibTypeSignature,
-				ElementType.U1 => corLibTypeSignature.Module?.CorLibTypeFactory.SByte,
+				ElementType.U1 => corLibTypeSignature.ContextModule?.CorLibTypeFactory.SByte,
 				ElementType.I2 => corLibTypeSignature,
-				ElementType.U2 => corLibTypeSignature.Module?.CorLibTypeFactory.Int16,
+				ElementType.U2 => corLibTypeSignature.ContextModule?.CorLibTypeFactory.Int16,
 				ElementType.I4 => corLibTypeSignature,
-				ElementType.U4 => corLibTypeSignature.Module?.CorLibTypeFactory.Int32,
+				ElementType.U4 => corLibTypeSignature.ContextModule?.CorLibTypeFactory.Int32,
 				ElementType.I8 => corLibTypeSignature,
-				ElementType.U8 => corLibTypeSignature.Module?.CorLibTypeFactory.Int64,
+				ElementType.U8 => corLibTypeSignature.ContextModule?.CorLibTypeFactory.Int64,
 				ElementType.I => corLibTypeSignature,
-				ElementType.U => corLibTypeSignature.Module?.CorLibTypeFactory.IntPtr,
+				ElementType.U => corLibTypeSignature.ContextModule?.CorLibTypeFactory.IntPtr,
 				_ => null,
 			} ?? type;
 		}
@@ -236,15 +236,15 @@ internal static class AsmResolverExtensions
 		{
 			return corLibTypeSignature.ElementType switch
 			{
-				ElementType.I1 => corLibTypeSignature.Module?.CorLibTypeFactory.Byte,
+				ElementType.I1 => corLibTypeSignature.ContextModule?.CorLibTypeFactory.Byte,
 				ElementType.U1 => corLibTypeSignature,
-				ElementType.I2 => corLibTypeSignature.Module?.CorLibTypeFactory.UInt16,
+				ElementType.I2 => corLibTypeSignature.ContextModule?.CorLibTypeFactory.UInt16,
 				ElementType.U2 => corLibTypeSignature,
-				ElementType.I4 => corLibTypeSignature.Module?.CorLibTypeFactory.UInt32,
+				ElementType.I4 => corLibTypeSignature.ContextModule?.CorLibTypeFactory.UInt32,
 				ElementType.U4 => corLibTypeSignature,
-				ElementType.I8 => corLibTypeSignature.Module?.CorLibTypeFactory.UInt64,
+				ElementType.I8 => corLibTypeSignature.ContextModule?.CorLibTypeFactory.UInt64,
 				ElementType.U8 => corLibTypeSignature,
-				ElementType.I => corLibTypeSignature.Module?.CorLibTypeFactory.UIntPtr,
+				ElementType.I => corLibTypeSignature.ContextModule?.CorLibTypeFactory.UIntPtr,
 				ElementType.U => corLibTypeSignature,
 				_ => null,
 			} ?? type;

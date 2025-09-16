@@ -71,7 +71,7 @@ internal sealed record class NumericalConversionInstruction : Instruction
 			return;
 		}
 
-		ModuleDefinition module = instructions.Owner.Owner.Module!;
+		ModuleDefinition module = instructions.Owner.Owner!.DeclaringModule!;
 
 		switch (Opcode)
 		{
@@ -175,12 +175,12 @@ internal sealed record class NumericalConversionInstruction : Instruction
 					else if (ResultTypeSignature is CorLibTypeSignature && SourceTypeSignature is TypeDefOrRefSignature)
 					{
 						MethodDefinition conversionMethod = GetConversionMethod(ResolveTypeSignature(SourceTypeSignature), SourceTypeSignature, ResultTypeSignature);
-						instructions.Add(CilOpCodes.Call, instructions.Owner.Owner.Module!.DefaultImporter.ImportMethod(conversionMethod));
+						instructions.Add(CilOpCodes.Call, instructions.Owner.Owner!.DeclaringModule!.DefaultImporter.ImportMethod(conversionMethod));
 					}
 					else if (ResultTypeSignature is TypeDefOrRefSignature && SourceTypeSignature is CorLibTypeSignature)
 					{
 						MethodDefinition conversionMethod = GetConversionMethod(ResolveTypeSignature(ResultTypeSignature), SourceTypeSignature, ResultTypeSignature);
-						instructions.Add(CilOpCodes.Call, instructions.Owner.Owner.Module!.DefaultImporter.ImportMethod(conversionMethod));
+						instructions.Add(CilOpCodes.Call, instructions.Owner.Owner!.DeclaringModule!.DefaultImporter.ImportMethod(conversionMethod));
 					}
 					else
 					{
@@ -217,9 +217,9 @@ internal sealed record class NumericalConversionInstruction : Instruction
 		else if (SourceTypeSignature is TypeDefOrRefSignature { Namespace: "System", Name: "Int128" })
 		{
 			TypeDefinition sourceTypeDefinition = ResolveTypeSignature(SourceTypeSignature);
-			TypeSignature unsignedType = GetUnsignedType(SourceTypeSignature, instructions.Owner.Owner.Module!);
+			TypeSignature unsignedType = GetUnsignedType(SourceTypeSignature, instructions.Owner.Owner!.DeclaringModule!);
 			MethodDefinition conversionMethod = GetConversionMethod(sourceTypeDefinition, SourceTypeSignature, unsignedType);
-			instructions.Add(CilOpCodes.Call, instructions.Owner.Owner.Module!.DefaultImporter.ImportMethod(conversionMethod));
+			instructions.Add(CilOpCodes.Call, instructions.Owner.Owner!.DeclaringModule!.DefaultImporter.ImportMethod(conversionMethod));
 		}
 	}
 

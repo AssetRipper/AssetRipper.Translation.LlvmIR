@@ -73,7 +73,7 @@ internal sealed class GlobalVariableContext : IHasName, IVariable
 			DataGetMethod = new MethodDefinition("get_Value", MethodAttributes.Public | MethodAttributes.Static | MethodAttributes.HideBySig | MethodAttributes.SpecialName, MethodSignature.CreateStatic(underlyingType));
 			DeclaringType.Methods.Add(DataGetMethod);
 
-			DataGetMethod.CilMethodBody = new(DataGetMethod);
+			DataGetMethod.CilMethodBody = new();
 			{
 				CilInstructionCollection instructions = DataGetMethod.CilMethodBody.Instructions;
 				instructions.Add(CilOpCodes.Ldsfld, PointerField);
@@ -85,7 +85,7 @@ internal sealed class GlobalVariableContext : IHasName, IVariable
 			DataSetMethod.Parameters[0].GetOrCreateDefinition().Name = "value";
 			DeclaringType.Methods.Add(DataSetMethod);
 
-			DataSetMethod.CilMethodBody = new(DataSetMethod);
+			DataSetMethod.CilMethodBody = new();
 			{
 				CilInstructionCollection instructions = DataSetMethod.CilMethodBody.Instructions;
 				instructions.Add(CilOpCodes.Ldsfld, PointerField);
@@ -149,7 +149,7 @@ internal sealed class GlobalVariableContext : IHasName, IVariable
 		MethodDefinition getMethod = new("get_" + Name, MethodAttributes.Public | MethodAttributes.Static | MethodAttributes.HideBySig | MethodAttributes.SpecialName, MethodSignature.CreateStatic(underlyingType));
 		Module.GlobalMembersType.Methods.Add(getMethod);
 
-		getMethod.CilMethodBody = new(getMethod);
+		getMethod.CilMethodBody = new();
 		{
 			CilInstructionCollection instructions = getMethod.CilMethodBody.Instructions;
 			instructions.Add(CilOpCodes.Call, DataGetMethod);
@@ -160,7 +160,7 @@ internal sealed class GlobalVariableContext : IHasName, IVariable
 		setMethod.Parameters[0].GetOrCreateDefinition().Name = "value";
 		Module.GlobalMembersType.Methods.Add(setMethod);
 
-		setMethod.CilMethodBody = new(setMethod);
+		setMethod.CilMethodBody = new();
 		{
 			CilInstructionCollection instructions = setMethod.CilMethodBody.Instructions;
 			instructions.Add(CilOpCodes.Ldarg_0);

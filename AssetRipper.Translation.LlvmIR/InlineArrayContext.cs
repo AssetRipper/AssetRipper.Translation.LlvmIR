@@ -87,7 +87,7 @@ internal sealed class InlineArrayContext
 		MethodDefinition equalityOperator;
 		{
 			equalityOperator = new("op_Equality", MethodAttributes.Public | MethodAttributes.HideBySig | MethodAttributes.SpecialName | MethodAttributes.Static, MethodSignature.CreateStatic(module.Definition.CorLibTypeFactory.Boolean, arrayType.ToTypeSignature(), arrayType.ToTypeSignature()));
-			equalityOperator.CilMethodBody = new(equalityOperator);
+			equalityOperator.CilMethodBody = new();
 			CilInstructionCollection instructions = equalityOperator.CilMethodBody.Instructions;
 			MethodDefinition helperMethod = module.InlineArrayHelperType.GetMethodByName(nameof(InlineArrayHelper.Equals));
 			instructions.Add(CilOpCodes.Ldarg_0);
@@ -104,7 +104,7 @@ internal sealed class InlineArrayContext
 		MethodDefinition inequalityOperator;
 		{
 			inequalityOperator = new("op_Inequality", MethodAttributes.Public | MethodAttributes.HideBySig | MethodAttributes.SpecialName | MethodAttributes.Static, MethodSignature.CreateStatic(module.Definition.CorLibTypeFactory.Boolean, arrayType.ToTypeSignature(), arrayType.ToTypeSignature()));
-			inequalityOperator.CilMethodBody = new(inequalityOperator);
+			inequalityOperator.CilMethodBody = new();
 			CilInstructionCollection instructions = inequalityOperator.CilMethodBody.Instructions;
 			instructions.Add(CilOpCodes.Ldarg_0);
 			instructions.Add(CilOpCodes.Ldarg_1);
@@ -121,7 +121,7 @@ internal sealed class InlineArrayContext
 		MethodDefinition equalsMethod;
 		{
 			equalsMethod = new("Equals", MethodAttributes.Public | MethodAttributes.HideBySig | MethodAttributes.Virtual | MethodAttributes.Final | MethodAttributes.NewSlot, MethodSignature.CreateInstance(module.Definition.CorLibTypeFactory.Boolean, arrayType.ToTypeSignature()));
-			equalsMethod.CilMethodBody = new(equalsMethod);
+			equalsMethod.CilMethodBody = new();
 			CilInstructionCollection instructions = equalsMethod.CilMethodBody.Instructions;
 			instructions.Add(CilOpCodes.Ldarg_0);
 			instructions.Add(CilOpCodes.Ldobj, arrayType);
@@ -137,7 +137,7 @@ internal sealed class InlineArrayContext
 		{
 			// return other is InlineArray array && Equals(array);
 			MethodDefinition method = new("Equals", MethodAttributes.Public | MethodAttributes.HideBySig | MethodAttributes.Virtual, MethodSignature.CreateInstance(module.Definition.CorLibTypeFactory.Boolean, module.Definition.CorLibTypeFactory.Object));
-			method.CilMethodBody = new(method);
+			method.CilMethodBody = new();
 			CilInstructionCollection instructions = method.CilMethodBody.Instructions;
 			CilInstructionLabel falseLabel = new();
 			instructions.Add(CilOpCodes.Ldarg_1);
@@ -158,7 +158,7 @@ internal sealed class InlineArrayContext
 		//GetHashCode
 		{
 			MethodDefinition method = new("GetHashCode", MethodAttributes.Public | MethodAttributes.HideBySig | MethodAttributes.Virtual, MethodSignature.CreateInstance(module.Definition.CorLibTypeFactory.Int32));
-			method.CilMethodBody = new(method);
+			method.CilMethodBody = new();
 			CilInstructionCollection instructions = method.CilMethodBody.Instructions;
 			MethodDefinition helperMethod = module.InlineArrayHelperType.GetMethodByName(nameof(InlineArrayHelper.GetHashCode));
 			instructions.Add(CilOpCodes.Ldarg_0);
@@ -261,7 +261,7 @@ internal sealed class InlineArrayContext
 			}
 
 			MethodDefinition method = new(prefix + methodName, attributes, methodSignature);
-			method.CilMethodBody = new(method);
+			method.CilMethodBody = new();
 
 			CilInstructionCollection instructions = method.CilMethodBody.Instructions;
 			instructions.Add(CilOpCodes.Ldc_I4, length);
