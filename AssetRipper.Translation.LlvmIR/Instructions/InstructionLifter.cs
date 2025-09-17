@@ -51,6 +51,13 @@ internal unsafe readonly struct InstructionLifter
 			lifter.basicBlockList.Add(basicBlock);
 		}
 
+		if (function.NeedsStackFrame)
+		{
+			BasicBlock entryBlock = lifter.basicBlockList[0];
+			Debug.Assert(entryBlock.Instructions.Count == 0);
+			entryBlock.Add(new InitializeStackFrameInstruction(function));
+		}
+
 		foreach (LLVMValueRef instruction in function.Function.GetInstructions())
 		{
 			if (instruction.InstructionOpcode is LLVMOpcode.LLVMAlloca)

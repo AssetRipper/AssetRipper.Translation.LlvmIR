@@ -24,9 +24,87 @@ public static class InstructionOptimizer
 		}
 
 		HashSet<IVariable> temporaryVariablesWithoutAddress = GetTemporaryVariablesWithoutAddress(basicBlocks);
+		if (temporaryVariablesWithoutAddress.Count == 0)
+		{
+			return;
+		}
+
+		// Remove unnessary initializations from alloca instructions.
 		foreach (BasicBlock basicBlock in basicBlocks)
 		{
 			RunPass_EliminateUnnessaryInitialization(basicBlock, temporaryVariablesWithoutAddress, true);
+		}
+
+		// Replace FunctionFieldVariables with LocalVariables where possible.
+		Dictionary<FunctionFieldVariable, LocalVariable> functionFieldReplacementMap = [];
+		foreach (BasicBlock basicBlock in basicBlocks)
+		{
+			for (int i = 0; i < basicBlock.Count; i++)
+			{
+				switch (basicBlock[i])
+				{
+					case LoadVariableInstruction load:
+						if (load.Variable is FunctionFieldVariable functionFieldVariable1 && temporaryVariablesWithoutAddress.Contains(functionFieldVariable1))
+						{
+							if (!functionFieldReplacementMap.TryGetValue(functionFieldVariable1, out LocalVariable? replacement))
+							{
+								replacement = new(functionFieldVariable1.VariableType);
+								functionFieldReplacementMap[functionFieldVariable1] = replacement;
+							}
+							basicBlock[i] = new LoadVariableInstruction(replacement);
+						}
+						break;
+					case StoreVariableInstruction store:
+						if (store.Variable is FunctionFieldVariable functionFieldVariable2 && temporaryVariablesWithoutAddress.Contains(functionFieldVariable2))
+						{
+							if (!functionFieldReplacementMap.TryGetValue(functionFieldVariable2, out LocalVariable? replacement))
+							{
+								replacement = new(functionFieldVariable2.VariableType);
+								functionFieldReplacementMap[functionFieldVariable2] = replacement;
+							}
+							basicBlock[i] = new StoreVariableInstruction(replacement);
+						}
+						break;
+					case AddressOfInstruction addressOf:
+						if (addressOf.Variable is FunctionFieldVariable functionFieldVariable3 && temporaryVariablesWithoutAddress.Contains(functionFieldVariable3))
+						{
+							if (!functionFieldReplacementMap.TryGetValue(functionFieldVariable3, out LocalVariable? replacement))
+							{
+								replacement = new(functionFieldVariable3.VariableType);
+								functionFieldReplacementMap[functionFieldVariable3] = replacement;
+							}
+							basicBlock[i] = new AddressOfInstruction(replacement);
+						}
+						break;
+					case InitializeInstruction initialize:
+						if (initialize.Variable is FunctionFieldVariable functionFieldVariable4 && temporaryVariablesWithoutAddress.Contains(functionFieldVariable4))
+						{
+							if (!functionFieldReplacementMap.TryGetValue(functionFieldVariable4, out LocalVariable? replacement))
+							{
+								replacement = new(functionFieldVariable4.VariableType);
+								functionFieldReplacementMap[functionFieldVariable4] = replacement;
+							}
+							basicBlock[i] = new InitializeInstruction(replacement);
+						}
+						break;
+				}
+			}
+		}
+
+		// If no FunctionFieldVariables were used, we can remove the stack frame clearing.
+		if (!UsesFunctionFieldVariable(basicBlocks))
+		{
+			foreach (BasicBlock basicBlock in basicBlocks)
+			{
+				// Order matters here, remove from the end to avoid messing up indices.
+				for (int i = basicBlock.Count - 1; i >= 0; i--)
+				{
+					if (basicBlock[i] is ClearStackFrameInstruction or InitializeStackFrameInstruction)
+					{
+						basicBlock.RemoveAt(i);
+					}
+				}
+			}
 		}
 	}
 
@@ -541,5 +619,32 @@ public static class InstructionOptimizer
 			return type2 is PointerTypeSignature;
 		}
 		return SignatureComparer.Default.Equals(type1, type2);
+	}
+
+	private static bool UsesFunctionFieldVariable(Instruction instruction)
+	{
+		return instruction switch
+		{
+			LoadVariableInstruction load => load.Variable is FunctionFieldVariable,
+			StoreVariableInstruction store => store.Variable is FunctionFieldVariable,
+			AddressOfInstruction addressOf => addressOf.Variable is FunctionFieldVariable,
+			InitializeInstruction initialize => initialize.Variable is FunctionFieldVariable,
+			_ => false,
+		};
+	}
+
+	private static bool UsesFunctionFieldVariable(IReadOnlyList<BasicBlock> basicBlocks)
+	{
+		foreach (BasicBlock basicBlock in basicBlocks)
+		{
+			foreach (Instruction instruction in basicBlock.Instructions)
+			{
+				if (UsesFunctionFieldVariable(instruction))
+				{
+					return true;
+				}
+			}
+		}
+		return false;
 	}
 }

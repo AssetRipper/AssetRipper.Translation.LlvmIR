@@ -211,21 +211,6 @@ internal sealed partial class ModuleContext
 			}
 
 			function.NeedsStackFrame = function.Function.GetInstructions().Any(i => i.InstructionOpcode is LLVMOpcode.LLVMAlloca);
-			if (!function.NeedsStackFrame)
-			{
-				continue;
-			}
-
-			TypeDefinition typeDefinition = new(
-				null,
-				"LocalVariables",
-				TypeAttributes.NestedPrivate | TypeAttributes.SequentialLayout,
-				Definition.DefaultImporter.ImportType(typeof(ValueType)));
-			function.DeclaringType.NestedTypes.Add(typeDefinition);
-
-			function.LocalVariablesType = typeDefinition;
-
-			function.StackFrameVariable = function.Definition.CilMethodBody!.Instructions.AddLocalVariable(InjectedTypes[typeof(StackFrame)].ToTypeSignature());
 		}
 	}
 

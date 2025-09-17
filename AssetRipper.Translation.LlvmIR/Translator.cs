@@ -103,17 +103,6 @@ public static unsafe class Translator
 			IReadOnlyList<BasicBlock> basicBlocks = InstructionLifter.Lift(functionContext);
 			InstructionOptimizer.Optimize(basicBlocks);
 
-			if (functionContext.NeedsStackFrame)
-			{
-				Debug.Assert(functionContext.LocalVariablesType is not null);
-				Debug.Assert(functionContext.StackFrameVariable is not null);
-				TypeDefinition stackFrameListType = moduleContext.InjectedTypes[typeof(StackFrameList)];
-
-				instructions.Add(CilOpCodes.Ldsflda, stackFrameListType.GetFieldByName(nameof(StackFrameList.Current)));
-				instructions.Add(CilOpCodes.Call, stackFrameListType.GetMethodByName(nameof(StackFrameList.New)).MakeGenericInstanceMethod(functionContext.LocalVariablesType.ToTypeSignature()));
-				instructions.Add(CilOpCodes.Stloc, functionContext.StackFrameVariable);
-			}
-
 			foreach (BasicBlock basicBlock in basicBlocks)
 			{
 				basicBlock.AddInstructions(instructions);
