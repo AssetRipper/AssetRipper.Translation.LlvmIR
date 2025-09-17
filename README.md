@@ -1,6 +1,8 @@
-This project transpiles LLVM IR to .NET CIL.
+# AssetRipper.Translation.LlvmIR
 
-# Clang Compilation Options
+This project transpiles LLVM IR to .NET CIL. This enables robust, automated translation of C and C++ to low-level C#. Translated code is highly performant, AOT compatible, cross-platform, and semantically accurate.
+
+## Compiling small projects to LLVM IR with Clang
 
 While this project is intended to handle any LLVM IR, it works best when the input is generated on Windows with the following Clang command:
 
@@ -10,13 +12,13 @@ clang -g -fno-discard-value-names -fstandalone-debug -S -emit-llvm {inputFile} -
 
 This ensures that debug information is included and that parameter names are preserved, which helps with generating code that is more readable.
 
-# Large Projects with CMake on Windows
+## Compiling large projects to LLVM IR with CMake on Windows
 
-## Install [Ninja](https://ninja-build.org/)
+### Install [Ninja](https://ninja-build.org/)
 
 Use `ninja --version` to verify that it's been added to the PATH.
 
-## Run CMake
+### Run CMake
 
 ```
 cmake -G "Ninja" \
@@ -31,11 +33,11 @@ cmake -G "Ninja" \
 
 This will generate a `compile_commands.json` file in the build output directory, which is necessary for a future step.
 
-### Flags
+#### Flags
 
 * `-DNOMINMAX` ensures that the `min` and `max` macros do no interfere with compilation.
 
-## Compile the project normally
+### Compile the project normally
 
 ```
 cmake --build ./path-to-build-output-directory/ --config Debug
@@ -43,10 +45,18 @@ cmake --build ./path-to-build-output-directory/ --config Debug
 
 This ensures that any generated files get generated.
 
-## Compile the project to LLVM IR
+### Compile the project to LLVM IR
 
 ```
 LargeProjectCompiler.exe ./path-to/compile_commands.json
 ```
 
 Use `--help` to see additional options.
+
+## NuGet tool
+
+There are [plans](https://github.com/AssetRipper/AssetRipper.Translation.LlvmIR/issues/44) to ship this as a NuGet tool for easy installation and usage.
+
+## Building
+
+The `libLLVMSharp` dependency is not included in the repository. The source code for it can be found [here](https://github.com/ds5678/LLVMSharp/tree/libllvmsharp).
