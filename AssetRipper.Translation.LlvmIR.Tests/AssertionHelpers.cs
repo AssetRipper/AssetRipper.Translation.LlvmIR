@@ -3,6 +3,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Emit;
 using NUnit.Framework;
+using System.Collections.Concurrent;
 using System.Numerics.Tensors;
 using System.Text;
 
@@ -62,6 +63,7 @@ internal static class AssertionHelpers
 		[
 			MetadataReference.CreateFromFile(typeof(object).Assembly.Location),
 			MetadataReference.CreateFromFile(typeof(Console).Assembly.Location),
+			MetadataReference.CreateFromFile(typeof(ConcurrentDictionary<,>).Assembly.Location),
 			MetadataReference.CreateFromFile(GetAssemblyPath("System.Runtime.dll")),
 			MetadataReference.CreateFromFile(typeof(TensorPrimitives).Assembly.Location),
 		];
