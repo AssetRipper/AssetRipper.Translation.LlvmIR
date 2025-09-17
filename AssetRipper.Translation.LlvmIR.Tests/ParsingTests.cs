@@ -42,6 +42,7 @@ public class ParsingTests
 		"void __cdecl crnd::utils::zero_object<unsigned int[17]>(unsigned int (&)[17])",
 		"unsigned int __cdecl crnd::crnd_crn_format_to_fourcc(enum crn_format)",
 		"public: unsigned int __cdecl crnd::crn_packed_uint<2>::operator unsigned int(void) const",
+		"public: struct crnd::crn_packed_uint<2> & __cdecl crnd::crn_packed_uint<2>::operator=(unsigned int)",
 	];
 
 	[TestCaseSource(nameof(demangledStrings))]

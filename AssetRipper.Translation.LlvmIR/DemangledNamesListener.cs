@@ -251,5 +251,45 @@ public interface IDemangledNamesListener : IParseTreeListener {
 	/// </summary>
 	/// <param name="context">The parse tree.</param>
 	void ExitOperatorName([NotNull] DemangledNamesParser.OperatorNameContext context);
+	/// <summary>
+	/// Enter a parse tree produced by <see cref="DemangledNamesParser.arithmeticOperator"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void EnterArithmeticOperator([NotNull] DemangledNamesParser.ArithmeticOperatorContext context);
+	/// <summary>
+	/// Exit a parse tree produced by <see cref="DemangledNamesParser.arithmeticOperator"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void ExitArithmeticOperator([NotNull] DemangledNamesParser.ArithmeticOperatorContext context);
+	/// <summary>
+	/// Enter a parse tree produced by <see cref="DemangledNamesParser.relationalOperator"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void EnterRelationalOperator([NotNull] DemangledNamesParser.RelationalOperatorContext context);
+	/// <summary>
+	/// Exit a parse tree produced by <see cref="DemangledNamesParser.relationalOperator"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void ExitRelationalOperator([NotNull] DemangledNamesParser.RelationalOperatorContext context);
+	/// <summary>
+	/// Enter a parse tree produced by <see cref="DemangledNamesParser.logicalOperator"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void EnterLogicalOperator([NotNull] DemangledNamesParser.LogicalOperatorContext context);
+	/// <summary>
+	/// Exit a parse tree produced by <see cref="DemangledNamesParser.logicalOperator"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void ExitLogicalOperator([NotNull] DemangledNamesParser.LogicalOperatorContext context);
+	/// <summary>
+	/// Enter a parse tree produced by <see cref="DemangledNamesParser.shiftOperator"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void EnterShiftOperator([NotNull] DemangledNamesParser.ShiftOperatorContext context);
+	/// <summary>
+	/// Exit a parse tree produced by <see cref="DemangledNamesParser.shiftOperator"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void ExitShiftOperator([NotNull] DemangledNamesParser.ShiftOperatorContext context);
 }
 } // namespace AssetRipper.Translation.LlvmIR

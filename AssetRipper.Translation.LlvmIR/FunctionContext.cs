@@ -306,7 +306,7 @@ internal sealed class FunctionContext : IHasName
 			}
 			else if (functionIdentifier.StartsWith("operator", StringComparison.Ordinal))
 			{
-				result = functionIdentifier switch
+				string operatatorName = functionIdentifier switch
 				{
 					"operator==" => "Equals",
 					"operator!=" => "NotEquals",
@@ -326,15 +326,28 @@ internal sealed class FunctionContext : IHasName
 					"operator<<" => "LeftShift",
 					"operator>>" => "RightShift",
 					"operator->" => "PointerDereference",
+					"operator++" => "Increment",
+					"operator--" => "Decrement",
+					"operator=" => "Assignment",
 					"operator[]" => "Index",
 					"operator()" => "Invoke",
 					"operator bool" => "ToBoolean",
+					"operator short" => "ToInt16",
+					"operator int" => "ToInt32",
+					"operator long long" => "ToInt64",
+					"operator unsigned short" => "ToUInt16",
+					"operator unsigned int" => "ToUInt32",
+					"operator unsigned long long" => "ToUInt64",
+					"operator float" => "ToSingle",
+					"operator double" => "ToDouble",
 					"operator new" => "New",
 					"operator delete" => "Delete",
 					"operator new[]" => "NewArray",
 					"operator delete[]" => "DeleteArray",
-					_ => NameGenerator.CleanName(functionIdentifier, "Operator"),
+					_ => NameGenerator.CleanName(functionIdentifier["operator".Length..], "Operator"),
 				};
+				string cleanTypeName = NameGenerator.CleanName(typeName ?? "", "Type");
+				result = $"{cleanTypeName}_{operatatorName}";
 			}
 			else
 			{

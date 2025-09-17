@@ -164,5 +164,29 @@ public interface IDemangledNamesVisitor<Result> : IParseTreeVisitor<Result> {
 	/// <param name="context">The parse tree.</param>
 	/// <return>The visitor result.</return>
 	Result VisitOperatorName([NotNull] DemangledNamesParser.OperatorNameContext context);
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="DemangledNamesParser.arithmeticOperator"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitArithmeticOperator([NotNull] DemangledNamesParser.ArithmeticOperatorContext context);
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="DemangledNamesParser.relationalOperator"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitRelationalOperator([NotNull] DemangledNamesParser.RelationalOperatorContext context);
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="DemangledNamesParser.logicalOperator"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitLogicalOperator([NotNull] DemangledNamesParser.LogicalOperatorContext context);
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="DemangledNamesParser.shiftOperator"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitShiftOperator([NotNull] DemangledNamesParser.ShiftOperatorContext context);
 }
 } // namespace AssetRipper.Translation.LlvmIR

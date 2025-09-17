@@ -300,6 +300,54 @@ public partial class DemangledNamesBaseListener : IDemangledNamesListener {
 	/// </summary>
 	/// <param name="context">The parse tree.</param>
 	public virtual void ExitOperatorName([NotNull] DemangledNamesParser.OperatorNameContext context) { }
+	/// <summary>
+	/// Enter a parse tree produced by <see cref="DemangledNamesParser.arithmeticOperator"/>.
+	/// <para>The default implementation does nothing.</para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	public virtual void EnterArithmeticOperator([NotNull] DemangledNamesParser.ArithmeticOperatorContext context) { }
+	/// <summary>
+	/// Exit a parse tree produced by <see cref="DemangledNamesParser.arithmeticOperator"/>.
+	/// <para>The default implementation does nothing.</para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	public virtual void ExitArithmeticOperator([NotNull] DemangledNamesParser.ArithmeticOperatorContext context) { }
+	/// <summary>
+	/// Enter a parse tree produced by <see cref="DemangledNamesParser.relationalOperator"/>.
+	/// <para>The default implementation does nothing.</para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	public virtual void EnterRelationalOperator([NotNull] DemangledNamesParser.RelationalOperatorContext context) { }
+	/// <summary>
+	/// Exit a parse tree produced by <see cref="DemangledNamesParser.relationalOperator"/>.
+	/// <para>The default implementation does nothing.</para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	public virtual void ExitRelationalOperator([NotNull] DemangledNamesParser.RelationalOperatorContext context) { }
+	/// <summary>
+	/// Enter a parse tree produced by <see cref="DemangledNamesParser.logicalOperator"/>.
+	/// <para>The default implementation does nothing.</para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	public virtual void EnterLogicalOperator([NotNull] DemangledNamesParser.LogicalOperatorContext context) { }
+	/// <summary>
+	/// Exit a parse tree produced by <see cref="DemangledNamesParser.logicalOperator"/>.
+	/// <para>The default implementation does nothing.</para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	public virtual void ExitLogicalOperator([NotNull] DemangledNamesParser.LogicalOperatorContext context) { }
+	/// <summary>
+	/// Enter a parse tree produced by <see cref="DemangledNamesParser.shiftOperator"/>.
+	/// <para>The default implementation does nothing.</para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	public virtual void EnterShiftOperator([NotNull] DemangledNamesParser.ShiftOperatorContext context) { }
+	/// <summary>
+	/// Exit a parse tree produced by <see cref="DemangledNamesParser.shiftOperator"/>.
+	/// <para>The default implementation does nothing.</para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	public virtual void ExitShiftOperator([NotNull] DemangledNamesParser.ShiftOperatorContext context) { }
 
 	/// <inheritdoc/>
 	/// <remarks>The default implementation does nothing.</remarks>

@@ -125,12 +125,43 @@ operatorName
     | 'new'
     | 'delete'
     | numericType
-    | Less Less
-    | Greater Greater
-    | Less
-    | Greater
+    | shiftOperator Equals?
+    | arithmeticOperator Equals?
+    | logicalOperator Equals?
+    | relationalOperator
+    | Exclamation
+    | Equals
+    | Plus Plus
+    | Minus Minus
     | LeftBracket RightBracket
     | LeftParen RightParen
+    ;
+
+arithmeticOperator
+    : Plus
+    | Minus
+    | Star
+    | Slash
+    | Modulo
+    ;
+
+relationalOperator
+    : Less Equals?
+    | Greater Equals?
+    | Equals Equals
+    | Exclamation Equals
+    ;
+
+logicalOperator
+    : And
+    | Pipe
+    | Caret
+    | Tilde
+    ;
+
+shiftOperator
+    : Less Less
+    | Greater Greater
     ;
 
 EscapedString
@@ -249,16 +280,48 @@ Greater
     : '>'
     ;
 
+Equals
+    : '='
+    ;
+
+Plus
+    : '+'
+    ;
+
+Minus
+    : '-'
+    ;
+
 Star
     : '*'
+    ;
+
+Slash
+    : '/'
+    ;
+
+Modulo
+    : '%'
     ;
 
 And
     : '&'
     ;
 
+Pipe
+    : '|'
+    ;
+
+Caret
+    : '^'
+    ;
+
 Tilde
     : '~'
+    ;
+
+Exclamation
+    : '!'
     ;
 
 Colon

@@ -30,6 +30,7 @@ public partial class DemangledNamesParser
 
 		if (ErrorListener.HasErrors(tree) || tree.ChildCount == 0 || (tree as ParserRuleContext)?.exception is not null)
 		{
+			Console.Error.WriteLine("Could not parse:\n" + input);
 			returnType = null;
 			@namespace = null;
 			typeName = null;
