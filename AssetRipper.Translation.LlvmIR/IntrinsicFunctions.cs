@@ -441,6 +441,12 @@ internal static unsafe partial class IntrinsicFunctions
 		NativeMemoryHelper.Free(ptr);
 	}
 
+	[MangledName("_msize")]
+	public static long Size(void* ptr)
+	{
+		return NativeMemoryHelper.Size(ptr);
+	}
+
 	[MangledName("??3@YAXPEAX_K@Z")]
 	public static void Delete(void* ptr, long size)
 	{
