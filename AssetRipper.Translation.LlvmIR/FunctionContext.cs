@@ -346,8 +346,15 @@ internal sealed class FunctionContext : IHasName
 					"operator delete[]" => "DeleteArray",
 					_ => NameGenerator.CleanName(functionIdentifier["operator".Length..], "Operator"),
 				};
-				string cleanTypeName = NameGenerator.CleanName(typeName ?? "", "Type");
-				result = $"{cleanTypeName}_{operatatorName}";
+				if (string.IsNullOrEmpty(typeName))
+				{
+					result = operatatorName;
+				}
+				else
+				{
+					string cleanTypeName = NameGenerator.CleanName(typeName ?? "", "Type");
+					result = $"{cleanTypeName}_{operatatorName}";
+				}
 			}
 			else
 			{
