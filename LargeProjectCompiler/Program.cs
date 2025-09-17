@@ -65,6 +65,8 @@ internal static class Program
 		string json = File.ReadAllText(compileDbPath);
 		List<CompileCommand> entries = JsonSerializer.Deserialize<List<CompileCommand>>(json)!;
 
+		HashSet<string> sourceFiles = new(entries.Count);
+
 		List<string> bcFiles = new(entries.Count);
 
 		string environmentDirectory = Environment.CurrentDirectory;
@@ -74,9 +76,19 @@ internal static class Program
 			{
 				CompileCommand entry = entries[i];
 
+				if (!sourceFiles.Add(entry.File))
+				{
+					continue; // Skip duplicates
+				}
+
 				List<string> commandParts = CommandParser.ParseCommand(entry.Command);
 
-				if (commandParts.Count is 0 || !commandParts[0].Contains("CLANG_~1", StringComparison.Ordinal))
+				if (commandParts.Count is 0)
+				{
+					continue; // Skip if empty
+				}
+
+				if (!commandParts[0].Contains("CLANG_~1", StringComparison.Ordinal))
 				{
 					continue; // Skip if not a clang-cl command
 				}
@@ -105,12 +117,12 @@ internal static class Program
 					Console.Error.WriteLine($"Expected output file {bcOutputPath} does not exist after compilation.");
 					return;
 				}
+				bcFiles.Add(Path.GetFullPath(bcOutputPath));
 				if (HasMain(arguments.MainFunctionDetector, bcOutputPath))
 				{
 					Console.Error.WriteLine($"Main function detected in {bcOutputPath}");
 					return;
 				}
-				bcFiles.Add(Path.GetFullPath(bcOutputPath));
 			}
 
 			Environment.CurrentDirectory = environmentDirectory;
@@ -143,11 +155,11 @@ internal static class Program
 		}
 		finally
 		{
+			Console.WriteLine($">> Removing {bcFiles.Count} BC files");
 			foreach (string bcFile in bcFiles)
 			{
 				if (File.Exists(bcFile))
 				{
-					Console.WriteLine($">> Removing {bcFile}");
 					File.Delete(bcFile);
 				}
 			}
@@ -197,14 +209,12 @@ internal static class Program
 
 		commandParts.Insert(1, "-c");
 
-		if (!commandParts.Contains("-emit-llvm"))
-		{
-			commandParts.Add("-emit-llvm");
-		}
-		if (!commandParts.Contains("-w"))
-		{
-			commandParts.Add("-w"); // Suppress warnings
-		}
+		AddIfNotPresent(commandParts, "-emit-llvm");
+		AddIfNotPresent(commandParts, "-w"); // Suppress warnings
+		AddIfNotPresent(commandParts, "-DNOMINMAX"); // Prevent macro conflicts
+		AddIfNotPresent(commandParts, "-g"); // Generate debug info
+		AddIfNotPresent(commandParts, "-fno-discard-value-names"); // Keep parameter names
+		AddIfNotPresent(commandParts, "-fstandalone-debug"); // Ensures that the debug information is self-contained
 	}
 
 	[SupportedOSPlatform("windows")]
@@ -297,5 +307,13 @@ internal static class Program
 		});
 
 		File.WriteAllLines(outputPath, lines);
+	}
+
+	static void AddIfNotPresent(List<string> list, string item)
+	{
+		if (!list.Contains(item))
+		{
+			list.Add(item);
+		}
 	}
 }

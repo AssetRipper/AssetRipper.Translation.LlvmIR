@@ -5,6 +5,9 @@ namespace SizeOptimizer;
 
 internal static unsafe class Program
 {
+	// https://github.com/llvm/llvm-project/blob/b9a627e6fba4137ca5411aaa416d57e28f685588/llvm/docs/Passes.rst
+	// Todo: add command line argument parsing and invoke opt
+
 	static void Main(string[] args)
 	{
 		string input = args[0];
