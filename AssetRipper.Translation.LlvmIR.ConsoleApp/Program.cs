@@ -44,6 +44,10 @@ internal static class Program
 		}
 		else
 		{
+			if (args.ClearDecompileDirectory && Directory.Exists(args.DecompileDirectory))
+			{
+				Directory.Delete(args.DecompileDirectory, true);
+			}
 			Directory.CreateDirectory(args.DecompileDirectory);
 			new TranslationProjectDecompiler().DecompileProject(moduleDefinition, args.DecompileDirectory, TextWriter.Null);
 		}
