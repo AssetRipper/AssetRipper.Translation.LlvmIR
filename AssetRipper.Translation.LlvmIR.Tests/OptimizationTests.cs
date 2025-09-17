@@ -249,6 +249,27 @@ internal class OptimizationTests
 	}
 
 	[Test]
+	public void Initialize_ShouldWorkOnMultipleVariables()
+	{
+		LocalVariable data1 = new(Int32);
+		LocalVariable data2 = new(Int32);
+
+		BasicBlock instructions =
+		[
+			new InitializeInstruction(data1),
+			new InitializeInstruction(data2),
+		];
+
+		BasicBlock optimizedInstructions =
+		[
+		];
+
+		Optimize(instructions);
+
+		Assert.That(instructions, Is.EqualTo(optimizedInstructions));
+	}
+
+	[Test]
 	public void Initialize_ShouldBeRemovedIfStoreOccursAfter_1()
 	{
 		LocalVariable data = new(Int32);
@@ -358,6 +379,42 @@ internal class OptimizationTests
 		Optimize(instructions);
 
 		Assert.That(instructions, Is.EqualTo(optimizedInstructions));
+	}
+
+	[Test]
+	public void Initialize_ShouldNotRemoveAcrossBasicBlocksWithoutTwoStores()
+	{
+		LocalVariable temp = new(Int32);
+
+		BasicBlock instructions1 =
+		[
+			new InitializeInstruction(temp),
+		];
+
+		BasicBlock instructions2 =
+		[
+			new LoadVariableInstruction(temp),
+			ReturnInstruction.Value,
+		];
+
+		BasicBlock optimizedInstructions1 =
+		[
+			new InitializeInstruction(temp),
+		];
+
+		BasicBlock optimizedInstructions2 =
+		[
+			new LoadVariableInstruction(temp),
+			ReturnInstruction.Value,
+		];
+
+		Optimize(instructions1, instructions2);
+
+		using (Assert.EnterMultipleScope())
+		{
+			Assert.That(instructions1, Is.EqualTo(optimizedInstructions1));
+			Assert.That(instructions2, Is.EqualTo(optimizedInstructions2));
+		}
 	}
 
 	[Test]
@@ -552,6 +609,8 @@ internal class OptimizationTests
 	}
 
 	private static void Optimize(BasicBlock instructions) => InstructionOptimizer.Optimize([instructions]);
+
+	private static void Optimize(params IReadOnlyList<BasicBlock> basicBlocks) => InstructionOptimizer.Optimize(basicBlocks);
 
 	private sealed class ImportantVariable(TypeSignature type) : LocalVariable(type), IVariable
 	{
