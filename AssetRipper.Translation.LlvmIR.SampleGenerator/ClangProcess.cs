@@ -2,7 +2,7 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Text.RegularExpressions;
 
-namespace AssetRipper.Translation.LlvmIR.Clang;
+namespace AssetRipper.Translation.LlvmIR.SampleGenerator;
 
 public static partial class ClangProcess
 {

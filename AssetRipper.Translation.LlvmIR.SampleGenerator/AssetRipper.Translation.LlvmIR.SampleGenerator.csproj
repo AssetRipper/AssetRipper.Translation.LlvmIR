@@ -11,8 +11,4 @@
 		<PackageReference Include="System.IO.Hashing" Version="9.0.9" />
 	</ItemGroup>
 
-	<ItemGroup>
-		<ProjectReference Include="..\AssetRipper.Translation.LlvmIR.Clang\AssetRipper.Translation.LlvmIR.Clang.csproj" />
-	</ItemGroup>
-
 </Project>

@@ -1,5 +1,4 @@
-﻿using AssetRipper.Translation.LlvmIR.Clang;
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.IO.Hashing;
 using System.Text.Json;
 
