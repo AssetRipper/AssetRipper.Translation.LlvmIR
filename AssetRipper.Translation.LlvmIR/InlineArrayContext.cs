@@ -5,6 +5,7 @@ using AsmResolver.PE.DotNet.Cil;
 using AsmResolver.PE.DotNet.Metadata.Tables;
 using AssetRipper.CIL;
 using AssetRipper.Translation.LlvmIR.Extensions;
+using System.Collections;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using AsmResolverElementType = AsmResolver.PE.DotNet.Metadata.Tables.ElementType;
@@ -193,6 +194,29 @@ internal sealed class InlineArrayContext
 				MemberReference interfaceMethod = new(genericInstance, "op_Inequality", methodSignature);
 				arrayType.MethodImplementations.Add(new MethodImplementation(interfaceMethod, inequalityOperator));
 			}
+		}
+
+		//IEnumerable.GetEnumerator
+		{
+			ITypeDefOrRef iEnumerable = module.Definition.DefaultImporter.ImportType(typeof(IEnumerable));
+			TypeSignature iEnumerator = module.Definition.DefaultImporter.ImportTypeSignature(typeof(IEnumerator));
+			MemberReference iEnumerable_GetEnumerator = new(iEnumerable, nameof(IEnumerable.GetEnumerator), MethodSignature.CreateInstance(iEnumerator));
+
+			ITypeDefOrRef iEnumerableGenericInstance = module.Definition.DefaultImporter.ImportType(typeof(IEnumerable<>)).MakeGenericInstanceType(type).ToTypeDefOrRef();
+			TypeSignature iEnumeratorGenericInstance = module.Definition.DefaultImporter.ImportType(typeof(IEnumerator<>)).MakeGenericInstanceType(type);
+			MemberReference iEnumerableGenericInstance_GetEnumerator = new(iEnumerableGenericInstance, nameof(IEnumerable<>.GetEnumerator), MethodSignature.CreateInstance(iEnumeratorGenericInstance));
+
+			arrayType.Interfaces.Add(new InterfaceImplementation(iEnumerable));
+			MethodDefinition method = new("System.Collections.IEnumerable.GetEnumerator", MethodAttributes.Private | MethodAttributes.HideBySig | MethodAttributes.Virtual, MethodSignature.CreateInstance(iEnumerator));
+			method.CilMethodBody = new();
+			CilInstructionCollection instructions = method.CilMethodBody.Instructions;
+			instructions.Add(CilOpCodes.Ldarg_0);
+			instructions.Add(CilOpCodes.Ldobj, arrayType);
+			instructions.Add(CilOpCodes.Box, arrayType);
+			instructions.Add(CilOpCodes.Callvirt, iEnumerableGenericInstance_GetEnumerator);
+			instructions.Add(CilOpCodes.Ret);
+			arrayType.Methods.Add(method);
+			arrayType.MethodImplementations.Add(new MethodImplementation(iEnumerable_GetEnumerator, method));
 		}
 
 		InlineArrayContext result = new(module, arrayType, type, size);

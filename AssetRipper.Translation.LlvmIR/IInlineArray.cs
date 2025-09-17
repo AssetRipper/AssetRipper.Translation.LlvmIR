@@ -1,6 +1,4 @@
-﻿using System.Collections;
-
-namespace AssetRipper.Translation.LlvmIR;
+﻿namespace AssetRipper.Translation.LlvmIR;
 
 internal interface IInlineArray<out T>
 {
@@ -18,7 +16,6 @@ internal interface IInlineArray<TSelf, out TElement> : IInlineArray<TElement>, I
 		}
 	}
 	int IReadOnlyCollection<TElement>.Count => TSelf.Length;
-	IEnumerator IEnumerable.GetEnumerator() => ((IEnumerable<TElement>)this).GetEnumerator();
 	IEnumerator<TElement> IEnumerable<TElement>.GetEnumerator()
 	{
 		for (int i = 0; i < TSelf.Length; i++)
