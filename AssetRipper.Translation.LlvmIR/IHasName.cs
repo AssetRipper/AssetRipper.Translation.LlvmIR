@@ -23,6 +23,13 @@ internal interface IHasName
 	/// The unique name used for output.
 	/// </summary>
 	string Name { get; set; }
+	/// <summary>
+	/// The native type, if it can be determined.
+	/// </summary>
+	/// <remarks>
+	/// For functions, this is the return type.
+	/// </remarks>
+	string? NativeType { get; }
 	ModuleContext Module { get; }
 }
 internal static class IHasNameExtensions
@@ -34,31 +41,65 @@ internal static class IHasNameExtensions
 			return;
 		}
 
-		if (hasName.MangledName != hasName.Name)
+		if (!string.IsNullOrEmpty(hasName.MangledName) && hasName.MangledName != hasName.Name)
 		{
 			MethodDefinition constructor = hasName.Module.InjectedTypes[typeof(MangledNameAttribute)].GetMethodByName(".ctor");
-			AddAttribute(constructor, hasName.MangledName);
+			AddAttribute(hasName, definition, constructor, hasName.MangledName);
 		}
 
 		if (!string.IsNullOrEmpty(hasName.DemangledName) && hasName.DemangledName != hasName.Name)
 		{
 			MethodDefinition constructor = hasName.Module.InjectedTypes[typeof(DemangledNameAttribute)].GetMethodByName(".ctor");
-			AddAttribute(constructor, hasName.DemangledName);
+			AddAttribute(hasName, definition, constructor, hasName.DemangledName);
 		}
 
 		if (hasName.CleanName != hasName.Name)
 		{
 			MethodDefinition constructor = hasName.Module.InjectedTypes[typeof(CleanNameAttribute)].GetMethodByName(".ctor");
-			AddAttribute(constructor, hasName.CleanName);
+			AddAttribute(hasName, definition, constructor, hasName.CleanName);
+		}
+	}
+
+	public static void AddTypeAttribute(this IHasName hasName, IHasCustomAttribute definition)
+	{
+		if (!hasName.Module.Options.EmitNameAttributes)
+		{
+			return;
 		}
 
-		void AddAttribute(MethodDefinition constructor, string name)
+		if (!string.IsNullOrEmpty(hasName.NativeType))
 		{
-			CustomAttributeSignature signature = new();
-			signature.FixedArguments.Add(new(hasName.Module.Definition.CorLibTypeFactory.String, name));
-			CustomAttribute attribute = new(constructor, signature);
-			definition.CustomAttributes.Add(attribute);
+			MethodDefinition constructor = hasName.Module.InjectedTypes[typeof(NativeTypeAttribute)].GetMethodByName(".ctor");
+			if (definition is MethodDefinition method)
+			{
+				ParameterDefinition returnParameterDefinition = method.Parameters.ReturnParameter.GetOrCreateDefinition();
+				AddAttribute(hasName, returnParameterDefinition, constructor, hasName.NativeType);
+				if (method.ParameterDefinitions.Count > 1 && method.ParameterDefinitions[^1] == returnParameterDefinition)
+				{
+					// Move it to the beginning
+					method.ParameterDefinitions.RemoveAt(method.ParameterDefinitions.Count - 1);
+					method.ParameterDefinitions.Insert(0, returnParameterDefinition);
+				}
+			}
+			else
+			{
+				AddAttribute(hasName, definition, constructor, hasName.NativeType);
+			}
 		}
+	}
+
+	public static void AddNameAndTypeAttributes(this IHasName hasName, IHasCustomAttribute definition)
+	{
+		hasName.AddNameAttributes(definition);
+		hasName.AddTypeAttribute(definition);
+	}
+
+	private static void AddAttribute(IHasName hasName, IHasCustomAttribute definition, MethodDefinition constructor, string name)
+	{
+		CustomAttributeSignature signature = new();
+		signature.FixedArguments.Add(new(hasName.Module.Definition.CorLibTypeFactory.String, name));
+		CustomAttribute attribute = new(constructor, signature);
+		definition.CustomAttributes.Add(attribute);
 	}
 
 	public static void AssignNames<T>(this IEnumerable<T> items) where T : IHasName

@@ -9,17 +9,22 @@ namespace AssetRipper.Translation.LlvmIR;
 [DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
 internal sealed class StructContext : IHasName
 {
+	/// <inheritdoc/>
 	public string MangledName => Type.StructName;
 
-	public string? DemangledName => null;
+	string? IHasName.DemangledName => null;
 
+	/// <inheritdoc/>
 	public string CleanName { get; }
 
+	/// <inheritdoc/>
 	public string Name
 	{
 		get => Definition.Name ?? "";
 		set => Definition.Name = value;
 	}
+
+	string? IHasName.NativeType => null;
 
 	public ModuleContext Module { get; }
 

@@ -23,7 +23,145 @@ internal sealed class FunctionContext : IHasName
 
 		MangledName = Function.Name;
 		DemangledName = LibLLVMSharp.ValueGetDemangledName(function);
-		CleanName = ExtractCleanName(MangledName, DemangledName, module.Options.RenamedSymbols, module.Options.ParseDemangledSymbols);
+
+		Debug.Assert(definition.Signature is not null);
+		definition.Signature.ReturnType = ReturnTypeSignature;
+
+		LLVMValueRef[] normalParameterRefs = function.GetParams();
+		NormalParameters = new ParameterContext[normalParameterRefs.Length];
+		for (int i = 0; i < normalParameterRefs.Length; i++)
+		{
+			LLVMValueRef parameter = normalParameterRefs[i];
+			ParameterContext parameterContext = new(parameter, definition.AddParameter(module.Definition.CorLibTypeFactory.Object), this);
+			NormalParameters[i] = parameterContext;
+			ParameterLookup[parameter] = parameterContext;
+		}
+
+		if (IsVariadic)
+		{
+			VariadicParameter = new(definition.AddParameter(module.Definition.CorLibTypeFactory.Object), this);
+		}
+
+		if (module.Options.ParseDemangledSymbols && !string.IsNullOrEmpty(DemangledName) && DemangledName != MangledName && DemangledNamesParser.ParseFunction(DemangledName, out string? returnType, out _, out string? typeName, out string? functionIdentifier, out string? functionName, out _, out string[]? parameterTypes))
+		{
+			NativeType = returnType;
+
+			if (ParameterCount == parameterTypes.Length)
+			{
+				int i = 0;
+				foreach (BaseParameterContext parameter in AllParameters)
+				{
+					parameter.NativeType = parameterTypes[i];
+					i++;
+				}
+			}
+			else if (!string.IsNullOrEmpty(typeName) && ParameterCount - 1 == parameterTypes.Length)
+			{
+				int i = 0;
+				foreach (BaseParameterContext parameter in AllParameters.Skip(1))
+				{
+					parameter.NativeType = parameterTypes[i];
+					i++;
+				}
+			}
+		}
+		else
+		{
+			returnType = null;
+			typeName = null;
+			functionIdentifier = null;
+			functionName = null;
+		}
+
+		AllParameters.AssignNames();
+		foreach (BaseParameterContext parameter in AllParameters)
+		{
+			ParameterDefinition parameterDefinition = parameter.Definition.GetOrCreateDefinition();
+			parameterDefinition.Name = parameter.Name;
+			parameter.AddNameAndTypeAttributes(parameterDefinition);
+		}
+
+		if (module.Options.RenamedSymbols.TryGetValue(MangledName, out string? result))
+		{
+			if (!NameGenerator.IsValidCSharpName(result))
+			{
+				throw new ArgumentException($"Renamed symbol '{MangledName}' has an invalid name '{result}'.", nameof(module));
+			}
+		}
+		else if (string.IsNullOrEmpty(functionIdentifier))
+		{
+			result = NameGenerator.CleanName(TryGetSimpleName(MangledName), "Function");
+		}
+		else if (string.IsNullOrEmpty(returnType) && !string.IsNullOrEmpty(typeName) && functionName == typeName)
+		{
+			result = NameGenerator.CleanName(typeName, "Type") + "_Constructor";
+		}
+		else if (string.IsNullOrEmpty(returnType) && functionName == $"~{typeName}")
+		{
+			result = NameGenerator.CleanName(typeName ?? "", "Type") + "_Destructor";
+		}
+		else if (returnType is "void *" && functionName == "`scalar deleting dtor'")
+		{
+			result = NameGenerator.CleanName(typeName ?? "", "Type") + "_Delete";
+		}
+		else if (functionIdentifier.StartsWith("operator", StringComparison.Ordinal))
+		{
+			string operatatorName = functionIdentifier switch
+			{
+				"operator==" => "Equals",
+				"operator!=" => "NotEquals",
+				"operator<" => "LessThan",
+				"operator>" => "GreaterThan",
+				"operator<=" => "LessThanOrEquals",
+				"operator>=" => "GreaterThanOrEquals",
+				"operator+" => "Add",
+				"operator-" => "Subtract",
+				"operator*" => "Multiply",
+				"operator/" => "Divide",
+				"operator%" => "Modulo",
+				"operator&" => "BitwiseAnd",
+				"operator|" => "BitwiseOr",
+				"operator^" => "BitwiseXor",
+				"operator~" => "BitwiseNot",
+				"operator<<" => "LeftShift",
+				"operator>>" => "RightShift",
+				"operator->" => "PointerDereference",
+				"operator++" => "Increment",
+				"operator--" => "Decrement",
+				"operator=" => "Assignment",
+				"operator[]" => "Index",
+				"operator()" => "Invoke",
+				"operator bool" => "ToBoolean",
+				"operator short" => "ToInt16",
+				"operator int" => "ToInt32",
+				"operator long long" => "ToInt64",
+				"operator unsigned short" => "ToUInt16",
+				"operator unsigned int" => "ToUInt32",
+				"operator unsigned long long" => "ToUInt64",
+				"operator float" => "ToSingle",
+				"operator double" => "ToDouble",
+				"operator new" => "New",
+				"operator delete" => "Delete",
+				"operator new[]" => "NewArray",
+				"operator delete[]" => "DeleteArray",
+				_ => NameGenerator.CleanName(functionIdentifier["operator".Length..], "Operator"),
+			};
+			if (string.IsNullOrEmpty(typeName))
+			{
+				result = operatatorName;
+			}
+			else
+			{
+				string cleanTypeName = NameGenerator.CleanName(typeName ?? "", "Type");
+				result = $"{cleanTypeName}_{operatatorName}";
+			}
+		}
+		else
+		{
+			result = NameGenerator.CleanName(functionIdentifier, "Function");
+		}
+
+		CleanName = result.CapitalizeGetOrSet();
 	}
 
 	public static FunctionContext Create(LLVMValueRef function, ModuleContext module)
@@ -36,34 +174,8 @@ internal sealed class FunctionContext : IHasName
 		definition.CilMethodBody = new();
 		declaringType.Methods.Add(definition);
 
-		Debug.Assert(definition.Signature is not null);
 		FunctionContext context = new(function, definition, module);
 		module.Methods.Add(function, context);
-
-		definition.Signature.ReturnType = context.ReturnTypeSignature;
-
-		LLVMValueRef[] normalParameterRefs = function.GetParams();
-		ParameterContext[] normalParameterContexts = new ParameterContext[normalParameterRefs.Length];
-		for (int i = 0; i < normalParameterRefs.Length; i++)
-		{
-			LLVMValueRef parameter = normalParameterRefs[i];
-			ParameterContext parameterContext = new(parameter, definition.AddParameter(module.Definition.CorLibTypeFactory.Object), context);
-			normalParameterContexts[i] = parameterContext;
-			context.ParameterLookup[parameter] = parameterContext;
-		}
-
-		if (context.IsVariadic)
-		{
-			context.VariadicParameter = new(definition.AddParameter(module.Definition.CorLibTypeFactory.Object), context);
-		}
-
-		context.NormalParameters = normalParameterContexts;
-
-		context.AllParameters.AssignNames();
-		foreach (BaseParameterContext parameter in context.AllParameters)
-		{
-			parameter.Definition.GetOrCreateDefinition().Name = parameter.Name;
-		}
 
 		// Pointer
 		{
@@ -88,6 +200,8 @@ internal sealed class FunctionContext : IHasName
 	public string CleanName { get; }
 	/// <inheritdoc/>
 	public string Name { get; set; } = "";
+	/// <inheritdoc/>
+	public string? NativeType { get; set; }
 	public bool MightThrowAnException { get; set; }
 	public LLVMValueRef Function { get; }
 	public unsafe bool IsVariadic => LLVM.IsFunctionVarArg(FunctionType) != 0;
@@ -104,6 +218,7 @@ internal sealed class FunctionContext : IHasName
 	public IEnumerable<BaseParameterContext> AllParameters => VariadicParameter is null
 		? NormalParameters
 		: NormalParameters.Append<BaseParameterContext>(VariadicParameter);
+	public int ParameterCount => NormalParameters.Length + (VariadicParameter is not null ? 1 : 0);
 	public AttributeWrapper[] Attributes => AttributeWrapper.FromArray(Function.GetAttributesAtIndex(LLVMAttributeIndex.LLVMAttributeFunctionIndex));
 	public AttributeWrapper[] ReturnAttributes => AttributeWrapper.FromArray(Function.GetAttributesAtIndex(LLVMAttributeIndex.LLVMAttributeReturnIndex));
 	public MethodDefinition Definition { get; }
@@ -115,6 +230,23 @@ internal sealed class FunctionContext : IHasName
 	public CilLocalVariable? StackFrameVariable { get; set; }
 	private FieldDefinition PointerField { get; set; } = null!;
 	private bool IsPointerFieldUsed { get; set; } = false;
+
+	public BaseParameterContext GetParameter(int index)
+	{
+		ArgumentOutOfRangeException.ThrowIfNegative(index);
+		if (index < NormalParameters.Length)
+		{
+			return NormalParameters[index];
+		}
+		else if (index == NormalParameters.Length && VariadicParameter is not null)
+		{
+			return VariadicParameter;
+		}
+		else
+		{
+			throw new IndexOutOfRangeException();
+		}
+	}
 
 	public void AddLocalVariablesPointer(CilInstructionCollection instructions)
 	{
@@ -188,7 +320,9 @@ internal sealed class FunctionContext : IHasName
 				Parameter originalParameter = method.Parameters[i + 1];
 				Parameter newParameter = newMethod.Parameters[i];
 				Debug.Assert(originalParameter.Definition is not null);
-				newParameter.GetOrCreateDefinition().Name = originalParameter.Definition.Name;
+				ParameterDefinition newParameterDefinition = newParameter.GetOrCreateDefinition();
+				newParameterDefinition.Name = originalParameter.Definition.Name;
+				GetParameter(i + 1).AddNameAndTypeAttributes(newParameterDefinition);
 			}
 		}
 		else
@@ -211,7 +345,9 @@ internal sealed class FunctionContext : IHasName
 				Parameter originalParameter = method.Parameters[i];
 				Parameter newParameter = newMethod.Parameters[i];
 				Debug.Assert(originalParameter.Definition is not null);
-				newParameter.GetOrCreateDefinition().Name = originalParameter.Definition.Name;
+				ParameterDefinition newParameterDefinition = newParameter.GetOrCreateDefinition();
+				newParameterDefinition.Name = originalParameter.Definition.Name;
+				GetParameter(i).AddNameAndTypeAttributes(newParameterDefinition);
 			}
 
 			if (IsVoidReturn)
@@ -259,7 +395,7 @@ internal sealed class FunctionContext : IHasName
 		instructions.Add(CilOpCodes.Ret);
 		instructions.OptimizeMacros();
 
-		this.AddNameAttributes(newMethod);
+		this.AddNameAndTypeAttributes(newMethod);
 
 		bool TryGetStructReturnType([NotNullWhen(true)] out TypeSignature? type)
 		{
@@ -279,107 +415,17 @@ internal sealed class FunctionContext : IHasName
 		return Name;
 	}
 
-	private static string ExtractCleanName(string mangledName, string? demangledName, Dictionary<string, string> renamedSymbols, bool parseDemangledSymbols)
+	private static string TryGetSimpleName(string name)
 	{
-		if (renamedSymbols.TryGetValue(mangledName, out string? result))
+		if (name.StartsWith('?'))
 		{
-			if (!NameGenerator.IsValidCSharpName(result))
-			{
-				throw new ArgumentException($"Renamed symbol '{mangledName}' has an invalid name '{result}'.", nameof(renamedSymbols));
-			}
-			return result;
-		}
-
-		if (parseDemangledSymbols && !string.IsNullOrEmpty(demangledName) && demangledName != mangledName && DemangledNamesParser.ParseFunction(demangledName, out string? returnType, out _, out string? typeName, out string? functionIdentifier, out string? functionName, out _, out _))
-		{
-			if (returnType is null && functionName == typeName)
-			{
-				result = NameGenerator.CleanName(typeName, "Type") + "_Constructor";
-			}
-			else if (returnType is null && functionName == $"~{typeName}")
-			{
-				result = NameGenerator.CleanName(typeName ?? "", "Type") + "_Destructor";
-			}
-			else if (returnType is "void *" && functionName == "`scalar deleting dtor'")
-			{
-				result = NameGenerator.CleanName(typeName ?? "", "Type") + "_Delete";
-			}
-			else if (functionIdentifier.StartsWith("operator", StringComparison.Ordinal))
-			{
-				string operatatorName = functionIdentifier switch
-				{
-					"operator==" => "Equals",
-					"operator!=" => "NotEquals",
-					"operator<" => "LessThan",
-					"operator>" => "GreaterThan",
-					"operator<=" => "LessThanOrEquals",
-					"operator>=" => "GreaterThanOrEquals",
-					"operator+" => "Add",
-					"operator-" => "Subtract",
-					"operator*" => "Multiply",
-					"operator/" => "Divide",
-					"operator%" => "Modulo",
-					"operator&" => "BitwiseAnd",
-					"operator|" => "BitwiseOr",
-					"operator^" => "BitwiseXor",
-					"operator~" => "BitwiseNot",
-					"operator<<" => "LeftShift",
-					"operator>>" => "RightShift",
-					"operator->" => "PointerDereference",
-					"operator++" => "Increment",
-					"operator--" => "Decrement",
-					"operator=" => "Assignment",
-					"operator[]" => "Index",
-					"operator()" => "Invoke",
-					"operator bool" => "ToBoolean",
-					"operator short" => "ToInt16",
-					"operator int" => "ToInt32",
-					"operator long long" => "ToInt64",
-					"operator unsigned short" => "ToUInt16",
-					"operator unsigned int" => "ToUInt32",
-					"operator unsigned long long" => "ToUInt64",
-					"operator float" => "ToSingle",
-					"operator double" => "ToDouble",
-					"operator new" => "New",
-					"operator delete" => "Delete",
-					"operator new[]" => "NewArray",
-					"operator delete[]" => "DeleteArray",
-					_ => NameGenerator.CleanName(functionIdentifier["operator".Length..], "Operator"),
-				};
-				if (string.IsNullOrEmpty(typeName))
-				{
-					result = operatatorName;
-				}
-				else
-				{
-					string cleanTypeName = NameGenerator.CleanName(typeName ?? "", "Type");
-					result = $"{cleanTypeName}_{operatatorName}";
-				}
-			}
-			else
-			{
-				result = NameGenerator.CleanName(functionIdentifier, "Function");
-			}
+			int start = name.StartsWith("??$") ? 3 : 1;
+			int end = name.IndexOf('@', start);
+			return name[start..end];
 		}
 		else
 		{
-			result = NameGenerator.CleanName(TryGetSimpleName(mangledName), "Function");
-		}
-
-		return result.CapitalizeGetOrSet();
-
-		static string TryGetSimpleName(string name)
-		{
-			if (name.StartsWith('?'))
-			{
-				int start = name.StartsWith("??$") ? 3 : 1;
-				int end = name.IndexOf('@', start);
-				return name[start..end];
-			}
-			else
-			{
-				return name;
-			}
+			return name;
 		}
 	}
 }

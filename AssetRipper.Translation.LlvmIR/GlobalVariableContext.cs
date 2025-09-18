@@ -32,6 +32,7 @@ internal sealed class GlobalVariableContext : IHasName, IVariable
 	public string CleanName { get; }
 	/// <inheritdoc/>
 	public string Name { get; set; } = "";
+	string? IHasName.NativeType => null;
 	public LLVMValueRef GlobalVariable { get; }
 	public ModuleContext Module { get; }
 	public bool HasSingleOperand => GlobalVariable.OperandCount == 1;

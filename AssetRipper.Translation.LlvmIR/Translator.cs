@@ -91,6 +91,7 @@ public static unsafe class Translator
 		foreach (FunctionContext functionContext in moduleContext.Methods.Values)
 		{
 			functionContext.AddNameAttributes(functionContext.DeclaringType);
+			functionContext.AddTypeAttribute(functionContext.Definition);
 			functionContext.AddPublicImplementation();
 
 			if (IntrinsicFunctionImplementer.TryHandleIntrinsicFunction(functionContext))

@@ -79,6 +79,18 @@ public class ParsingTests
 		}
 	}
 
+	[TestCase(6, "bool __cdecl fpng::fpng_encode_image_to_memory(void const *, unsigned int, unsigned int, unsigned int, class std::vector<unsigned char, class std::allocator<unsigned char>> &, unsigned int)")]
+	public void ExtractionHasCorrectParameterCount(int expectedCount, string input)
+	{
+		bool success = DemangledNamesParser.ParseFunction(input, out _, out _, out _, out _, out _, out _, out string[]? normalParameters);
+
+		Assert.That(success, Is.True);
+		using (Assert.EnterMultipleScope())
+		{
+			Assert.That(normalParameters, Has.Length.EqualTo(expectedCount));
+		}
+	}
+
 	private sealed class ErrorListener : IParseTreeListener
 	{
 		public static void AssertNoErrors(IParseTree tree)

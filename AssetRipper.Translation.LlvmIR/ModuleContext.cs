@@ -32,6 +32,7 @@ internal sealed partial class ModuleContext
 			typeof(MangledNameAttribute),
 			typeof(DemangledNameAttribute),
 			typeof(CleanNameAttribute),
+			typeof(NativeTypeAttribute),
 			typeof(InlineAssemblyAttribute),
 			typeof(MightThrowAttribute),
 			typeof(ExceptionInfo),

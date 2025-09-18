@@ -1,6 +1,7 @@
 using Antlr4.Runtime;
 using Antlr4.Runtime.Tree;
 using AssetRipper.Translation.LlvmIR.Extensions;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 
 namespace AssetRipper.Translation.LlvmIR;
@@ -62,8 +63,8 @@ public partial class DemangledNamesParser
 			}
 			functionIdentifier = tree.GetChild(4).GetChild(0).GetText(input);
 			functionName = tree.GetChild(4).GetChild(0).GetText(input) + tree.GetChild(4).GetChild(1).GetText(input);
-			templateParameters = tree.GetChild(4).GetChild(1).GetText(input).Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
-			normalParameters = tree.GetChild(6).GetText(input).Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+			templateParameters = tree.GetChild(4).GetChild(1).GetText(input).Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries); // This is flawed
+			normalParameters = ParseParameterList(tree.GetChild(6), input);
 			if (normalParameters.Length == 1 && normalParameters[0] == "void")
 			{
 				normalParameters = [];
@@ -83,6 +84,30 @@ public partial class DemangledNamesParser
 			normalParameters = null;
 			return false;
 		}
+	}
+
+	private static string[] ParseParameterList(IParseTree parameterListNode, string input)
+	{
+		if (parameterListNode.ChildCount == 0)
+		{
+			return [];
+		}
+
+		if (parameterListNode.ChildCount == 1)
+		{
+			return [parameterListNode.GetChild(0).GetText(input)];
+		}
+
+		Debug.Assert(parameterListNode.ChildCount % 2 == 1);
+		int parameterCount = (parameterListNode.ChildCount + 1) / 2;
+
+		string[] parameters = new string[parameterCount];
+		for (int i = 0; i < parameterCount; i++)
+		{
+			parameters[i] = parameterListNode.GetChild(i * 2).GetText(input);
+		}
+
+		return parameters;
 	}
 
 	private sealed class ErrorListener : IParseTreeListener

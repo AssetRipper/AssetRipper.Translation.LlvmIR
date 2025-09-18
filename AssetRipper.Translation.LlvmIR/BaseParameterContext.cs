@@ -8,10 +8,15 @@ namespace AssetRipper.Translation.LlvmIR;
 
 internal abstract class BaseParameterContext : IHasName, IVariable
 {
+	/// <inheritdoc/>
 	public abstract string MangledName { get; }
-	public string? DemangledName => null;
+	string? IHasName.DemangledName => null;
+	/// <inheritdoc/>
 	public abstract string CleanName { get; }
+	/// <inheritdoc/>
 	public string Name { get; set; } = "";
+	/// <inheritdoc/>
+	public string? NativeType { get; set; }
 	public abstract AttributeWrapper[] Attributes { get; }
 	public FunctionContext Function { get; }
 	public ModuleContext Module => Function.Module;
