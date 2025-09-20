@@ -14,16 +14,43 @@ public static class InstructionOptimizer
 			return;
 		}
 
-		HashSet<IVariable> temporaryVariables = GetTemporaryVariablesEligibleForRemoval(basicBlocks).ToHashSet();
-		foreach (BasicBlock basicBlock in basicBlocks)
+		TryOptimizeBasicBlocksIndividually(basicBlocks);
+
+		HashSet<IVariable> temporaryVariablesWithoutAddressOrLoad = GetTemporaryVariablesWithoutAddressOrLoad(basicBlocks);
+		if (temporaryVariablesWithoutAddressOrLoad.Count > 0)
 		{
-			while (TryOptimize(basicBlock, temporaryVariables))
+			foreach (BasicBlock basicBlock in basicBlocks)
 			{
-				// Keep optimizing until no more optimizations can be made.
+				for (int i = basicBlock.Count - 1; i >= 0; i--)
+				{
+					switch (basicBlock[i])
+					{
+						case StoreVariableInstruction store:
+							if (temporaryVariablesWithoutAddressOrLoad.Contains(store.Variable))
+							{
+								basicBlock[i] = PopInstruction.Instance;
+							}
+							break;
+						case InitializeInstruction initialize:
+							if (temporaryVariablesWithoutAddressOrLoad.Contains(initialize.Variable))
+							{
+								basicBlock.RemoveAt(i);
+							}
+							break;
+					}
+				}
 			}
+
+			TryOptimizeBasicBlocksIndividually(basicBlocks);
 		}
 
+		TryReplaceFunctionFieldVariablesWithLocalVariables(basicBlocks);
+	}
+
+	private static void TryReplaceFunctionFieldVariablesWithLocalVariables(IReadOnlyList<BasicBlock> basicBlocks)
+	{
 		HashSet<IVariable> temporaryVariablesWithoutAddress = GetTemporaryVariablesWithoutAddress(basicBlocks);
+
 		if (temporaryVariablesWithoutAddress.Count == 0)
 		{
 			return;
@@ -104,6 +131,18 @@ public static class InstructionOptimizer
 						basicBlock.RemoveAt(i);
 					}
 				}
+			}
+		}
+	}
+
+	private static void TryOptimizeBasicBlocksIndividually(IReadOnlyList<BasicBlock> basicBlocks)
+	{
+		HashSet<IVariable> temporaryVariables = GetTemporaryVariablesEligibleForRemoval(basicBlocks).ToHashSet();
+		foreach (BasicBlock basicBlock in basicBlocks)
+		{
+			while (TryOptimize(basicBlock, temporaryVariables))
+			{
+				// Keep optimizing until no more optimizations can be made.
 			}
 		}
 	}
@@ -610,6 +649,40 @@ public static class InstructionOptimizer
 			}
 		}
 		return variablesWithoutAddress;
+	}
+
+	private static HashSet<IVariable> GetTemporaryVariablesWithoutAddressOrLoad(IReadOnlyList<BasicBlock> basicBlocks)
+	{
+		HashSet<IVariable> variablesWithAddressOrLoad = new();
+		HashSet<IVariable> variablesWithoutAddressOrLoad = new();
+		foreach (BasicBlock basicBlock in basicBlocks)
+		{
+			foreach (Instruction instruction in basicBlock.Instructions)
+			{
+				IVariable? variable = instruction switch
+				{
+					LoadVariableInstruction load => load.Variable,
+					StoreVariableInstruction store => store.Variable,
+					AddressOfInstruction addressOf => addressOf.Variable,
+					InitializeInstruction initialize => initialize.Variable,
+					_ => null,
+				};
+
+				if (variable is null or { IsTemporary: false } || variablesWithAddressOrLoad.Contains(variable))
+				{
+				}
+				else if (instruction is AddressOfInstruction or LoadVariableInstruction)
+				{
+					variablesWithAddressOrLoad.Add(variable);
+					variablesWithoutAddressOrLoad.Remove(variable);
+				}
+				else
+				{
+					variablesWithoutAddressOrLoad.Add(variable);
+				}
+			}
+		}
+		return variablesWithoutAddressOrLoad;
 	}
 
 	private static bool AreCompatible(TypeSignature? type1, TypeSignature? type2)
