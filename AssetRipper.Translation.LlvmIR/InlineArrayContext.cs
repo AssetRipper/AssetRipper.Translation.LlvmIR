@@ -17,7 +17,7 @@ internal sealed class InlineArrayContext : IHasName
 	string IHasName.MangledName => CleanName;
 	string? IHasName.DemangledName => null;
 	/// <inheritdoc/>
-	public string CleanName { get; }
+	public string CleanName => $"InlineArray{Length}_{GetName(ElementType, Module)}";
 	/// <inheritdoc/>
 	public string Name
 	{
@@ -38,13 +38,12 @@ internal sealed class InlineArrayContext : IHasName
 		}
 	}
 
-	private InlineArrayContext(ModuleContext module, TypeDefinition type, TypeSignature elementType, int length, string cleanName)
+	private InlineArrayContext(ModuleContext module, TypeDefinition type, TypeSignature elementType, int length)
 	{
 		Module = module;
 		Type = type;
 		ElementType = elementType;
 		Length = length;
-		CleanName = cleanName;
 	}
 
 	public void GetElementType(out TypeSignature elementType, out int length)
@@ -75,11 +74,9 @@ internal sealed class InlineArrayContext : IHasName
 
 	public static InlineArrayContext CreateInlineArray(TypeSignature type, int size, ModuleContext module)
 	{
-		string cleanName = $"InlineArray{size}_{GetName(type, module)}";
-
 		TypeDefinition arrayType = new(
 			module.Options.GetNamespace("InlineArrays"),
-			$"{cleanName}_{Guid.NewGuid()}",
+			$"InlineArray{size}_{Guid.NewGuid()}",
 			TypeAttributes.Public | TypeAttributes.SequentialLayout | TypeAttributes.Sealed,
 			module.Definition.DefaultImporter.ImportType(typeof(ValueType)));
 		module.Definition.TopLevelTypes.Add(arrayType);
@@ -234,7 +231,7 @@ internal sealed class InlineArrayContext : IHasName
 			arrayType.MethodImplementations.Add(new MethodImplementation(iEnumerable_GetEnumerator, method));
 		}
 
-		InlineArrayContext result = new(module, arrayType, type, size, cleanName);
+		InlineArrayContext result = new(module, arrayType, type, size);
 
 		result.ImplementInterface();
 
@@ -326,7 +323,7 @@ internal sealed class InlineArrayContext : IHasName
 			}
 			if (module.Structs.TryGetValue(typeDef, out StructContext? structContext))
 			{
-				return structContext.CleanName;
+				return structContext.Name;
 			}
 		}
 		return type.Name ?? throw new NullReferenceException();

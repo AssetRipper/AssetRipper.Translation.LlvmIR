@@ -142,8 +142,8 @@ public static unsafe class Translator
 		}
 
 		// Structs and inline arrays are discovered dynamically, so we need to assign names after all methods are created.
-		moduleContext.AssignInlineArrayNames();
 		moduleContext.AssignStructNames();
+		moduleContext.AssignInlineArrayNames();
 
 		return moduleDefinition;
 	}
