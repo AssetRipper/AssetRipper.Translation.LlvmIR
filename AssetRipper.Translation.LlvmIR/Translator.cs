@@ -75,19 +75,24 @@ public static unsafe class Translator
 
 		moduleContext.AssignMemberNames();
 
+		Console.WriteLine("Identifying functions that might throw exceptions...");
 		moduleContext.IdentifyFunctionsThatMightThrow();
 
+		Console.WriteLine("Creating properties for global variables...");
 		foreach (GlobalVariableContext globalVariableContext in moduleContext.GlobalVariables.Values)
 		{
 			globalVariableContext.CreateProperties();
 		}
 
+		Console.WriteLine("Initializing data for global variables");
 		foreach (GlobalVariableContext globalVariableContext in moduleContext.GlobalVariables.Values)
 		{
 			globalVariableContext.InitializeData();
 			globalVariableContext.AddPublicImplementation();
 		}
 
+		Console.WriteLine("Implementing functions...");
+		int functionIndex = 1;
 		foreach (FunctionContext functionContext in moduleContext.Methods.Values)
 		{
 			functionContext.AddNameAttributes(functionContext.DeclaringType);
@@ -97,6 +102,11 @@ public static unsafe class Translator
 			if (IntrinsicFunctionImplementer.TryHandleIntrinsicFunction(functionContext))
 			{
 				continue;
+			}
+
+			if (functionIndex % 100 == 0)
+			{
+				Console.WriteLine($"Implementing function {functionIndex}/{moduleContext.Methods.Count}");
 			}
 
 			CilInstructionCollection instructions = functionContext.Definition.CilMethodBody!.Instructions;
@@ -110,8 +120,11 @@ public static unsafe class Translator
 			}
 
 			instructions.OptimizeMacros();
+
+			functionIndex++;
 		}
 
+		Console.WriteLine("Cleaning up...");
 		foreach (GlobalVariableContext globalVariableContext in moduleContext.GlobalVariables.Values)
 		{
 			globalVariableContext.RemovePointerFieldIfNotUsed();

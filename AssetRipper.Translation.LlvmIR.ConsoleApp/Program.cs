@@ -40,10 +40,12 @@ internal static class Program
 		ModuleDefinition moduleDefinition = Translator.Translate(name, data, options);
 		if (string.IsNullOrEmpty(args.DecompileDirectory))
 		{
+			Console.WriteLine("Writing assembly...");
 			moduleDefinition.Write($"{moduleDefinition.Name}.dll");
 		}
 		else
 		{
+			Console.WriteLine("Decompiling assembly...");
 			if (args.ClearDecompileDirectory && Directory.Exists(args.DecompileDirectory))
 			{
 				Directory.Delete(args.DecompileDirectory, true);

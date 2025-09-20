@@ -106,9 +106,16 @@ internal sealed partial class ModuleContext
 
 	public void CreateFunctions()
 	{
+		int count = Module.GetFunctions().Count();
+		int i = 1;
 		foreach (LLVMValueRef function in Module.GetFunctions())
 		{
+			if (i % 100 == 0)
+			{
+				Console.WriteLine($"Creating function {i}/{count}");
+			}
 			FunctionContext.Create(function, this);
+			i++;
 		}
 	}
 
