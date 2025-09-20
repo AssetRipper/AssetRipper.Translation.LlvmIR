@@ -115,4 +115,33 @@ internal static class LLVMValueRefExtensions
 			? LLVM.ConstRealGetDouble(value, &losesInfo)
 			: default;
 	}
+
+	public static unsafe LLVMMetadataRef[] GetAllMetadataOtherThanDebugLoc(this LLVMValueRef value)
+	{
+		if (value.IsAInstruction == null)
+		{
+			return [];
+		}
+
+		nuint metadataCount = 0;
+		LLVMValueMetadataEntry* ptr = LLVM.InstructionGetAllMetadataOtherThanDebugLoc(value, &metadataCount);
+
+		LLVMMetadataRef[] metadataArray;
+		if (metadataCount == 0)
+		{
+			metadataArray = [];
+		}
+		else
+		{
+			metadataArray = new LLVMMetadataRef[metadataCount];
+			for (uint i = 0; i < metadataCount; i++)
+			{
+				metadataArray[i] = LLVM.ValueMetadataEntriesGetMetadata(ptr, i);
+			}
+			LLVM.DisposeValueMetadataEntries(ptr);
+		}
+
+		LLVM.DisposeValueMetadataEntries(ptr);
+		return metadataArray;
+	}
 }

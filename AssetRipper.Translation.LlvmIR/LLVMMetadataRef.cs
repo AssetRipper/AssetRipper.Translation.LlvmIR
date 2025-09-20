@@ -70,6 +70,12 @@ public unsafe partial struct LLVMMetadataRef(IntPtr handle) : IEquatable<LLVMMet
 		_ => default,
 	};
 
+	public readonly LLVMValueRef Count => Kind switch
+	{
+		LLVMMetadataKind.LLVMDISubrangeMetadataKind => LibLLVMSharp.DISubrangeGetCount(this),
+		_ => default,
+	};
+
 	public readonly LLVMMetadataRef[] Elements => Kind switch
 	{
 		LLVMMetadataKind.LLVMDICompositeTypeMetadataKind => LibLLVMSharp.DICompositeTypeGetElements(this),

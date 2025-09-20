@@ -29,6 +29,15 @@ internal static unsafe partial class LibLLVMSharp
 		return FunctionGetFunctionType((LLVMOpaqueValue*)fn);
 	}
 
+	[LibraryImport("libLLVMSharp", EntryPoint = "llvmsharp_GlobalVariable_getGlobalVariableExpression")]
+	[UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+	private static partial LLVMOpaqueMetadata* GlobalVariableGetGlobalVariableExpression(LLVMOpaqueValue* global_variable);
+
+	public static LLVMMetadataRef GlobalVariableGetGlobalVariableExpression(LLVMValueRef global_variable)
+	{
+		return GlobalVariableGetGlobalVariableExpression((LLVMOpaqueValue*)global_variable);
+	}
+
 	[LibraryImport("libLLVMSharp", EntryPoint = "llvmsharp_ConstantDataArray_getData")]
 	[UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
 	private static partial byte* ConstantDataArrayGetData(LLVMOpaqueValue* ConstantDataArray, int* out_size);
@@ -52,14 +61,16 @@ internal static unsafe partial class LibLLVMSharp
 		}
 	}
 
-	public static string? ValueGetDemangledName(LLVMValueRef value)
+	public static string ValueGetDemangledName(LLVMValueRef value)
 	{
 		const int MaxLength = 4096;
 		Span<byte> buffer = stackalloc byte[MaxLength];
 		int length = ValueGetDemangledName((LLVMOpaqueValue*)value, buffer);
-		if (length == 0)
+
+		if (length > MaxLength)
 		{
-			return null;
+			buffer = new byte[length];
+			length = ValueGetDemangledName((LLVMOpaqueValue*)value, buffer);
 		}
 		return Encoding.UTF8.GetString(buffer[..length]);
 	}
@@ -216,6 +227,15 @@ internal static unsafe partial class LibLLVMSharp
 	public static uint DISubprogramGetSPFlags(LLVMMetadataRef subprogram)
 	{
 		return DISubprogramGetSPFlags((LLVMOpaqueMetadata*)subprogram);
+	}
+
+	[LibraryImport("libLLVMSharp", EntryPoint = "llvmsharp_DISubrange_getCount")]
+	[UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+	private static partial LLVMOpaqueValue* DISubrangeGetCount(LLVMOpaqueMetadata* subrange);
+
+	public static LLVMValueRef DISubrangeGetCount(LLVMMetadataRef subrange)
+	{
+		return DISubrangeGetCount((LLVMOpaqueMetadata*)subrange);
 	}
 
 	[LibraryImport("libLLVMSharp", EntryPoint = "llvmsharp_DISubroutineType_getTypeArray")]
