@@ -70,10 +70,11 @@ internal sealed partial class ModuleContext
 	public TranslatorOptions Options { get; }
 	public TypeDefinition GlobalMembersType { get; }
 	public TypeDefinition PrivateImplementationDetails { get; }
-	private Dictionary<string, FieldDefinition> storedDataFieldCache = new();
+	private readonly Dictionary<string, FieldDefinition> storedDataFieldCache = new();
 	private IMethodDefOrRef CompilerGeneratedAttributeConstructor { get; }
 	public Dictionary<LLVMValueRef, FunctionContext> Methods { get; } = new();
-	public Dictionary<LLVMTypeRef, StructContext> Structs { get; } = new();
+	private readonly Dictionary<LLVMTypeRef, StructContext> structsCache = new();
+	public Dictionary<TypeDefinition, StructContext> Structs { get; } = new(SignatureComparer.Default);
 	public Dictionary<LLVMValueRef, GlobalVariableContext> GlobalVariables { get; } = new();
 	private readonly Dictionary<(TypeSignature, int), InlineArrayContext> inlineArrayCache = new(TypeSignatureIntPairComparer);
 	public Dictionary<TypeDefinition, InlineArrayContext> InlineArrayTypes { get; } = new(SignatureComparer.Default);
@@ -127,6 +128,11 @@ internal sealed partial class ModuleContext
 		{
 			structContext.AddNameAttributes();
 		}
+	}
+
+	public void AssignInlineArrayNames()
+	{
+		InlineArrayTypes.Values.AssignNames();
 	}
 
 	public void IdentifyFunctionsThatMightThrow()
@@ -265,10 +271,11 @@ internal sealed partial class ModuleContext
 
 			case LLVMTypeKind.LLVMStructTypeKind:
 				{
-					if (!Structs.TryGetValue(type, out StructContext? structContext))
+					if (!structsCache.TryGetValue(type, out StructContext? structContext))
 					{
 						structContext = StructContext.Create(this, type);
-						Structs.Add(type, structContext);
+						structsCache.Add(type, structContext);
+						Structs.Add(structContext.Definition, structContext);
 					}
 					return structContext.Definition.ToTypeSignature();
 				}

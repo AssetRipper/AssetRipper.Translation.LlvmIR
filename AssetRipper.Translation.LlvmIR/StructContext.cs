@@ -3,16 +3,18 @@ using AsmResolver.DotNet.Signatures;
 using AsmResolver.PE.DotNet.Metadata.Tables;
 using LLVMSharp.Interop;
 using System.Diagnostics;
+using System.Text.RegularExpressions;
 
 namespace AssetRipper.Translation.LlvmIR;
 
 [DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
-internal sealed class StructContext : IHasName
+internal sealed partial class StructContext : IHasName
 {
 	/// <inheritdoc/>
 	public string MangledName => Type.StructName;
 
-	string? IHasName.DemangledName => null;
+	/// <inheritdoc/>
+	public string? DemangledName { get; }
 
 	/// <inheritdoc/>
 	public string CleanName { get; }
@@ -37,14 +39,15 @@ internal sealed class StructContext : IHasName
 		Module = module;
 		Definition = definition;
 		Type = type;
-		CleanName = ExtractCleanName(MangledName, module.Options.RenamedSymbols);
+		DemangledName = ExtractDemangledName(MangledName);
+		CleanName = ExtractCleanName(MangledName, DemangledName, module.Options.RenamedSymbols);
 	}
 
 	public static unsafe StructContext Create(ModuleContext module, LLVMTypeRef type)
 	{
 		TypeDefinition typeDefinition = new(
 			module.Options.GetNamespace("Structures"),
-			type.StructName,
+			$"{type.StructName}_{Guid.NewGuid()}",
 			TypeAttributes.Public | TypeAttributes.ExplicitLayout,
 			module.Definition.DefaultImporter.ImportType(typeof(ValueType)));
 		module.Definition.TopLevelTypes.Add(typeDefinition);
@@ -78,25 +81,44 @@ internal sealed class StructContext : IHasName
 		return name.StartsWith(prefix, StringComparison.Ordinal) ? name[prefix.Length..] : name;
 	}
 
-	private static string ExtractCleanName(string name, Dictionary<string, string> renamedSymbols)
+	private static string ExtractCleanName(string mangledName, string demangledName, Dictionary<string, string> renamedSymbols)
 	{
-		if (renamedSymbols.TryGetValue(name, out string? result))
+		if (renamedSymbols.TryGetValue(mangledName, out string? result))
 		{
 			if (!NameGenerator.IsValidCSharpName(result))
 			{
-				throw new ArgumentException($"Renamed symbol '{name}' has an invalid name '{result}'.", nameof(renamedSymbols));
+				throw new ArgumentException($"Renamed symbol '{mangledName}' has an invalid name '{result}'.", nameof(renamedSymbols));
 			}
 			return result;
 		}
+		else
+		{
+			return NameGenerator.CleanName(demangledName, "Struct");
+		}
+	}
 
+	private static string ExtractDemangledName(string name)
+	{
 		name = RemovePrefix(name, "class.");
 		name = RemovePrefix(name, "struct.");
 		name = RemovePrefix(name, "union.");
-		return NameGenerator.CleanName(name, "Struct");
+
+		Match match = NumericalSuffix.Match(name);
+		if (match.Success)
+		{
+			return match.Groups[1].Value;
+		}
+		else
+		{
+			return name;
+		}
 	}
 
 	private string GetDebuggerDisplay()
 	{
 		return CleanName;
 	}
+
+	[GeneratedRegex(@"^(.*)\.\d+$")]
+	private static partial Regex NumericalSuffix { get; }
 }

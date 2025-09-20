@@ -128,7 +128,8 @@ public static unsafe class Translator
 			moduleDefinition.TopLevelTypes.Remove(moduleContext.InjectedTypes[typeof(InlineAssemblyAttribute)]);
 		}
 
-		// Structs are discovered dynamically, so we need to assign names after all methods are created.
+		// Structs and inline arrays are discovered dynamically, so we need to assign names after all methods are created.
+		moduleContext.AssignInlineArrayNames();
 		moduleContext.AssignStructNames();
 
 		return moduleDefinition;

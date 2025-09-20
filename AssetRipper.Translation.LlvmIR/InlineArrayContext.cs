@@ -12,8 +12,19 @@ using AsmResolverElementType = AsmResolver.PE.DotNet.Metadata.Tables.ElementType
 
 namespace AssetRipper.Translation.LlvmIR;
 
-internal sealed class InlineArrayContext
+internal sealed class InlineArrayContext : IHasName
 {
+	string IHasName.MangledName => CleanName;
+	string? IHasName.DemangledName => null;
+	/// <inheritdoc/>
+	public string CleanName { get; }
+	/// <inheritdoc/>
+	public string Name
+	{
+		get => Type.Name ?? "";
+		set => Type.Name = value;
+	}
+	string? IHasName.NativeType => null;
 	public ModuleContext Module { get; }
 	public TypeDefinition Type { get; }
 	public TypeSignature ElementType { get; }
@@ -27,12 +38,13 @@ internal sealed class InlineArrayContext
 		}
 	}
 
-	private InlineArrayContext(ModuleContext module, TypeDefinition type, TypeSignature elementType, int length)
+	private InlineArrayContext(ModuleContext module, TypeDefinition type, TypeSignature elementType, int length, string cleanName)
 	{
 		Module = module;
 		Type = type;
 		ElementType = elementType;
 		Length = length;
+		CleanName = cleanName;
 	}
 
 	public void GetElementType(out TypeSignature elementType, out int length)
@@ -63,10 +75,13 @@ internal sealed class InlineArrayContext
 
 	public static InlineArrayContext CreateInlineArray(TypeSignature type, int size, ModuleContext module)
 	{
-		string name = $"InlineArray_{size}";
-		string uniqueName = NameGenerator.GenerateName(name, type.FullName);
+		string cleanName = $"InlineArray{size}_{GetName(type, module)}";
 
-		TypeDefinition arrayType = new(module.Options.GetNamespace("InlineArrays"), uniqueName, TypeAttributes.Public | TypeAttributes.SequentialLayout | TypeAttributes.Sealed, module.Definition.DefaultImporter.ImportType(typeof(ValueType)));
+		TypeDefinition arrayType = new(
+			module.Options.GetNamespace("InlineArrays"),
+			$"{cleanName}_{Guid.NewGuid()}",
+			TypeAttributes.Public | TypeAttributes.SequentialLayout | TypeAttributes.Sealed,
+			module.Definition.DefaultImporter.ImportType(typeof(ValueType)));
 		module.Definition.TopLevelTypes.Add(arrayType);
 
 		//Add InlineArrayAttribute to arrayType
@@ -219,7 +234,7 @@ internal sealed class InlineArrayContext
 			arrayType.MethodImplementations.Add(new MethodImplementation(iEnumerable_GetEnumerator, method));
 		}
 
-		InlineArrayContext result = new(module, arrayType, type, size);
+		InlineArrayContext result = new(module, arrayType, type, size, cleanName);
 
 		result.ImplementInterface();
 
@@ -299,5 +314,21 @@ internal sealed class InlineArrayContext
 			property.GetMethod = method;
 			Type.Properties.Add(property);
 		}
+	}
+
+	private static string GetName(TypeSignature type, ModuleContext module)
+	{
+		if (type is TypeDefOrRefSignature { Type: TypeDefinition typeDef })
+		{
+			if (module.InlineArrayTypes.TryGetValue(typeDef, out InlineArrayContext? inlineArray))
+			{
+				return inlineArray.CleanName;
+			}
+			if (module.Structs.TryGetValue(typeDef, out StructContext? structContext))
+			{
+				return structContext.CleanName;
+			}
+		}
+		return type.Name ?? throw new NullReferenceException();
 	}
 }
