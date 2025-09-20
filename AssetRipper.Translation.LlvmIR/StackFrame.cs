@@ -27,11 +27,6 @@ internal unsafe struct StackFrame
 		}
 	}
 
-	public readonly ref T GetLocalsRef<T>() where T : unmanaged
-	{
-		return ref Unsafe.AsRef<T>(Locals);
-	}
-
 	public readonly T* GetLocalsPointer<T>() where T : unmanaged
 	{
 		return (T*)Locals;

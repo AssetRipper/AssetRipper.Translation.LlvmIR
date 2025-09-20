@@ -27,10 +27,16 @@ internal sealed record class InitializeStackFrameInstruction(FunctionContext Fun
 
 		Function.StackFrameVariable = Function.Definition.CilMethodBody!.Instructions.AddLocalVariable(Function.Module.InjectedTypes[typeof(StackFrame)].ToTypeSignature());
 
+		Function.LocalVariablesPointer = Function.Definition.CilMethodBody.Instructions.AddLocalVariable(typeDefinition.MakePointerType());
+
 		TypeDefinition stackFrameListType = Function.Module.InjectedTypes[typeof(StackFrameList)];
 
 		instructions.Add(CilOpCodes.Ldsflda, stackFrameListType.GetFieldByName(nameof(StackFrameList.Current)));
 		instructions.Add(CilOpCodes.Call, stackFrameListType.GetMethodByName(nameof(StackFrameList.New)).MakeGenericInstanceMethod(Function.LocalVariablesType.ToTypeSignature()));
 		instructions.Add(CilOpCodes.Stloc, Function.StackFrameVariable);
+
+		instructions.Add(CilOpCodes.Ldloca, Function.StackFrameVariable);
+		instructions.Add(CilOpCodes.Call, Function.Module.InjectedTypes[typeof(StackFrame)].GetMethodByName(nameof(StackFrame.GetLocalsPointer)).MakeGenericInstanceMethod(Function.LocalVariablesType.ToTypeSignature()));
+		instructions.Add(CilOpCodes.Stloc, Function.LocalVariablesPointer);
 	}
 }

@@ -228,6 +228,7 @@ internal sealed class FunctionContext : IHasName
 	public bool NeedsStackFrame { get; set; }
 	public TypeDefinition? LocalVariablesType { get; set; }
 	public CilLocalVariable? StackFrameVariable { get; set; }
+	public CilLocalVariable? LocalVariablesPointer { get; set; }
 	private FieldDefinition PointerField { get; set; } = null!;
 	private bool IsPointerFieldUsed { get; set; } = false;
 
@@ -250,18 +251,8 @@ internal sealed class FunctionContext : IHasName
 
 	public void AddLocalVariablesPointer(CilInstructionCollection instructions)
 	{
-		Debug.Assert(LocalVariablesType is not null);
-		Debug.Assert(StackFrameVariable is not null);
-		instructions.Add(CilOpCodes.Ldloca, StackFrameVariable);
-		instructions.Add(CilOpCodes.Call, Module.InjectedTypes[typeof(StackFrame)].GetMethodByName(nameof(StackFrame.GetLocalsPointer)).MakeGenericInstanceMethod(LocalVariablesType.ToTypeSignature()));
-	}
-
-	public void AddLocalVariablesRef(CilInstructionCollection instructions)
-	{
-		Debug.Assert(LocalVariablesType is not null);
-		Debug.Assert(StackFrameVariable is not null);
-		instructions.Add(CilOpCodes.Ldloca, StackFrameVariable);
-		instructions.Add(CilOpCodes.Call, Module.InjectedTypes[typeof(StackFrame)].GetMethodByName(nameof(StackFrame.GetLocalsRef)).MakeGenericInstanceMethod(LocalVariablesType.ToTypeSignature()));
+		Debug.Assert(LocalVariablesPointer is not null);
+		instructions.Add(CilOpCodes.Ldloc, LocalVariablesPointer);
 	}
 
 	public void AddLoadFunctionPointer(CilInstructionCollection instructions)
