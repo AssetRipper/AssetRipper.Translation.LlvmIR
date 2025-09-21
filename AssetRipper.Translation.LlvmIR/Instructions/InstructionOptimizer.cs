@@ -45,6 +45,34 @@ public static class InstructionOptimizer
 		}
 
 		TryReplaceFunctionFieldVariablesWithLocalVariables(basicBlocks);
+
+		// If no FunctionFieldVariables were used, we can remove the stack frame clearing.
+		if (!UsesFunctionFieldVariable(basicBlocks))
+		{
+			foreach (BasicBlock basicBlock in basicBlocks)
+			{
+				// Order matters here, remove from the end to avoid messing up indices.
+				for (int i = basicBlock.Count - 1; i >= 0; i--)
+				{
+					if (basicBlock[i] is ClearStackFrameInstruction or InitializeStackFrameInstruction)
+					{
+						basicBlock.RemoveAt(i);
+					}
+				}
+			}
+		}
+
+		foreach (BasicBlock basicBlock in basicBlocks)
+		{
+			// Order matters here, remove from the end to avoid messing up indices.
+			for (int i = basicBlock.Count - 1; i > 0; i--)
+			{
+				if (basicBlock[i] == ReturnInstruction.Void && basicBlock[i - 1] is ReturnIfExceptionInfoNotNullInstruction)
+				{
+					basicBlock.RemoveAt(i - 1);
+				}
+			}
+		}
 	}
 
 	private static void TryReplaceFunctionFieldVariablesWithLocalVariables(IReadOnlyList<BasicBlock> basicBlocks)
@@ -114,22 +142,6 @@ public static class InstructionOptimizer
 							basicBlock[i] = new InitializeInstruction(replacement);
 						}
 						break;
-				}
-			}
-		}
-
-		// If no FunctionFieldVariables were used, we can remove the stack frame clearing.
-		if (!UsesFunctionFieldVariable(basicBlocks))
-		{
-			foreach (BasicBlock basicBlock in basicBlocks)
-			{
-				// Order matters here, remove from the end to avoid messing up indices.
-				for (int i = basicBlock.Count - 1; i >= 0; i--)
-				{
-					if (basicBlock[i] is ClearStackFrameInstruction or InitializeStackFrameInstruction)
-					{
-						basicBlock.RemoveAt(i);
-					}
 				}
 			}
 		}
