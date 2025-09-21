@@ -1528,11 +1528,13 @@ internal unsafe readonly struct InstructionLifter
 		{
 			elementType = module.Definition.CorLibTypeFactory.Char;
 
-			IMethodDescriptor toCharacterSpan = module.SpanHelperType.Methods
-				.Single(m => m.Name == nameof(SpanHelper.ToCharacterSpan));
+			MemberReference conversionToCharacterReadOnlySpan = new(
+				module.Definition.CorLibTypeFactory.String.ToTypeDefOrRef(),
+				"op_Implicit",
+				MethodSignature.CreateStatic(module.Definition.DefaultImporter.ImportTypeSignature(typeof(ReadOnlySpan<char>)), module.Definition.CorLibTypeFactory.String));
 
 			LoadVariable(basicBlock, new ConstantString(@string, module.Definition));
-			Call(basicBlock, toCharacterSpan);
+			Call(basicBlock, conversionToCharacterReadOnlySpan);
 		}
 		else if (elementType is CorLibTypeSignature { ElementType: ElementType.I1 or ElementType.U1 })
 		{
