@@ -16,6 +16,7 @@ public class TranslationProjectDecompiler : WholeProjectDecompiler
 		Settings.CheckForOverflowUnderflow = true;
 		Settings.UseNestedDirectoriesForNamespaces = true;
 		Settings.AggressiveInlining = true;
+		Settings.RemoveDeadStores = true;
 	}
 
 	protected override CSharpDecompiler CreateDecompiler(DecompilerTypeSystem ts)
