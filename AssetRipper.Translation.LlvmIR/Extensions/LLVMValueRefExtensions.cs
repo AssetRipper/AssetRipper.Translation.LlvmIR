@@ -130,6 +130,7 @@ internal static class LLVMValueRefExtensions
 		if (metadataCount == 0)
 		{
 			metadataArray = [];
+			LLVM.DisposeValueMetadataEntries(ptr);
 		}
 		else
 		{
@@ -141,7 +142,6 @@ internal static class LLVMValueRefExtensions
 			LLVM.DisposeValueMetadataEntries(ptr);
 		}
 
-		LLVM.DisposeValueMetadataEntries(ptr);
 		return metadataArray;
 	}
 }
