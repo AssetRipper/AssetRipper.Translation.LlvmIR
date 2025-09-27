@@ -1,4 +1,5 @@
 ﻿using LLVMSharp.Interop;
+using System.Diagnostics;
 
 namespace AssetRipper.Translation.LlvmIR.Extensions;
 
@@ -149,13 +150,14 @@ internal static class LLVMValueRefExtensions
 
 	public static bool TryGetStructReturnType(this LLVMValueRef function, out LLVMTypeRef returnType)
 	{
-		if (LibLLVMSharp.FunctionGetReturnType(function).Kind != LLVMTypeKind.LLVMVoidTypeKind || function.ParamsCount == 0 || function.GetParam(0).TypeOf.Kind != LLVMTypeKind.LLVMPointerTypeKind)
+		const int Index = 0;
+		if (LibLLVMSharp.FunctionGetReturnType(function).Kind != LLVMTypeKind.LLVMVoidTypeKind || function.ParamsCount == 0 || function.GetParam(Index).TypeOf.Kind != LLVMTypeKind.LLVMPointerTypeKind)
 		{
 			returnType = default;
 			return false;
 		}
 
-		foreach (AttributeWrapper attribute in AttributeWrapper.FromArray(function.GetAttributesAtIndex(LLVMAttributeIndex.LLVMAttributeFunctionIndex)))
+		foreach (AttributeWrapper attribute in AttributeWrapper.FromArray(function.GetAttributesAtIndex((LLVMAttributeIndex)(Index + 1))))
 		{
 			if (attribute.IsTypeAttribute) // Todo: Need to check the kind
 			{
