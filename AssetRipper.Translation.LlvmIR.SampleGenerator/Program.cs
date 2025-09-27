@@ -8,11 +8,12 @@ internal static class Program
 {
 	private sealed record class HashFile(string ClangVersion, Dictionary<string, uint> Hashes);
 
-	static void Main()
+	static void Main(string[] args)
 	{
+		bool force = args.Length > 0 && args[0] == "--force";
 		Dictionary<string, uint> hashes;
 		const string PathToHashes = "hashes.json";
-		if (File.Exists(PathToHashes))
+		if (!force && File.Exists(PathToHashes))
 		{
 			string json = File.ReadAllText(PathToHashes);
 			HashFile? hashFile = JsonSerializer.Deserialize<HashFile>(json);
@@ -71,7 +72,7 @@ internal static class Program
 	private static void GenerateIR(string inputFile, string outputFile)
 	{
 		// Prepare the Clang command to generate IR
-		string clangCommand = $"clang -g -fno-discard-value-names -fstandalone-debug -S -emit-llvm -o {outputFile} {inputFile}";
+		string clangCommand = $"clang -g -fno-discard-value-names -fstandalone-debug -w -S -emit-llvm -o {outputFile} {inputFile}";
 
 		// Execute the Clang command
 		ProcessStartInfo processInfo = new("cmd.exe", $"/c {clangCommand}")
