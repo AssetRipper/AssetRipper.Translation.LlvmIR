@@ -1,6 +1,7 @@
 ﻿using AsmResolver.DotNet;
 using AsmResolver.DotNet.Collections;
 using AsmResolver.DotNet.Signatures;
+using AssetRipper.Translation.LlvmIR.Extensions;
 using LLVMSharp.Interop;
 
 namespace AssetRipper.Translation.LlvmIR;
@@ -12,7 +13,7 @@ internal sealed class ParameterContext : BaseParameterContext
 		Parameter = parameter;
 		MangledName = parameter.Name ?? "";
 		Attributes = AttributeWrapper.FromArray(function.Function.GetAttributesAtIndex((LLVMAttributeIndex)(Index + 1)));
-		if (TryGetStructReturnType(out LLVMTypeRef type))
+		if (Index == 0 && function.Function.TryGetStructReturnType(out LLVMTypeRef type))
 		{
 			CleanName = NameGenerator.CleanName(MangledName, "result");
 			StructReturnTypeSignature = Module.GetTypeSignature(type);
@@ -37,25 +38,4 @@ internal sealed class ParameterContext : BaseParameterContext
 	public int Index => Definition.Index;
 	public LLVMValueRef Parameter { get; }
 	public TypeSignature? StructReturnTypeSignature { get; }
-
-	private bool TryGetStructReturnType(out LLVMTypeRef type)
-	{
-		if (!Function.IsVoidReturn || Index != 0 || Parameter.TypeOf.Kind != LLVMTypeKind.LLVMPointerTypeKind)
-		{
-			type = default;
-			return false;
-		}
-
-		foreach (AttributeWrapper attribute in Attributes)
-		{
-			if (attribute.IsTypeAttribute) // Todo: Need to check the kind
-			{
-				type = attribute.TypeValue;
-				return true;
-			}
-		}
-
-		type = default;
-		return false;
-	}
 }

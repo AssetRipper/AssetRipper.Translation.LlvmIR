@@ -144,4 +144,27 @@ internal static class LLVMValueRefExtensions
 
 		return metadataArray;
 	}
+
+	public static bool IsStructReturn(this LLVMValueRef function) => TryGetStructReturnType(function, out _);
+
+	public static bool TryGetStructReturnType(this LLVMValueRef function, out LLVMTypeRef returnType)
+	{
+		if (LibLLVMSharp.FunctionGetReturnType(function).Kind != LLVMTypeKind.LLVMVoidTypeKind || function.ParamsCount == 0 || function.GetParam(0).TypeOf.Kind != LLVMTypeKind.LLVMPointerTypeKind)
+		{
+			returnType = default;
+			return false;
+		}
+
+		foreach (AttributeWrapper attribute in AttributeWrapper.FromArray(function.GetAttributesAtIndex(LLVMAttributeIndex.LLVMAttributeFunctionIndex)))
+		{
+			if (attribute.IsTypeAttribute) // Todo: Need to check the kind
+			{
+				returnType = attribute.TypeValue;
+				return true;
+			}
+		}
+
+		returnType = default;
+		return false;
+	}
 }
