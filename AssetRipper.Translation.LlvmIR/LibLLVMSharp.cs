@@ -13,20 +13,20 @@ internal static unsafe partial class LibLLVMSharp
 
 	[LibraryImport("libLLVMSharp", EntryPoint = "llvmsharp_Function_getReturnType")]
 	[UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
-	private static partial LLVMOpaqueType* FunctionGetReturnType(LLVMOpaqueValue* Fn);
+	private static partial LLVMOpaqueType* FunctionGetReturnType(LLVMOpaqueValue* function);
 
-	public static LLVMTypeRef FunctionGetReturnType(LLVMValueRef fn)
+	public static LLVMTypeRef FunctionGetReturnType(LLVMValueRef function)
 	{
-		return FunctionGetReturnType((LLVMOpaqueValue*)fn);
+		return FunctionGetReturnType((LLVMOpaqueValue*)function);
 	}
 
 	[LibraryImport("libLLVMSharp", EntryPoint = "llvmsharp_Function_getFunctionType")]
 	[UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
-	private static partial LLVMOpaqueType* FunctionGetFunctionType(LLVMOpaqueValue* Fn);
+	private static partial LLVMOpaqueType* FunctionGetFunctionType(LLVMOpaqueValue* function);
 
-	public static LLVMTypeRef FunctionGetFunctionType(LLVMValueRef fn)
+	public static LLVMTypeRef FunctionGetFunctionType(LLVMValueRef function)
 	{
-		return FunctionGetFunctionType((LLVMOpaqueValue*)fn);
+		return FunctionGetFunctionType((LLVMOpaqueValue*)function);
 	}
 
 	[LibraryImport("libLLVMSharp", EntryPoint = "llvmsharp_GlobalVariable_getGlobalVariableExpression")]
@@ -49,30 +49,46 @@ internal static unsafe partial class LibLLVMSharp
 		return new ReadOnlySpan<byte>(data, size);
 	}
 
-	[LibraryImport("libLLVMSharp", EntryPoint = "llvmsharp_Value_getDemangledName")]
-	[UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
-	private static partial int ValueGetDemangledName(LLVMOpaqueValue* value, byte* buffer, int buffer_size);
-
-	private static int ValueGetDemangledName(LLVMOpaqueValue* value, Span<byte> buffer)
+	public static string? ValueGetDemangledName(LLVMValueRef value)
 	{
+		nuint nameLength = 0;
+		sbyte* name = LLVM.GetValueName2(value, &nameLength);
+		if (name == null || nameLength == 0)
+		{
+			return null;
+		}
+		return Demangle(new ReadOnlySpan<byte>((byte*)name, (int)nameLength));
+	}
+
+	[LibraryImport("libLLVMSharp", EntryPoint = "llvmsharp_Demangle")]
+	[UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+	private static partial int Demangle(sbyte* mangled_string, int mangled_string_size, sbyte* buffer, int buffer_size);
+
+	private static int Demangle(ReadOnlySpan<byte> mangledString, Span<byte> buffer)
+	{
+		fixed (byte* mangledStringPtr = mangledString)
 		fixed (byte* bufferPtr = buffer)
 		{
-			return ValueGetDemangledName(value, bufferPtr, buffer.Length);
+			return Demangle((sbyte*)mangledStringPtr, mangledString.Length, (sbyte*)bufferPtr, buffer.Length);
 		}
 	}
 
-	public static string ValueGetDemangledName(LLVMValueRef value)
+	public static string Demangle(ReadOnlySpan<byte> mangledString)
 	{
 		const int MaxLength = 4096;
 		Span<byte> buffer = stackalloc byte[MaxLength];
-		int length = ValueGetDemangledName((LLVMOpaqueValue*)value, buffer);
-
+		int length = Demangle(mangledString, buffer);
 		if (length > MaxLength)
 		{
 			buffer = new byte[length];
-			length = ValueGetDemangledName((LLVMOpaqueValue*)value, buffer);
+			length = Demangle(mangledString, buffer);
 		}
 		return Encoding.UTF8.GetString(buffer[..length]);
+	}
+
+	public static string Demangle(string mangledString)
+	{
+		return Demangle(Encoding.UTF8.GetBytes(mangledString));
 	}
 
 	[LibraryImport("libLLVMSharp", EntryPoint = "llvmsharp_Instruction_hasNoSignedWrap")]
@@ -172,19 +188,61 @@ internal static unsafe partial class LibLLVMSharp
 		return DIDerivedTypeGetEncoding((LLVMOpaqueMetadata*)type);
 	}
 
+	[LibraryImport("libLLVMSharp", EntryPoint = "llvmsharp_DIEnumerator_getName")]
+	[UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+	private static partial sbyte* DIEnumeratorGetName(LLVMOpaqueMetadata* enumerator, int* out_size);
+
+	public static string? DIEnumeratorGetName(LLVMMetadataRef enumerator)
+	{
+		int size = 0;
+		sbyte* ptr = DIEnumeratorGetName((LLVMOpaqueMetadata*)enumerator, &size);
+		if (ptr == null || size == 0)
+		{
+			return null;
+		}
+		return Encoding.UTF8.GetString((byte*)ptr, size);
+	}
+
+	[LibraryImport("libLLVMSharp", EntryPoint = "llvmsharp_DIEnumerator_getValue_SExt")]
+	[UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+	private static partial long DIEnumeratorGetValueSExt(LLVMOpaqueMetadata* enumerator);
+
+	public static long DIEnumeratorGetValueSExt(LLVMMetadataRef enumerator)
+	{
+		return DIEnumeratorGetValueSExt((LLVMOpaqueMetadata*)enumerator);
+	}
+
+	[LibraryImport("libLLVMSharp", EntryPoint = "llvmsharp_DIEnumerator_getValue_ZExt")]
+	[UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+	private static partial ulong DIEnumeratorGetValueZExt(LLVMOpaqueMetadata* enumerator);
+
+	public static ulong DIEnumeratorGetValueZExt(LLVMMetadataRef enumerator)
+	{
+		return DIEnumeratorGetValueZExt((LLVMOpaqueMetadata*)enumerator);
+	}
+
+	[LibraryImport("libLLVMSharp", EntryPoint = "llvmsharp_DIEnumerator_isUnsigned")]
+	[UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+	private static partial byte DIEnumeratorIsUnsigned(LLVMOpaqueMetadata* enumerator);
+
+	public static bool DIEnumeratorIsUnsigned(LLVMMetadataRef enumerator)
+	{
+		return DIEnumeratorIsUnsigned((LLVMOpaqueMetadata*)enumerator) != 0;
+	}
+
 	[LibraryImport("libLLVMSharp", EntryPoint = "llvmsharp_DINode_getTagString")]
 	[UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
-	private static partial sbyte* DINodeGetTagString(LLVMOpaqueMetadata* node, nuint* out_size);
+	private static partial sbyte* DINodeGetTagString(LLVMOpaqueMetadata* node, int* out_size);
 
 	public static string? DINodeGetTagString(LLVMMetadataRef node)
 	{
-		nuint size = 0;
+		int size = 0;
 		sbyte* ptr = DINodeGetTagString((LLVMOpaqueMetadata*)node, &size);
 		if (ptr == null || size == 0)
 		{
 			return null;
 		}
-		return Encoding.UTF8.GetString((byte*)ptr, (int)size);
+		return Encoding.UTF8.GetString((byte*)ptr, size);
 	}
 
 	[LibraryImport("libLLVMSharp", EntryPoint = "llvmsharp_DISubprogram_getType")]
@@ -325,5 +383,41 @@ internal static unsafe partial class LibLLVMSharp
 	public static LLVMMetadataRef DIVariableGetType(LLVMMetadataRef variable)
 	{
 		return DIVariableGetType((LLVMOpaqueMetadata*)variable);
+	}
+
+	[LibraryImport("libLLVMSharp", EntryPoint = "llvmsharp_MDNode_getNumOperands")]
+	[UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+	private static partial uint MDNodeGetNumOperands(LLVMOpaqueMetadata* metadata);
+
+	public static uint MDNodeGetNumOperands(LLVMMetadataRef metadata)
+	{
+		return MDNodeGetNumOperands((LLVMOpaqueMetadata*)metadata);
+	}
+
+	[LibraryImport("libLLVMSharp", EntryPoint = "llvmsharp_MDNode_getOperand")]
+	[UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+	private static partial LLVMOpaqueMetadata* MDNodeGetOperand(LLVMOpaqueMetadata* metadata, uint index);
+
+	public static LLVMMetadataRef MDNodeGetOperand(LLVMMetadataRef metadata, uint index)
+	{
+		return MDNodeGetOperand((LLVMOpaqueMetadata*)metadata, index);
+	}
+
+	[DllImport("libLLVMSharp", CallingConvention = CallingConvention.Cdecl, EntryPoint = "llvmsharp_Metadata_IsAMDNode", ExactSpelling = true)]
+	public static extern LLVMOpaqueMetadata* Metadata_IsAMDNode(LLVMOpaqueMetadata* metadata);
+
+	[LibraryImport("libLLVMSharp", EntryPoint = "llvmsharp_MDString_getString")]
+	[UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+	private static partial sbyte* MDStringGetString(LLVMOpaqueMetadata* mdstring, int* out_size);
+
+	public static string? MDStringGetString(LLVMMetadataRef mdstring)
+	{
+		int size = 0;
+		sbyte* ptr = MDStringGetString((LLVMOpaqueMetadata*)mdstring, &size);
+		if (ptr == null || size == 0)
+		{
+			return null;
+		}
+		return Encoding.UTF8.GetString((byte*)ptr, size);
 	}
 }
