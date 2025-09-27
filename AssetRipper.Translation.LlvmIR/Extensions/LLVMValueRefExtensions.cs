@@ -159,7 +159,7 @@ internal static class LLVMValueRefExtensions
 
 		foreach (AttributeWrapper attribute in AttributeWrapper.FromArray(function.GetAttributesAtIndex((LLVMAttributeIndex)(Index + 1))))
 		{
-			if (attribute.IsTypeAttribute) // Todo: Need to check the kind
+			if (attribute.IsTypeAttribute && attribute.EnumKind == AttributeWrapper.StructReturnAttributeKind.Value)
 			{
 				returnType = attribute.TypeValue;
 				return true;
