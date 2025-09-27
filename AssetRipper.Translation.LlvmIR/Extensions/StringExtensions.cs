@@ -30,4 +30,14 @@ internal static class StringExtensions
 			return value;
 		}
 	}
+
+	public static string RemovePrefix(this string name, string prefix)
+	{
+		return name.StartsWith(prefix, StringComparison.Ordinal) ? name[prefix.Length..] : name;
+	}
+
+	public static string RemoveSuffix(this string name, string suffix)
+	{
+		return name.EndsWith(suffix, StringComparison.Ordinal) ? name[..^suffix.Length] : name;
+	}
 }

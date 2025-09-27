@@ -1,6 +1,7 @@
 ﻿using AsmResolver.DotNet;
 using AsmResolver.DotNet.Signatures;
 using AsmResolver.PE.DotNet.Metadata.Tables;
+using AssetRipper.Translation.LlvmIR.Extensions;
 using LLVMSharp.Interop;
 using System.Diagnostics;
 using System.Text.RegularExpressions;
@@ -76,11 +77,6 @@ internal sealed partial class StructContext : IHasName
 
 	public void AddNameAttributes() => this.AddNameAttributes(Definition);
 
-	private static string RemovePrefix(string name, string prefix)
-	{
-		return name.StartsWith(prefix, StringComparison.Ordinal) ? name[prefix.Length..] : name;
-	}
-
 	private static string ExtractCleanName(string mangledName, string demangledName, Dictionary<string, string> renamedSymbols)
 	{
 		if (renamedSymbols.TryGetValue(mangledName, out string? result))
@@ -99,9 +95,7 @@ internal sealed partial class StructContext : IHasName
 
 	private static string ExtractDemangledName(string name)
 	{
-		name = RemovePrefix(name, "class.");
-		name = RemovePrefix(name, "struct.");
-		name = RemovePrefix(name, "union.");
+		name = name.RemovePrefix("class.").RemovePrefix("struct.").RemovePrefix("union.");
 
 		Match match = NumericalSuffix.Match(name);
 		if (match.Success)
