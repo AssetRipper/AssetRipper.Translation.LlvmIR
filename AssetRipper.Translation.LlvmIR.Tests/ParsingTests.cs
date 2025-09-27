@@ -6,7 +6,7 @@ namespace AssetRipper.Translation.LlvmIR.Tests;
 
 public class ParsingTests
 {
-	static readonly string[] demangledStrings =
+	static readonly string[] demangledFunctionStrings =
 	[
 		"void __cdecl fpng::fpng_init(void)",
 		"bool __cdecl fpng::fpng_cpu_supports_sse41(void)",
@@ -45,10 +45,22 @@ public class ParsingTests
 		"public: struct crnd::crn_packed_uint<2> & __cdecl crnd::crn_packed_uint<2>::operator=(unsigned int)",
 	];
 
-	[TestCaseSource(nameof(demangledStrings))]
-	public void ParsingSucceeds(string input)
+	static readonly string[] demangledTypeStrings =
+	[
+		"class std::vector<unsigned char, class std::allocator<unsigned char>>",
+	];
+
+	[TestCaseSource(nameof(demangledFunctionStrings))]
+	public void FunctionParsingSucceeds(string input)
 	{
 		IParseTree tree = DemangledNamesParser.ParseFunction(input);
+		ErrorListener.AssertNoErrors(tree);
+	}
+
+	[TestCaseSource(nameof(demangledTypeStrings))]
+	public void TypeParsingSucceeds(string input)
+	{
+		IParseTree tree = DemangledNamesParser.ParseType(input);
 		ErrorListener.AssertNoErrors(tree);
 	}
 
