@@ -83,4 +83,43 @@ internal static class LLVMModuleRefExtensions
 			metadata = metadata.GetNextNamedMetadata();
 		}
 	}
+
+	/// <summary>
+	/// Finds all metadata in the module, referenced from global variables and functions.
+	/// </summary>
+	/// <param name="module">The module to traverse.</param>
+	/// <returns>The distinct metadata items.</returns>
+	public static unsafe IEnumerable<LLVMMetadataRef> GetAllMetadata(this LLVMModuleRef module)
+	{
+		Queue<LLVMMetadataRef> metadataToVisit = new();
+		HashSet<LLVMMetadataRef> visitedMetadata = new();
+		foreach (LLVMValueRef global in module.GetGlobals())
+		{
+			metadataToVisit.Enqueue(LibLLVMSharp.GlobalVariableGetGlobalVariableExpression(global));
+		}
+		foreach (LLVMValueRef function in module.GetFunctions())
+		{
+			metadataToVisit.Enqueue(LLVM.GetSubprogram(function));
+			foreach (LLVMValueRef instruction in function.GetInstructions())
+			{
+				foreach (LLVMMetadataRef instructionMetadata in instruction.GetAllMetadataOtherThanDebugLoc())
+				{
+					metadataToVisit.Enqueue(instructionMetadata);
+				}
+			}
+		}
+		while (metadataToVisit.TryDequeue(out LLVMMetadataRef metadata))
+		{
+			if (metadata.Handle == IntPtr.Zero || !visitedMetadata.Add(metadata))
+			{
+				continue;
+			}
+			foreach (LLVMMetadataRef operand in metadata.Operands)
+			{
+				metadataToVisit.Enqueue(operand);
+			}
+		}
+
+		return visitedMetadata;
+	}
 }

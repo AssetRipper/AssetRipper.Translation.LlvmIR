@@ -148,6 +148,46 @@ public unsafe partial struct LLVMMetadataRef(IntPtr handle) : IEquatable<LLVMMet
 		_ => "",
 	};
 
+	public readonly string IdentifierDemangled
+	{
+		get
+		{
+			string identifier = Identifier;
+			if (string.IsNullOrEmpty(identifier))
+			{
+				return "";
+			}
+			return LibLLVMSharp.Demangle(identifier).RemoveSuffix(" `RTTI Type Descriptor Name'");
+		}
+	}
+
+	public readonly string IdentifierClean
+	{
+		get
+		{
+			if (string.IsNullOrEmpty(Name))
+			{
+				// Anonymous types don't have parsable identifiers.
+				return "";
+			}
+
+			string demangled = IdentifierDemangled;
+			if (string.IsNullOrEmpty(demangled))
+			{
+				return "";
+			}
+
+			if (DemangledNamesParser.ParseType(demangled, out string? cleanType))
+			{
+				return cleanType;
+			}
+			else
+			{
+				return "";
+			}
+		}
+	}
+
 	public readonly LLVMMetadataRef InlinedAt => Kind switch
 	{
 		LLVMMetadataKind.LLVMDILocationMetadataKind => LLVM.DILocationGetInlinedAt(this),
@@ -162,6 +202,8 @@ public unsafe partial struct LLVMMetadataRef(IntPtr handle) : IEquatable<LLVMMet
 		_ when IsVariable => LLVM.DIVariableGetLine(this),
 		_ => default,
 	};
+
+	public readonly IEnumerable<LLVMMetadataRef> Members => Elements.Where(e => e.TagString is "DW_TAG_member");
 
 	public readonly string Name
 	{
@@ -291,5 +333,20 @@ public unsafe partial struct LLVMMetadataRef(IntPtr handle) : IEquatable<LLVMMet
 	public readonly LLVMValueRef AsValue(LLVMContextRef context)
 	{
 		return Handle == default ? default : LLVM.MetadataAsValue(context, this);
+	}
+
+	public readonly LLVMMetadataRef PassThroughToBaseTypeIfNecessary()
+	{
+		if (Kind is not LLVMMetadataKind.LLVMDIDerivedTypeMetadataKind)
+		{
+			return this;
+		}
+
+		if (TagString is "DW_TAG_typedef" or "DW_TAG_const_type" or "DW_TAG_volatile_type" or "DW_TAG_restrict_type")
+		{
+			return BaseType.PassThroughToBaseTypeIfNecessary();
+		}
+
+		return this;
 	}
 }
