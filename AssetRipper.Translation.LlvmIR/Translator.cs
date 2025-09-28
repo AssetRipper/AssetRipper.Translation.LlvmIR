@@ -189,7 +189,7 @@ public static unsafe class Translator
 				}
 				else if (metadata.Kind is LLVMMetadataKind.LLVMDICompositeTypeMetadataKind && type.Kind is LLVMTypeKind.LLVMStructTypeKind)
 				{
-					if (!AreCompatible(type, metadata, module))
+					if (!AreCompatible(type, metadata))
 					{
 						globalVariableTypes.RemoveAt(i);
 						i--;
@@ -215,8 +215,12 @@ public static unsafe class Translator
 			enumContexts.AssignNames();
 			enumContexts.ForEach(e => e.AddNameAttributes(e.Definition));
 
-			List<LLVMMetadataRef> typesWithIdentifiers = types.Where(m => !string.IsNullOrEmpty(m.Identifier)).ToList();
-			List<string> identifiers = typesWithIdentifiers.Select(m => m.IdentifierClean).ToList();
+			List<LLVMMetadataRef> typesWithIdentifiers = types.Where(m => m.IsStruct || m.IsClass || m.IsUnion).ToList();
+			List<string> identifiers = typesWithIdentifiers.Select(m =>
+			{
+				string identifier = m.IdentifierClean;
+				return string.IsNullOrEmpty(identifier) ? m.Name : identifier;
+			}).ToList();
 
 			Dictionary<StructContext, List<LLVMMetadataRef>> validMetadata = globalVariableTypes
 				.Where(p => p.Item1.Kind is LLVMTypeKind.LLVMStructTypeKind && p.Item2.Kind is LLVMMetadataKind.LLVMDICompositeTypeMetadataKind)
@@ -232,8 +236,6 @@ public static unsafe class Translator
 				List<LLVMMetadataRef> list = [];
 				validMetadata[structContext] = list;
 
-				ulong size = structContext.Type.GetABISize(module);
-
 				if (string.IsNullOrEmpty(structContext.DemangledName))
 				{
 					continue;
@@ -246,7 +248,7 @@ public static unsafe class Translator
 						continue;
 					}
 					LLVMMetadataRef metadata = typesWithIdentifiers[i];
-					if (!AreCompatible(structContext.Type, metadata, size))
+					if (!AreCompatible(structContext.Type, metadata))
 					{
 						continue;
 					}
@@ -291,7 +293,7 @@ public static unsafe class Translator
 						continue;
 					}
 					LLVMMetadataRef metadata = typesWithIdentifiers[i];
-					if (!AreCompatible(structContext.Type, metadata, size))
+					if (!AreCompatible(structContext.Type, metadata))
 					{
 						continue;
 					}
@@ -343,14 +345,9 @@ public static unsafe class Translator
 		return moduleDefinition;
 	}
 
-	private static bool AreCompatible(LLVMTypeRef type, LLVMMetadataRef metadata, LLVMModuleRef module)
+	private static bool AreCompatible(LLVMTypeRef type, LLVMMetadataRef metadata)
 	{
-		return AreCompatible(type, metadata, type.GetABISize(module));
-	}
-
-	private static bool AreCompatible(LLVMTypeRef type, LLVMMetadataRef metadata, ulong expectedSize)
-	{
-		return metadata.SizeInBytes == expectedSize && metadata.Members.Count() == type.SubtypesCount;
+		return metadata.Members.Count() == type.SubtypesCount;
 	}
 
 	private sealed class FieldDefinitionHasName(FieldDefinition field, string debugName, int index, ModuleContext module) : IHasName
