@@ -1,7 +1,6 @@
 ﻿using AsmResolver.DotNet;
 using AsmResolver.DotNet.Code.Cil;
 using AsmResolver.DotNet.Signatures;
-using AsmResolver.PE.DotNet.Cil;
 using AssetRipper.Translation.LlvmIR.Attributes;
 using AssetRipper.Translation.LlvmIR.Extensions;
 using AssetRipper.Translation.LlvmIR.Instructions;
@@ -28,31 +27,25 @@ public static unsafe class Translator
 	{
 		fixed (byte* ptr = content)
 		{
+			using LLVMContextRef context = LLVMContextRef.Create();
 			nint namePtr = Marshal.StringToHGlobalAnsi(name);
-			LLVMMemoryBufferRef buffer = LLVM.CreateMemoryBufferWithMemoryRange((sbyte*)ptr, (nuint)content.Length, (sbyte*)namePtr, 1);
+			LLVMMemoryBufferRef buffer = LLVM.CreateMemoryBufferWithMemoryRange((sbyte*)ptr, (nuint)content.Length, (sbyte*)namePtr, 0);
 			try
 			{
-				LLVMContextRef context = LLVMContextRef.Create();
-				try
-				{
-					LLVMModuleRef module = context.ParseIR(buffer);
-					return Translate(module, options ?? new());
-				}
-				finally
-				{
-					// https://github.com/dotnet/LLVMSharp/issues/234
-					//context.Dispose();
-				}
+				using LLVMModuleRef module = context.ParseIR(buffer);
+				return Translate(module, options ?? new());
 			}
 			finally
 			{
 				// This fails randomly with no real explanation.
-				// I'm fairly certain that the IR text data is only referenced (not copied),
-				// so the memory leak of not disposing the buffer is probably not a big deal.
-				// https://github.com/dotnet/LLVMSharp/issues/234
+				// The IR text data is only referenced (not copied),
+				// so the memory leak of not disposing the buffer is negligible.
 				//LLVM.DisposeMemoryBuffer(buffer);
 
 				Marshal.FreeHGlobal(namePtr);
+
+				// Collect any memory that got allocated.
+				GC.Collect();
 			}
 		}
 	}

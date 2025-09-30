@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 17
-VisualStudioVersion = 17.10.35013.160
+# Visual Studio Version 18
+VisualStudioVersion = 18.0.11018.127 d18.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AssetRipper.Translation.LlvmIR", "AssetRipper.Translation.LlvmIR\AssetRipper.Translation.LlvmIR.csproj", "{20B07121-20AE-4D9D-83A1-604ABC4C99C4}"
 EndProject
@@ -27,8 +27,6 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LlvmBinaryTextConverter", "LlvmBinaryTextConverter\LlvmBinaryTextConverter.csproj", "{C3F93AB9-D338-4A69-A1D2-44027F296D23}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LargeProjectCompiler", "LargeProjectCompiler\LargeProjectCompiler.csproj", "{15470A24-18BF-67B0-A3A9-2F3F0B805B40}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MainFunctionDetector", "MainFunctionDetector\MainFunctionDetector.csproj", "{29EBF0FA-8FB8-4AEB-B7F6-37DCBFE744A1}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SizeOptimizer", "SizeOptimizer\SizeOptimizer.csproj", "{B2CDFA96-8BE7-4F1E-9600-0BAAFAAC1D1E}"
 EndProject
@@ -70,10 +68,6 @@ Global
 		{15470A24-18BF-67B0-A3A9-2F3F0B805B40}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{15470A24-18BF-67B0-A3A9-2F3F0B805B40}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{15470A24-18BF-67B0-A3A9-2F3F0B805B40}.Release|Any CPU.Build.0 = Release|Any CPU
-		{29EBF0FA-8FB8-4AEB-B7F6-37DCBFE744A1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{29EBF0FA-8FB8-4AEB-B7F6-37DCBFE744A1}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{29EBF0FA-8FB8-4AEB-B7F6-37DCBFE744A1}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{29EBF0FA-8FB8-4AEB-B7F6-37DCBFE744A1}.Release|Any CPU.Build.0 = Release|Any CPU
 		{B2CDFA96-8BE7-4F1E-9600-0BAAFAAC1D1E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{B2CDFA96-8BE7-4F1E-9600-0BAAFAAC1D1E}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{B2CDFA96-8BE7-4F1E-9600-0BAAFAAC1D1E}.Release|Any CPU.ActiveCfg = Release|Any CPU

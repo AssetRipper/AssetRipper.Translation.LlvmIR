@@ -36,33 +36,22 @@ internal static unsafe class Program
 	{
 		fixed (byte* ptr = content)
 		{
+			using LLVMContextRef context = LLVMContextRef.Create();
 			nint namePtr = Marshal.StringToHGlobalAnsi(name);
-			nint outputPathPtr = Marshal.StringToHGlobalAnsi(outputPath);
-			LLVMMemoryBufferRef buffer = LLVM.CreateMemoryBufferWithMemoryRange((sbyte*)ptr, (nuint)content.Length, (sbyte*)namePtr, 1);
+			LLVMMemoryBufferRef buffer = LLVM.CreateMemoryBufferWithMemoryRange((sbyte*)ptr, (nuint)content.Length, (sbyte*)namePtr, 0);
 			try
 			{
-				LLVMContextRef context = LLVMContextRef.Create();
-				try
-				{
-					LLVMModuleRef module = context.ParseIR(buffer);
-					LLVM.WriteBitcodeToFile(module, (sbyte*)outputPathPtr);
-				}
-				finally
-				{
-					// https://github.com/dotnet/LLVMSharp/issues/234
-					//context.Dispose();
-				}
+				using LLVMModuleRef module = context.ParseIR(buffer);
+				module.WriteBitcodeToFile(outputPath);
 			}
 			finally
 			{
 				// This fails randomly with no real explanation.
-				// I'm fairly certain that the IR text data is only referenced (not copied),
-				// so the memory leak of not disposing the buffer is probably not a big deal.
-				// https://github.com/dotnet/LLVMSharp/issues/234
+				// The IR text data is only referenced (not copied),
+				// so the memory leak of not disposing the buffer is negligible.
 				//LLVM.DisposeMemoryBuffer(buffer);
 
 				Marshal.FreeHGlobal(namePtr);
-				Marshal.FreeHGlobal(outputPathPtr);
 			}
 		}
 	}
@@ -71,28 +60,19 @@ internal static unsafe class Program
 	{
 		fixed (byte* ptr = content)
 		{
+			using LLVMContextRef context = LLVMContextRef.Create();
 			nint namePtr = Marshal.StringToHGlobalAnsi(name);
-			LLVMMemoryBufferRef buffer = LLVM.CreateMemoryBufferWithMemoryRange((sbyte*)ptr, (nuint)content.Length, (sbyte*)namePtr, 1);
+			LLVMMemoryBufferRef buffer = LLVM.CreateMemoryBufferWithMemoryRange((sbyte*)ptr, (nuint)content.Length, (sbyte*)namePtr, 0);
 			try
 			{
-				LLVMContextRef context = LLVMContextRef.Create();
-				try
-				{
-					LLVMModuleRef module = context.ParseBitcode(buffer);
-					return module.PrintToString();
-				}
-				finally
-				{
-					// https://github.com/dotnet/LLVMSharp/issues/234
-					//context.Dispose();
-				}
+				using LLVMModuleRef module = context.ParseBitcode(buffer);
+				return module.PrintToString();
 			}
 			finally
 			{
 				// This fails randomly with no real explanation.
-				// I'm fairly certain that the IR text data is only referenced (not copied),
-				// so the memory leak of not disposing the buffer is probably not a big deal.
-				// https://github.com/dotnet/LLVMSharp/issues/234
+				// The binary data is only referenced (not copied),
+				// so the memory leak of not disposing the buffer is negligible.
 				//LLVM.DisposeMemoryBuffer(buffer);
 
 				Marshal.FreeHGlobal(namePtr);

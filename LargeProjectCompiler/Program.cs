@@ -1,4 +1,6 @@
-﻿using System.Diagnostics;
+﻿using LLVMSharp.Interop;
+using System.Diagnostics;
+using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using System.Text.Json;
 
@@ -118,7 +120,7 @@ internal static class Program
 					return;
 				}
 				bcFiles.Add(Path.GetFullPath(bcOutputPath));
-				if (HasMain(arguments.MainFunctionDetector, bcOutputPath))
+				if (HasMain(bcOutputPath))
 				{
 					Console.Error.WriteLine($"Main function detected in {bcOutputPath}");
 					return;
@@ -254,24 +256,32 @@ internal static class Program
 		return proc.ExitCode == 0;
 	}
 
-	static bool HasMain(string? mainFunctionDetector, string path)
+	static unsafe bool HasMain(string path)
 	{
-		if (string.IsNullOrEmpty(mainFunctionDetector))
+		byte[] content = File.ReadAllBytes(path);
+		fixed (byte* ptr = content)
 		{
-			return false; // Main function detection is not enabled.
+			using LLVMContextRef context = LLVMContextRef.Create();
+			nint namePtr = Marshal.StringToHGlobalAnsi(Path.GetFileName(path));
+			LLVMMemoryBufferRef buffer = LLVM.CreateMemoryBufferWithMemoryRange((sbyte*)ptr, (nuint)content.Length, (sbyte*)namePtr, 0);
+			try
+			{
+				using LLVMModuleRef module = context.ParseIR(buffer);
+				return module.GetNamedFunction("main") != default;
+			}
+			finally
+			{
+				// This fails randomly with no real explanation.
+				// The IR text data is only referenced (not copied),
+				// so the memory leak of not disposing the buffer is negligible.
+				//LLVM.DisposeMemoryBuffer(buffer);
+
+				Marshal.FreeHGlobal(namePtr);
+
+				// Collect any memory that got allocated.
+				GC.Collect();
+			}
 		}
-
-		ProcessStartInfo psi = new(mainFunctionDetector, [path])
-		{
-			UseShellExecute = false,
-		};
-
-		using Process proc = new() { StartInfo = psi };
-
-		proc.Start();
-		proc.WaitForExit();
-
-		return proc.ExitCode != 0;
 	}
 
 	[SupportedOSPlatform("windows")]
