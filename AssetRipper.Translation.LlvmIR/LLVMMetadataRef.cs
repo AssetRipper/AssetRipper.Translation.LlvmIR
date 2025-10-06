@@ -117,7 +117,7 @@ public unsafe partial struct LLVMMetadataRef(IntPtr handle) : IEquatable<LLVMMet
 
 	public readonly uint Encoding => Kind switch
 	{
-		LLVMMetadataKind.LLVMDIDerivedTypeMetadataKind => LibLLVMSharp.DIDerivedTypeGetEncoding(this),
+		LLVMMetadataKind.LLVMDIBasicTypeMetadataKind => LibLLVMSharp.DIBasicTypeGetEncoding(this),
 		_ => default,
 	};
 

@@ -179,13 +179,13 @@ internal static unsafe partial class LibLLVMSharp
 		return DIDerivedTypeGetBaseType((LLVMOpaqueMetadata*)type);
 	}
 
-	[LibraryImport("libLLVMSharp", EntryPoint = "llvmsharp_DIDerivedType_getEncoding")]
+	[LibraryImport("libLLVMSharp", EntryPoint = "llvmsharp_DIBasicType_getEncoding")]
 	[UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
-	private static partial uint DIDerivedTypeGetEncoding(LLVMOpaqueMetadata* type);
+	private static partial uint DIBasicTypeGetEncoding(LLVMOpaqueMetadata* type);
 
-	public static uint DIDerivedTypeGetEncoding(LLVMMetadataRef type)
+	public static uint DIBasicTypeGetEncoding(LLVMMetadataRef type)
 	{
-		return DIDerivedTypeGetEncoding((LLVMOpaqueMetadata*)type);
+		return DIBasicTypeGetEncoding((LLVMOpaqueMetadata*)type);
 	}
 
 	[LibraryImport("libLLVMSharp", EntryPoint = "llvmsharp_DIEnumerator_getName")]
