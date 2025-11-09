@@ -114,6 +114,7 @@ internal static unsafe partial class IntrinsicFunctions
 	[MangledName("strcmp")]
 	public static int strcmp(byte* p1, byte* p2)
 	{
+		// https://cplusplus.com/reference/cstring/strcmp/
 		while (*p1 == *p2 && *p1 != '\0') // keep going while bytes match
 		{
 			++p1;
@@ -183,6 +184,7 @@ internal static unsafe partial class IntrinsicFunctions
 	[MangledName("strrstr")]
 	public static byte* strrstr(byte* haystack, byte* needle)
 	{
+		// https://cplusplus.com/reference/cstring/strstr/
 		if (haystack == null || needle == null)
 		{
 			return null; // Return null for null strings
@@ -204,6 +206,24 @@ internal static unsafe partial class IntrinsicFunctions
 	[MangledName("strlen")]
 	public static long strlen(byte* str)
 	{
+		// https://cplusplus.com/reference/cstring/strlen/
+		if (str == null)
+		{
+			return 0; // Return 0 for null strings
+		}
+		long length = 0;
+		while (*str != '\0') // count until null terminator
+		{
+			length++;
+			str++;
+		}
+		return length; // return the length of the string
+	}
+
+	[MangledName("wcslen")]
+	public static long wcslen(char* str)
+	{
+		// https://cplusplus.com/reference/cwchar/wcslen/
 		if (str == null)
 		{
 			return 0; // Return 0 for null strings
