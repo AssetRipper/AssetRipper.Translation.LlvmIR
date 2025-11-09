@@ -1,5 +1,6 @@
 ﻿using AssetRipper.Translation.LlvmIR.Attributes;
 using System.Buffers;
+using System.Collections.Concurrent;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
@@ -59,6 +60,35 @@ internal static unsafe partial class IntrinsicFunctions
 	public static void Terminate()
 	{
 		throw new FatalException(nameof(Terminate));
+	}
+
+	// Stack to hold atexit functions because they need to be called in LIFO order.
+	private readonly static ConcurrentStack<nint> atexitFunctions = new();
+	[MangledName("atexit")]
+	public static int AtExit(delegate*<void> func)
+	{
+		// https://cplusplus.com/reference/cstdlib/atexit/
+
+		if (atexitFunctions.IsEmpty)
+		{
+			lock (atexitFunctions)
+			{
+				if (atexitFunctions.IsEmpty)
+				{
+					AppDomain.CurrentDomain.ProcessExit += static (_, _) =>
+					{
+						while (atexitFunctions.TryPop(out nint function))
+						{
+							((delegate*<void>)function)();
+						}
+					};
+				}
+			}
+		}
+
+		atexitFunctions.Push((nint)func);
+
+		return 0; // Success
 	}
 
 	[MangledName("llvm.va_start.p0")]
