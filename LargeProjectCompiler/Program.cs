@@ -107,7 +107,7 @@ internal static class Program
 				string bcOutputPath = Path.ChangeExtension(entry.Output, ".bc");
 
 				Directory.CreateDirectory(Path.GetDirectoryName(bcOutputPath)!);
-				RewriteCommand(commandParts, bcOutputPath, entry.Output);
+				RewriteCommand(commandParts, bcOutputPath);
 
 				Console.WriteLine($">> Compiling {i + 1}/{entries.Count} {Path.GetFileName(entry.File)} -> {bcOutputPath}");
 				bool success = RunCommand(commandParts, entry.Directory);
@@ -170,13 +170,14 @@ internal static class Program
 		}
 	}
 
-	static void RewriteCommand(List<string> commandParts, string outputPath, string originalOutputPath)
+	static void RewriteCommand(List<string> commandParts, string outputPath)
 	{
 		if (commandParts.Count is 0)
 		{
 			throw new ArgumentException("There must be at least one command part", nameof(commandParts));
 		}
 
+		bool foundOutput = false;
 		for (int i = commandParts.Count - 1; i >= 0; i--)
 		{
 			string part = commandParts[i];
@@ -194,10 +195,12 @@ internal static class Program
 			{
 				commandParts[i] = "-o";
 				commandParts.Insert(i + 1, outputPath);
+				foundOutput = true;
 			}
-			else if (part == originalOutputPath)
+			else if (part is "-o" && i < commandParts.Count - 1)
 			{
-				commandParts[i] = outputPath;
+				commandParts[i + 1] = outputPath;
+				foundOutput = true;
 			}
 			else if (part.StartsWith("-std:", StringComparison.Ordinal) || part.StartsWith("/std:", StringComparison.Ordinal))
 			{
@@ -212,6 +215,11 @@ internal static class Program
 			{
 				commandParts.RemoveAt(i);
 			}
+		}
+
+		if (!foundOutput)
+		{
+			throw new ArgumentException("Output path not found in command", nameof(commandParts));
 		}
 
 		commandParts[0] = commandParts[0].Replace("CLANG_~1", "clang");
