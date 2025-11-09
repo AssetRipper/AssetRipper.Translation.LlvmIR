@@ -229,30 +229,6 @@ public partial class DemangledNamesBaseListener : IDemangledNamesListener {
 	/// <param name="context">The parse tree.</param>
 	public virtual void ExitQualifiedTypeIdentifier([NotNull] DemangledNamesParser.QualifiedTypeIdentifierContext context) { }
 	/// <summary>
-	/// Enter a parse tree produced by <see cref="DemangledNamesParser.accessModifier"/>.
-	/// <para>The default implementation does nothing.</para>
-	/// </summary>
-	/// <param name="context">The parse tree.</param>
-	public virtual void EnterAccessModifier([NotNull] DemangledNamesParser.AccessModifierContext context) { }
-	/// <summary>
-	/// Exit a parse tree produced by <see cref="DemangledNamesParser.accessModifier"/>.
-	/// <para>The default implementation does nothing.</para>
-	/// </summary>
-	/// <param name="context">The parse tree.</param>
-	public virtual void ExitAccessModifier([NotNull] DemangledNamesParser.AccessModifierContext context) { }
-	/// <summary>
-	/// Enter a parse tree produced by <see cref="DemangledNamesParser.vcSpecificModifer"/>.
-	/// <para>The default implementation does nothing.</para>
-	/// </summary>
-	/// <param name="context">The parse tree.</param>
-	public virtual void EnterVcSpecificModifer([NotNull] DemangledNamesParser.VcSpecificModiferContext context) { }
-	/// <summary>
-	/// Exit a parse tree produced by <see cref="DemangledNamesParser.vcSpecificModifer"/>.
-	/// <para>The default implementation does nothing.</para>
-	/// </summary>
-	/// <param name="context">The parse tree.</param>
-	public virtual void ExitVcSpecificModifer([NotNull] DemangledNamesParser.VcSpecificModiferContext context) { }
-	/// <summary>
 	/// Enter a parse tree produced by <see cref="DemangledNamesParser.numericType"/>.
 	/// <para>The default implementation does nothing.</para>
 	/// </summary>

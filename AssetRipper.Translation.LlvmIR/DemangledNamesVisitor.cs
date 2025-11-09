@@ -129,18 +129,6 @@ public interface IDemangledNamesVisitor<Result> : IParseTreeVisitor<Result> {
 	/// <return>The visitor result.</return>
 	Result VisitQualifiedTypeIdentifier([NotNull] DemangledNamesParser.QualifiedTypeIdentifierContext context);
 	/// <summary>
-	/// Visit a parse tree produced by <see cref="DemangledNamesParser.accessModifier"/>.
-	/// </summary>
-	/// <param name="context">The parse tree.</param>
-	/// <return>The visitor result.</return>
-	Result VisitAccessModifier([NotNull] DemangledNamesParser.AccessModifierContext context);
-	/// <summary>
-	/// Visit a parse tree produced by <see cref="DemangledNamesParser.vcSpecificModifer"/>.
-	/// </summary>
-	/// <param name="context">The parse tree.</param>
-	/// <return>The visitor result.</return>
-	Result VisitVcSpecificModifer([NotNull] DemangledNamesParser.VcSpecificModiferContext context);
-	/// <summary>
 	/// Visit a parse tree produced by <see cref="DemangledNamesParser.numericType"/>.
 	/// </summary>
 	/// <param name="context">The parse tree.</param>

@@ -28,7 +28,13 @@ internal sealed class EnumContext : IHasName
 		Definition = definition;
 		Metadata = metadata;
 		Elements = metadata.Elements;
-		CleanName = NameGenerator.CleanName(metadata.Name, "Enum");
+		string name = metadata.Name;
+		if (string.IsNullOrEmpty(name) && !metadata.IdentifierDemangled.Contains(">:"))
+		{
+			// The >: check avoids names from templates, which tend to be long and worse than just using Enum_hash.
+			name = metadata.IdentifierClean;
+		}
+		CleanName = NameGenerator.CleanName(name, "Enum");
 	}
 
 	public static EnumContext Create(ModuleContext module, LLVMMetadataRef metadata)

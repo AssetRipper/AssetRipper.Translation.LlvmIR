@@ -165,12 +165,6 @@ public unsafe partial struct LLVMMetadataRef(IntPtr handle) : IEquatable<LLVMMet
 	{
 		get
 		{
-			if (string.IsNullOrEmpty(Name))
-			{
-				// Anonymous types don't have parsable identifiers.
-				return "";
-			}
-
 			string demangled = IdentifierDemangled;
 			if (string.IsNullOrEmpty(demangled))
 			{

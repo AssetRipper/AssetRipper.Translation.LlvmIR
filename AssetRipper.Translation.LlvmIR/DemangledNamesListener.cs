@@ -192,26 +192,6 @@ public interface IDemangledNamesListener : IParseTreeListener {
 	/// <param name="context">The parse tree.</param>
 	void ExitQualifiedTypeIdentifier([NotNull] DemangledNamesParser.QualifiedTypeIdentifierContext context);
 	/// <summary>
-	/// Enter a parse tree produced by <see cref="DemangledNamesParser.accessModifier"/>.
-	/// </summary>
-	/// <param name="context">The parse tree.</param>
-	void EnterAccessModifier([NotNull] DemangledNamesParser.AccessModifierContext context);
-	/// <summary>
-	/// Exit a parse tree produced by <see cref="DemangledNamesParser.accessModifier"/>.
-	/// </summary>
-	/// <param name="context">The parse tree.</param>
-	void ExitAccessModifier([NotNull] DemangledNamesParser.AccessModifierContext context);
-	/// <summary>
-	/// Enter a parse tree produced by <see cref="DemangledNamesParser.vcSpecificModifer"/>.
-	/// </summary>
-	/// <param name="context">The parse tree.</param>
-	void EnterVcSpecificModifer([NotNull] DemangledNamesParser.VcSpecificModiferContext context);
-	/// <summary>
-	/// Exit a parse tree produced by <see cref="DemangledNamesParser.vcSpecificModifer"/>.
-	/// </summary>
-	/// <param name="context">The parse tree.</param>
-	void ExitVcSpecificModifer([NotNull] DemangledNamesParser.VcSpecificModiferContext context);
-	/// <summary>
 	/// Enter a parse tree produced by <see cref="DemangledNamesParser.numericType"/>.
 	/// </summary>
 	/// <param name="context">The parse tree.</param>

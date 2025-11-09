@@ -48,6 +48,8 @@ public class ParsingTests
 	static readonly string[] demangledTypeStrings =
 	[
 		"class std::vector<unsigned char, class std::allocator<unsigned char>>",
+		"struct spirv_cross::CompilerHLSL::<unnamed-type-base_vertex_info>",
+		"enum std::_Iosb<int>::<unnamed-enum-_Openprot>",
 	];
 
 	[TestCaseSource(nameof(demangledFunctionStrings))]

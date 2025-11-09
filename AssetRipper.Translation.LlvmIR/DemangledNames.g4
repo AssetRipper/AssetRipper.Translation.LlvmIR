@@ -1,11 +1,11 @@
 grammar DemangledNames;
 
 function
-    : functionPrefix functionReturnType vcSpecificModifer functionDeclaringScope functionName LeftParen functionParameters RightParen functionSuffix
+    : functionPrefix functionReturnType CallingConvention functionDeclaringScope functionName LeftParen functionParameters RightParen functionSuffix
     ;
 
 functionPrefix
-    : accessModifier? (Virtual | Static)?
+    : (AccessModifier Colon)? (Virtual | Static)?
     ;
 
 functionSuffix
@@ -54,6 +54,24 @@ functionName
 identifier
     : Identifier
     | EscapedString
+    | AccessModifier
+    | CallingConvention
+    | NewOrDelete
+    | TypeKeyword
+    | Bool
+    | Char
+    | Const
+    | Float
+    | Int
+    | Int64
+    | Long
+    | Operator
+    | Short
+    | Signed
+    | Static
+    | Unsigned
+    | Virtual
+    | Void
     ;
 
 functionIdentifier
@@ -63,11 +81,11 @@ functionIdentifier
     ;
 
 type
-    : (Class | Enum | Struct | Union)? qualifiedTypeIdentifier Const? (Star | And)*
+    : TypeKeyword? qualifiedTypeIdentifier Const? (Star | And)*
     | type LeftParen Star Const RightParen LeftBracket Number RightBracket // constant array reference
     | type LeftParen And RightParen LeftBracket Number RightBracket // mutable array reference
     | type LeftBracket Number RightBracket // array type
-    | type LeftParen vcSpecificModifer Star RightParen LeftParen functionParameters RightParen // function pointer type
+    | type LeftParen CallingConvention Star RightParen LeftParen functionParameters RightParen // function pointer type
     ;
 
 typeIdentifier
@@ -76,26 +94,12 @@ typeIdentifier
     | numericType
     | identifier+ template
     | Less identifier+ Greater
+    | Less identifier (Minus identifier)* Greater
     ;
 
 qualifiedTypeIdentifier
     : qualifiedTypeIdentifier Colon Colon typeIdentifier
     | typeIdentifier
-    ;
-
-accessModifier
-    : 'public' Colon
-    | 'protected' Colon
-    | 'private' Colon
-    ;
-
-vcSpecificModifer
-    : CDecl
-    | CLRCall
-    | StdCall
-    | FastCall
-    | ThisCall
-    | VectorCall
     ;
 
 numericType
@@ -116,14 +120,12 @@ integerType
     ;
 
 operator
-    : 'operator' operatorName
+    : Operator operatorName
     ;
 
 operatorName
-    : 'new' LeftBracket RightBracket
-    | 'delete' LeftBracket RightBracket
-    | 'new'
-    | 'delete'
+    : NewOrDelete LeftBracket RightBracket
+    | NewOrDelete
     | numericType
     | shiftOperator Equals?
     | arithmeticOperator Equals?
@@ -168,24 +170,39 @@ EscapedString
     : '`' ~[']* '\''
     ;
 
+AccessModifier
+    : 'public'
+    | 'protected'
+    | 'private'
+    ;
+
+CallingConvention
+    : '__cdecl'
+    | '__clrcall'
+    | '__stdcall'
+    | '__fastcall'
+    | '__thiscall'
+    | '__vectorcall'
+    ;
+
+NewOrDelete
+    : 'new'
+    | 'delete'
+    ;
+
+TypeKeyword
+    : 'class'
+    | 'struct'
+    | 'union'
+    | 'enum'
+    ;
+
 Bool
     : 'bool'
     ;
 
-CDecl
-    : '__cdecl'
-    ;
-
-CLRCall
-    : '__clrcall'
-    ;
-
 Char
     : 'char'
-    ;
-
-Class
-    : 'class'
     ;
 
 Const
@@ -194,14 +211,6 @@ Const
 
 DeclTypeAuto
     : 'decltype(auto)'
-    ;
-
-Enum
-    : 'enum'
-    ;
-
-FastCall
-    : '__fastcall'
     ;
 
 Float
@@ -220,6 +229,10 @@ Long
     : 'long'
     ;
 
+Operator
+    : 'operator'
+    ;
+
 Short
     : 'short'
     ;
@@ -232,28 +245,8 @@ Static
     : 'static'
     ;
 
-StdCall
-    : '__stdcall'
-    ;
-
-Struct
-    : 'struct'
-    ;
-
-ThisCall
-    : '__thiscall'
-    ;
-
-Union
-    : 'union'
-    ;
-
 Unsigned
     : 'unsigned'
-    ;
-
-VectorCall
-    : '__vectorcall'
     ;
 
 Virtual
