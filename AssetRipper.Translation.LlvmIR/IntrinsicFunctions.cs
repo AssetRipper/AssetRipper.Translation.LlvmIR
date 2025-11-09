@@ -123,6 +123,25 @@ internal static unsafe partial class IntrinsicFunctions
 		return *p1 - *p2; // positive, negative, or zero
 	}
 
+	[MangledName("memchr")]
+	public static byte* memchr(byte* data, int c, long length)
+	{
+		// https://cplusplus.com/reference/cstring/memchr/
+		if (data == null)
+		{
+			return null; // Return null for null data
+		}
+		byte b = unchecked((byte)c);
+		for (long i = 0; i < length; i++)
+		{
+			if (data[i] == b) // check if current byte matches the character
+			{
+				return data + i; // return pointer to the first occurrence
+			}
+		}
+		return null; // return null if character not found
+	}
+
 	[MangledName("strchr")]
 	public static byte* strchr(byte* str, int c)
 	{
@@ -131,15 +150,16 @@ internal static unsafe partial class IntrinsicFunctions
 		{
 			return null; // Return null for null strings
 		}
+		byte b = unchecked((byte)c);
 		while (*str != '\0') // iterate until null terminator
 		{
-			if (*str == c) // check if current byte matches the character
+			if (*str == b) // check if current byte matches the character
 			{
 				return str; // return pointer to the first occurrence
 			}
 			str++;
 		}
-		return null; // return null if character not found
+		return b == 0 ? str : null; // return pointer to null terminator if c is '\0', else null
 	}
 
 	[MangledName("strstr")]
