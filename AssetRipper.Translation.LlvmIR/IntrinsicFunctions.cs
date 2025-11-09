@@ -56,6 +56,7 @@ internal static unsafe partial class IntrinsicFunctions
 
 	[DoesNotReturn]
 	[MangledName("__std_terminate")]
+	[MangledName("terminate")]
 	[MangledName("llvm.trap")]
 	public static void Terminate()
 	{
@@ -252,6 +253,13 @@ internal static unsafe partial class IntrinsicFunctions
 		}
 		destination[insertionPoint + sourceLength] = 0; // Null-terminate the destination string
 		return destination; // Return pointer to the destination string
+	}
+
+	[MangledName("strcat")]
+	public static byte* strcat(byte* destination, byte* source)
+	{
+		// https://cplusplus.com/reference/cstring/strcat/
+		return strncat(destination, source, int.MaxValue);
 	}
 
 	private static long StringLengthWithMaximum(byte* str, long maxLength)
