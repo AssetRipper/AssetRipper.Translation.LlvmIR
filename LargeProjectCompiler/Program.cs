@@ -8,6 +8,8 @@ namespace LargeProjectCompiler;
 
 internal static class Program
 {
+	const string LatestCppStandard = "c++26";
+
 	static void Main(string[] args)
 	{
 		Arguments? arguments = Arguments.Parse(args);
@@ -197,9 +199,14 @@ internal static class Program
 			{
 				commandParts[i] = outputPath;
 			}
-			else if (part.StartsWith("-std:", StringComparison.Ordinal))
+			else if (part.StartsWith("-std:", StringComparison.Ordinal) || part.StartsWith("/std:", StringComparison.Ordinal))
 			{
-				commandParts[i] = string.Concat("-std=", part.AsSpan("-std:".Length));
+				ReadOnlySpan<char> value = part.AsSpan("-std:".Length);
+				if (value.SequenceEqual("c++latest"))
+				{
+					value = LatestCppStandard;
+				}
+				commandParts[i] = string.Concat("-std=", value);
 			}
 			else if (part.StartsWith('/'))
 			{
