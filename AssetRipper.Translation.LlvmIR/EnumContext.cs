@@ -31,8 +31,11 @@ internal sealed class EnumContext : IHasName
 		string name = metadata.Name;
 		if (string.IsNullOrEmpty(name) && !metadata.IdentifierDemangled.Contains(">:"))
 		{
+			// Handle unnamed enums.
 			// The >: check avoids names from templates, which tend to be long and worse than just using Enum_hash.
-			name = metadata.IdentifierClean;
+			string cleanIdentifier = metadata.IdentifierClean;
+			int index = cleanIdentifier.LastIndexOf("<unnamed-enum-");
+			name = index >= 0 ? $"{cleanIdentifier.AsSpan(0, index)}_unnamed_enum" : cleanIdentifier;
 		}
 		CleanName = NameGenerator.CleanName(name, "Enum");
 	}
