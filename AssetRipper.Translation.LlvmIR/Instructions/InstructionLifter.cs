@@ -398,13 +398,15 @@ internal unsafe readonly struct InstructionLifter
 
 					// The first operand is the parent catch switch
 
-					bool hasDefaultUnwind = false; // Default unwind detection is not implemented yet.
+					bool hasDefaultUnwind = operands.Length >= 2
+						&& operands[1].IsBasicBlock
+						&& operands[1].AsBasicBlock().GetInstructions().FirstOrDefault(static i => i.IsACleanupPadInst != default) != default;
 
 					LLVMBasicBlockRef defaultUnwindTargetRef = hasDefaultUnwind
-						? operands[^1].AsBasicBlock()
+						? operands[1].AsBasicBlock()
 						: default;
 					ReadOnlySpan<LLVMValueRef> handlerBlocks = hasDefaultUnwind
-						? operands.AsSpan(1, operands.Length - 2)
+						? operands.AsSpan(2)
 						: operands.AsSpan(1);
 					LLVMValueRef[] catchPads = new LLVMValueRef[handlerBlocks.Length];
 					for (int i = 0; i < handlerBlocks.Length; i++)
