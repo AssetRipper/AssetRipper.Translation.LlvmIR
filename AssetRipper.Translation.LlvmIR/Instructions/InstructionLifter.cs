@@ -337,7 +337,7 @@ internal unsafe readonly struct InstructionLifter
 					LoadValue(basicBlock, operands[1]);
 
 					TypeSignature type = module.GetTypeSignature(operands[0]);
-					basicBlock.Add(NumericalComparison.Create(type, instruction.FCmpPredicate));
+					basicBlock.Add(NumericalComparison.Create(type, instruction.FCmpPredicate, module));
 
 					StoreResult(basicBlock, instruction);
 				}

@@ -62,4 +62,60 @@ internal static partial class NumericHelper
 		long count = TensorPrimitives.PopCount(MemoryMarshal.AsBytes(new ReadOnlySpan<T>(ref x)));
 		return ConvertFromInt32<T>((int)count);
 	}
+
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	public static bool IsOrdered<T>(T x, T y)
+		where T : INumberBase<T>
+	{
+		return !IsUnordered(x, y);
+	}
+
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	public static bool IsUnordered<T>(T x, T y)
+		where T : INumberBase<T>
+	{
+		return T.IsNaN(x) || T.IsNaN(y);
+	}
+
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	public static bool IsUnorderedOrEquals<T>(T x, T y)
+		where T : INumberBase<T>
+	{
+		return IsUnordered(x, y) || x == y;
+	}
+
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	public static bool IsUnorderedOrNotEquals<T>(T x, T y)
+		where T : INumberBase<T>
+	{
+		return IsUnordered(x, y) || x != y;
+	}
+
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	public static bool IsUnorderedOrGreaterThan<T>(T x, T y)
+		where T : INumberBase<T>, IComparisonOperators<T, T, bool>
+	{
+		return IsUnordered(x, y) || x > y;
+	}
+
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	public static bool IsUnorderedOrGreaterThanOrEquals<T>(T x, T y)
+		where T : INumberBase<T>, IComparisonOperators<T, T, bool>
+	{
+		return IsUnordered(x, y) || x >= y;
+	}
+
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	public static bool IsUnorderedOrLessThan<T>(T x, T y)
+		where T : INumberBase<T>, IComparisonOperators<T, T, bool>
+	{
+		return IsUnordered(x, y) || x < y;
+	}
+
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	public static bool IsUnorderedOrLessThanOrEquals<T>(T x, T y)
+		where T : INumberBase<T>, IComparisonOperators<T, T, bool>
+	{
+		return IsUnordered(x, y) || x <= y;
+	}
 }

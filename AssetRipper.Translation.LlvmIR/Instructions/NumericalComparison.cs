@@ -1,9 +1,11 @@
-﻿using AsmResolver.DotNet.Code.Cil;
+﻿using AsmResolver.DotNet;
+using AsmResolver.DotNet.Code.Cil;
 using AsmResolver.DotNet.Signatures;
 using AsmResolver.PE.DotNet.Cil;
 using AsmResolver.PE.DotNet.Metadata.Tables;
 using AssetRipper.CIL;
 using AssetRipper.Translation.LlvmIR.Extensions;
+using AssetRipper.Translation.LlvmIR.Variables;
 using LLVMSharp.Interop;
 
 namespace AssetRipper.Translation.LlvmIR.Instructions;
@@ -43,26 +45,42 @@ public static class NumericalComparison
 		};
 	}
 
-	public static NumericalComparisonInstruction Create(TypeSignature type, LLVMRealPredicate comparisonKind)
+	internal static Instruction Create(TypeSignature type, LLVMRealPredicate comparisonKind, ModuleContext module)
 	{
 		if (type is not CorLibTypeSignature { ElementType: ElementType.R4 or ElementType.R8 })
 		{
 			throw new NotSupportedException($"Unsupported type for float comparison: {type}");
 		}
+		// https://github.com/llvm/llvm-project/blob/070f3310ccfd040271aae982f36c008f2c34e11d/llvm/include/llvm-c/Core.h#L307-L324
 		return comparisonKind switch
 		{
-			LLVMRealPredicate.LLVMRealOEQ or LLVMRealPredicate.LLVMRealUEQ => Equals,
-			LLVMRealPredicate.LLVMRealONE or LLVMRealPredicate.LLVMRealUNE => NotEquals,
-			LLVMRealPredicate.LLVMRealUGT => UnsignedGreaterThan,
-			LLVMRealPredicate.LLVMRealUGE => UnsignedGreaterThanOrEquals,
-			LLVMRealPredicate.LLVMRealULT => UnsignedLessThan,
-			LLVMRealPredicate.LLVMRealULE => UnsignedLessThanOrEquals,
+			LLVMRealPredicate.LLVMRealOEQ => Equals,
+			LLVMRealPredicate.LLVMRealONE => NotEquals,
 			LLVMRealPredicate.LLVMRealOGT => GreaterThan,
 			LLVMRealPredicate.LLVMRealOGE => GreaterThanOrEquals,
 			LLVMRealPredicate.LLVMRealOLT => LessThan,
 			LLVMRealPredicate.LLVMRealOLE => LessThanOrEquals,
+
+			LLVMRealPredicate.LLVMRealORD => Call(nameof(NumericHelper.IsOrdered), type, module),
+			LLVMRealPredicate.LLVMRealUNO => Call(nameof(NumericHelper.IsUnordered), type, module),
+
+			LLVMRealPredicate.LLVMRealUEQ => Call(nameof(NumericHelper.IsUnorderedOrEquals), type, module),
+			LLVMRealPredicate.LLVMRealUNE => Call(nameof(NumericHelper.IsUnorderedOrNotEquals), type, module),
+			LLVMRealPredicate.LLVMRealUGT => Call(nameof(NumericHelper.IsUnorderedOrGreaterThan), type, module),
+			LLVMRealPredicate.LLVMRealUGE => Call(nameof(NumericHelper.IsUnorderedOrGreaterThanOrEquals), type, module),
+			LLVMRealPredicate.LLVMRealULT => Call(nameof(NumericHelper.IsUnorderedOrLessThan), type, module),
+			LLVMRealPredicate.LLVMRealULE => Call(nameof(NumericHelper.IsUnorderedOrLessThanOrEquals), type, module),
+
+			LLVMRealPredicate.LLVMRealPredicateTrue => new LoadVariableInstruction(new ConstantI4(1, module.Definition)),
+			LLVMRealPredicate.LLVMRealPredicateFalse => new LoadVariableInstruction(new ConstantI4(0, module.Definition)),
+
 			_ => throw new InvalidOperationException($"Unknown comparison predicate: {comparisonKind}"),
 		};
+
+		static Instruction Call(string methodName, TypeSignature type, ModuleContext module)
+		{
+			return new CallInstruction(module.NumericHelperType.Methods.First(m => m.Name == methodName).MakeGenericInstanceMethod(type));
+		}
 	}
 
 	#region Individual Implementations
