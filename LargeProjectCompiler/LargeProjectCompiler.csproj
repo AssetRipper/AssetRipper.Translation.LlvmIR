@@ -9,7 +9,7 @@
 	<ItemGroup>
 		<PackageReference Include="LLVMSharp" Version="20.1.2" />
 		<PackageReference Include="Ookii.CommandLine" Version="5.0.0" />
-		<PackageReference Include="TerraFX.Interop.Windows" Version="10.0.26100.2" />
+		<PackageReference Include="TerraFX.Interop.Windows" Version="10.0.26100.5" />
 	</ItemGroup>
 
 </Project>
