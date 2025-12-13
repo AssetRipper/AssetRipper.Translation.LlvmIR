@@ -18,6 +18,27 @@ This ensures that debug information is included and that parameter names are pre
 
 Use `ninja --version` to verify that it's been added to the PATH.
 
+### Environmental variables
+
+Clang on Windows can have trouble finding the Windows SDK and Visual Studio libraries and includes. You can set the `LIB` and `INCLUDE` environmental variables to help it find them. Adjust the paths below to match your installation.
+
+```powershell
+$env:LIB="C:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.50.35717\lib\x64;C:\Program Files (x86)\Windows Kits\10\Lib\10.0.26100.0\um\x64;C:\Program Files (x86)\Windows Kits\10\Lib\10.0.26100.0\ucrt\x64"
+$env:INCLUDE="C:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.50.35717\include;C:\Program Files (x86)\Windows Kits\10\Include\10.0.26100.0\um;C:\Program Files (x86)\Windows Kits\10\Include\10.0.26100.0\ucrt"
+```
+
+This is an example of an error you might see if Clang cannot find the necessary libraries:
+
+```
+-- Check for working C compiler: C:/Program Files/LLVM/bin/clang.exe - broken
+CMake Error at C:/Program Files/CMake/share/cmake-4.2/Modules/CMakeTestCCompiler.cmake:67 (message):
+  The C compiler
+
+    "C:/Program Files/LLVM/bin/clang.exe"
+
+  is not able to compile a simple test program.
+```
+
 ### Run CMake
 
 ```
@@ -59,4 +80,4 @@ There are [plans](https://github.com/AssetRipper/AssetRipper.Translation.LlvmIR/
 
 ## Building
 
-The `libLLVMSharp` dependency is not included in the repository. The source code for it can be found [here](https://github.com/ds5678/LLVMSharp/tree/libllvmsharp).
+The `libLLVMSharp` dependency is not included in the repository. The source code for it can be found [here](https://github.com/dotnet/LLVMSharp).
