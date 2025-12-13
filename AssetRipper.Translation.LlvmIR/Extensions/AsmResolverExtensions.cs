@@ -3,39 +3,11 @@ using AsmResolver.DotNet.Signatures;
 using AsmResolver.PE.DotNet.Cil;
 using AsmResolver.PE.DotNet.Metadata.Tables;
 using System.Diagnostics.CodeAnalysis;
-using System.Runtime.Versioning;
 
 namespace AssetRipper.Translation.LlvmIR.Extensions;
 
 internal static class AsmResolverExtensions
 {
-	public static void AddTargetFrameworkAttributeForDotNet9(this ModuleDefinition module)
-	{
-		IMethodDescriptor constructor = module.DefaultImporter.ImportMethod(typeof(TargetFrameworkAttribute).GetConstructors().Single());
-
-		CustomAttributeSignature signature = new();
-
-		signature.FixedArguments.Add(new(module.CorLibTypeFactory.String, module.OriginalTargetRuntime.ToString()));
-		signature.NamedArguments.Add(new(
-			CustomAttributeArgumentMemberType.Property,
-			nameof(TargetFrameworkAttribute.FrameworkDisplayName),
-			module.CorLibTypeFactory.String,
-			new(module.CorLibTypeFactory.String, ".NET 9.0")));
-
-		CustomAttribute attribute = new((ICustomAttributeType)constructor, signature);
-
-		if (module.Assembly is null)
-		{
-			AssemblyDefinition assembly = new(module.Name, new Version(1, 0, 0, 0));
-			assembly.Modules.Add(module);
-			assembly.CustomAttributes.Add(attribute);
-		}
-		else
-		{
-			module.Assembly.CustomAttributes.Add(attribute);
-		}
-	}
-
 	public static int GetSize(this TypeSignature type)
 	{
 		if (type is CorLibTypeSignature corLibTypeSignature)

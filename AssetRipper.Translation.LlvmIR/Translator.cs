@@ -54,8 +54,6 @@ public static unsafe class Translator
 	{
 		CustomModuleDefinition moduleDefinition = new(string.IsNullOrEmpty(options.ModuleName) ? "ConvertedCpp" : options.ModuleName);
 
-		moduleDefinition.AddTargetFrameworkAttributeForDotNet9();
-
 		ModuleContext moduleContext = new(module, moduleDefinition, options);
 
 		foreach (LLVMValueRef global in module.GetGlobals())
@@ -406,30 +404,39 @@ public static unsafe class Translator
 		ModuleContext IHasName.Module => module;
 	}
 
-	private sealed class CustomModuleDefinition(string name) : ModuleDefinition(name, KnownCorLibs.SystemRuntime_v9_0_0_0)
+	private sealed class CustomModuleDefinition : ModuleDefinition
 	{
+		public CustomModuleDefinition(string name) : base(name, KnownCorLibs.SystemRuntime_v10_0_0_0)
+		{
+			if (Assembly is null)
+			{
+				AssemblyDefinition assembly = new(Name, new Version(1, 0, 0, 0));
+				assembly.Modules.Add(this);
+			}
+		}
+
 		protected override ReferenceImporter GetDefaultImporter()
 		{
 			return new CustomReferenceImporter(this);
 		}
-	}
 
-	private sealed class CustomReferenceImporter(CustomModuleDefinition module) : ReferenceImporter(module)
-	{
-		protected override AssemblyReference ImportAssembly(AssemblyDescriptor assembly)
+		private sealed class CustomReferenceImporter(CustomModuleDefinition module) : ReferenceImporter(module)
 		{
-			// This importer will fail if System.Runtime.InteropServices.Marshal is ever imported.
-			// At runtime, Marshal is part of System.Private.CoreLib.
-			// However, at compile time, it is not part of System.Runtime, but rather System.Runtime.InteropServices.
-			// If we ever try to import it, the reference will be invalid.
-			// This is one of the primary reasons for NativeMemoryHelper, which allows us to avoid referencing Marshal directly.
-			if (SignatureComparer.Default.Equals(assembly, KnownCorLibs.SystemPrivateCoreLib_v9_0_0_0))
+			protected override AssemblyReference ImportAssembly(AssemblyDescriptor assembly)
 			{
-				return base.ImportAssembly(KnownCorLibs.SystemRuntime_v9_0_0_0);
-			}
-			else
-			{
-				return base.ImportAssembly(assembly);
+				// This importer will fail if System.Runtime.InteropServices.Marshal is ever imported.
+				// At runtime, Marshal is part of System.Private.CoreLib.
+				// However, at compile time, it is not part of System.Runtime, but rather System.Runtime.InteropServices.
+				// If we ever try to import it, the reference will be invalid.
+				// This is one of the primary reasons for NativeMemoryHelper, which allows us to avoid referencing Marshal directly.
+				if (SignatureComparer.Default.Equals(assembly, KnownCorLibs.SystemPrivateCoreLib_v10_0_0_0))
+				{
+					return base.ImportAssembly(KnownCorLibs.SystemRuntime_v10_0_0_0);
+				}
+				else
+				{
+					return base.ImportAssembly(assembly);
+				}
 			}
 		}
 	}
