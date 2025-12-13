@@ -169,10 +169,20 @@ public static unsafe class Translator
 
 			Dictionary<LLVMTypeRef, StructContext> contextLookUp = moduleContext.Structs.Values.ToDictionary(s => s.Type);
 
-			Dictionary<StructContext, List<LLVMMetadataRef>> validMetadata = globalVariableTypes
-				.Where(p => p.Item1.Kind is LLVMTypeKind.LLVMStructTypeKind && p.Item2.Kind is LLVMMetadataKind.LLVMDICompositeTypeMetadataKind)
-				.Distinct()
-				.ToDictionary(p => contextLookUp[p.Item1], p => (List<LLVMMetadataRef>)[p.Item2]);
+			Dictionary<StructContext, List<LLVMMetadataRef>> validMetadata = [];
+			foreach ((LLVMTypeRef type, LLVMMetadataRef metadata) in globalVariableTypes.Where(p => p.Item1.Kind is LLVMTypeKind.LLVMStructTypeKind && p.Item2.Kind is LLVMMetadataKind.LLVMDICompositeTypeMetadataKind).Distinct())
+			{
+				StructContext structContext = contextLookUp[type];
+				if (validMetadata.TryGetValue(structContext, out List<LLVMMetadataRef>? list))
+				{
+					list.Add(metadata);
+				}
+				else
+				{
+					validMetadata[structContext] = [metadata];
+				}
+			}
+
 			foreach (StructContext structContext in moduleContext.Structs.Values)
 			{
 				if (validMetadata.ContainsKey(structContext))
