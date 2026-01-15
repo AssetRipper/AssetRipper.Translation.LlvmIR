@@ -11,18 +11,117 @@ namespace AssetRipper.Translation.LlvmIR;
 internal static unsafe partial class IntrinsicFunctions
 {
 	[MangledName("puts")]
-	public static int PutString(sbyte* P_0)
+	public static int PutString(sbyte* str)
 	{
+		// https://cplusplus.com/reference/cstdio/puts/
 		try
 		{
-			string? s = Marshal.PtrToStringAnsi((IntPtr)P_0); // Maybe UTF-8?
-			Console.WriteLine(s);
-			return 0;
+			string? s = Marshal.PtrToStringAnsi((IntPtr)str); // Maybe UTF-8?
+			Console.Write(s);
+			return s?.Length ?? 0;
 		}
 		catch
 		{
 			return -1;
 		}
+	}
+
+	[MangledName("fputs")]
+	public static int PutString(sbyte* str, void* file)
+	{
+		// https://cplusplus.com/reference/cstdio/fputs/
+		try
+		{
+			string? s = Marshal.PtrToStringAnsi((IntPtr)str); // Maybe UTF-8?
+			if (file == StandardOutput)
+			{
+				Console.Write(s);
+			}
+			else if (file == StandardError)
+			{
+				Console.Error.Write(s);
+			}
+			else
+			{
+				// Unsupported stream
+				return -1;
+			}
+			return s?.Length ?? 0;
+		}
+		catch
+		{
+			return -1;
+		}
+	}
+
+	[MangledName("__stdio_common_vfprintf")]
+	public static int __stdio_common_vfprintf(long options, void* stream, void* format, void* locale, void* argList)
+	{
+		// https://learn.microsoft.com/en-us/cpp/c-runtime-library/internal-crt-globals-and-functions?view=msvc-170
+		throw new NotSupportedException("C++ string formatting is not supported.");
+	}
+
+	[MangledName("__stdio_common_vsprintf_s")]
+	public static int __stdio_common_vsprintf_s(long options, void* buffer, long bufferLength, void* format, void* locale, void* argList)
+	{
+		// https://learn.microsoft.com/en-us/cpp/c-runtime-library/internal-crt-globals-and-functions?view=msvc-170
+		throw new NotSupportedException("C++ string formatting is not supported.");
+	}
+
+	private static void* _standardInput;
+	private static void* StandardInput
+	{
+		get
+		{
+			if (_standardInput == null)
+			{
+				// Allocate a dummy value to represent standard input
+				_standardInput = (void*)Marshal.AllocHGlobal(sizeof(byte));
+			}
+			return _standardInput;
+		}
+	}
+
+	private static void* _standardOutput;
+	private static void* StandardOutput
+	{
+		get
+		{
+			if (_standardOutput == null)
+			{
+				// Allocate a dummy value to represent standard output
+				_standardOutput = (void*)Marshal.AllocHGlobal(sizeof(byte));
+			}
+			return _standardOutput;
+		}
+	}
+
+	private static void* _standardError;
+	private static void* StandardError
+	{
+		get
+		{
+			if (_standardError == null)
+			{
+				// Allocate a dummy value to represent standard error
+				_standardError = (void*)Marshal.AllocHGlobal(sizeof(byte));
+			}
+			return _standardError;
+		}
+	}
+
+	[MangledName("__acrt_iob_func")]
+	public static void* GetSystemStream(int identifier)
+	{
+		// https://learn.microsoft.com/en-us/cpp/c-runtime-library/internal-crt-globals-and-functions?view=msvc-170
+		// identifier: 0 = stdin, 1 = stdout, 2 = stderr
+		return identifier switch
+		{
+			0 => StandardInput,
+			1 => StandardOutput,
+			2 => StandardError,
+			_ => null,
+		};
 	}
 
 	[MangledName("_wassert")]
