@@ -63,6 +63,13 @@ internal static unsafe partial class IntrinsicFunctions
 		throw new FatalException(nameof(Terminate));
 	}
 
+	[DoesNotReturn]
+	[MangledName("exit")]
+	public static void Exit(int exitCode)
+	{
+		Environment.Exit(exitCode);
+	}
+
 	// Stack to hold atexit functions because they need to be called in LIFO order.
 	private readonly static ConcurrentStack<nint> atexitFunctions = new();
 	[MangledName("atexit")]
