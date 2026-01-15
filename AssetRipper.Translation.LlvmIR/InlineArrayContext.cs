@@ -40,6 +40,7 @@ internal sealed class InlineArrayContext : IHasName
 
 	private InlineArrayContext(ModuleContext module, TypeDefinition type, TypeSignature elementType, int length)
 	{
+		ArgumentOutOfRangeException.ThrowIfNegative(length);
 		Module = module;
 		Type = type;
 		ElementType = elementType;
@@ -82,6 +83,7 @@ internal sealed class InlineArrayContext : IHasName
 		module.Definition.TopLevelTypes.Add(arrayType);
 
 		//Add InlineArrayAttribute to arrayType
+		if (size > 0)
 		{
 			System.Reflection.ConstructorInfo constructorInfo = typeof(InlineArrayAttribute).GetConstructors().Single();
 			IMethodDescriptor inlineArrayAttributeConstructor = module.Definition.DefaultImporter.ImportMethod(constructorInfo);
@@ -91,6 +93,7 @@ internal sealed class InlineArrayContext : IHasName
 		}
 
 		//Add private instance field with the cooresponding type.
+		if (size > 0)
 		{
 			FieldDefinition field = new("__element0", FieldAttributes.Private, type);
 			arrayType.Fields.Add(field);
