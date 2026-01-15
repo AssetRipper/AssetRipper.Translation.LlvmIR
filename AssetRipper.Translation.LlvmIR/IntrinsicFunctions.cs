@@ -430,6 +430,17 @@ internal static unsafe partial class IntrinsicFunctions
 		return double.Sqrt(d);
 	}
 
+	private static readonly long StartTicks = Environment.TickCount64;
+	[MangledName("clock")]
+	public static int Clock()
+	{
+		// https://cplusplus.com/reference/ctime/clock/
+		// Note: this assumes that CLOCKS_PER_SEC is 1000, which is true on Windows, but not necessarily on other platforms.
+		// If C++ code is compiled on a platform where CLOCKS_PER_SEC is different, this implementation will not be accurate.
+		long elapsedTicks = Environment.TickCount64 - StartTicks;
+		return unchecked((int)elapsedTicks);
+	}
+
 	[MangledName("memcmp")]
 	public static int memcmp(byte* p1, byte* p2, long count)
 	{
