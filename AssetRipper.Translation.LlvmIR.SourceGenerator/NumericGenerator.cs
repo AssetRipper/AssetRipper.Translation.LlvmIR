@@ -85,6 +85,11 @@ public partial class NumericGenerator() : IncrementalGenerator(nameof(NumericGen
 		("Pow", null, "IPowerFunctions<T>"),
 	];
 
+	private static IEnumerable<(string LlvmName, string? DotNetName, string? RequiredInterfaces)> TertiaryInterfaceOperations =>
+	[
+		("FMulAdd", "FusedMultiplyAdd", "IFloatingPointIeee754<T>"),
+	];
+
 	public override void OnInitialize(SgfInitializationContext context)
 	{
 		context.RegisterPostInitializationOutput(static context =>
@@ -238,6 +243,21 @@ public partial class NumericGenerator() : IncrementalGenerator(nameof(NumericGen
 					writer.WriteLine($"return T.{methodName}(x, y);");
 				}
 			}
+			foreach ((string llvmName, string? dotNetName, string? requiredInterfaces) in TertiaryInterfaceOperations)
+			{
+				writer.WriteLineNoTabs();
+				writer.WriteLine("[MethodImpl(MethodImplOptions.AggressiveInlining)]");
+				string methodName = string.IsNullOrEmpty(dotNetName) ? llvmName : dotNetName!;
+				writer.WriteLine($"public static T {llvmName}<T>(T x, T y, T z)");
+				if (!string.IsNullOrEmpty(requiredInterfaces))
+				{
+					writer.WriteLine($"where T : {requiredInterfaces}");
+				}
+				using (new CurlyBrackets(writer))
+				{
+					writer.WriteLine($"return T.{methodName}(x, y, z);");
+				}
+			}
 		}
 
 		return stringWriter.ToString();
@@ -290,6 +310,11 @@ public partial class NumericGenerator() : IncrementalGenerator(nameof(NumericGen
 			foreach ((string llvmName, string? dotNetName, string? requiredInterfaces) in BinaryInterfaceOperations)
 			{
 				WriteBinaryTensorPrimitivesMethod(writer, llvmName, dotNetName, ReplaceTypeParameterName(requiredInterfaces));
+			}
+
+			foreach ((string llvmName, string? dotNetName, string? requiredInterfaces) in TertiaryInterfaceOperations)
+			{
+				WriteTertiaryTensorPrimitivesMethod(writer, llvmName, dotNetName, ReplaceTypeParameterName(requiredInterfaces));
 			}
 		}
 
@@ -377,6 +402,26 @@ public partial class NumericGenerator() : IncrementalGenerator(nameof(NumericGen
 				{
 					writer.WriteLine($"result.SetElement(i, NumericHelper.{methodName}<TElement>(x.GetElement<TBuffer, TElement>(i), y.GetElement<TBuffer, TElement>(i)));");
 				}
+				writer.WriteLine("return result;");
+			}
+		}
+
+		static void WriteTertiaryTensorPrimitivesMethod(IndentedTextWriter writer, string llvmName, string? dotNetName, string? requiredInterfaces)
+		{
+			writer.WriteLineNoTabs();
+			writer.WriteLine($"public static TBuffer {llvmName}<TBuffer, TElement>(TBuffer x, TBuffer y, TBuffer z)");
+			using (new Indented(writer))
+			{
+				writer.WriteLine("where TBuffer : struct, IInlineArray<TElement>");
+				if (!string.IsNullOrEmpty(requiredInterfaces))
+				{
+					writer.WriteLine($"where TElement : {requiredInterfaces}");
+				}
+			}
+			using (new CurlyBrackets(writer))
+			{
+				writer.WriteLine("TBuffer result = default;");
+				writer.WriteLine($"TensorPrimitives.{(string.IsNullOrEmpty(dotNetName) ? llvmName : dotNetName)}(x.AsReadOnlySpan<TBuffer, TElement>(), y.AsReadOnlySpan<TBuffer, TElement>(), z.AsReadOnlySpan<TBuffer, TElement>(), result.AsSpan<TBuffer, TElement>());");
 				writer.WriteLine("return result;");
 			}
 		}

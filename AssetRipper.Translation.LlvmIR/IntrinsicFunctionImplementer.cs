@@ -4,6 +4,7 @@ using AsmResolver.DotNet.Collections;
 using AsmResolver.DotNet.Signatures;
 using AsmResolver.PE.DotNet.Cil;
 using AssetRipper.Translation.LlvmIR.Attributes;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Text.RegularExpressions;
 
@@ -117,10 +118,16 @@ internal static partial class IntrinsicFunctionImplementer
 
 		CilInstructionCollection instructions = context.Definition.CilMethodBody!.Instructions;
 
+		int parameterCount = implementation.Method!.Signature!.GetTotalParameterCount();
+		Debug.Assert(parameterCount is 1 or 2 or 3);
 		instructions.Add(CilOpCodes.Ldarg_0);
-		if (implementation.Method!.Signature!.GetTotalParameterCount() == 2)
+		if (parameterCount is >= 2)
 		{
 			instructions.Add(CilOpCodes.Ldarg_1);
+			if (parameterCount is 3)
+			{
+				instructions.Add(CilOpCodes.Ldarg_2);
+			}
 		}
 		instructions.Add(CilOpCodes.Call, implementation);
 		instructions.Add(CilOpCodes.Ret);
