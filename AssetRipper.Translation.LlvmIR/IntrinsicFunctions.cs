@@ -417,6 +417,12 @@ internal static unsafe partial class IntrinsicFunctions
 		return int.Parse(span, System.Globalization.CultureInfo.InvariantCulture);
 	}
 
+	[MangledName("sqrt")]
+	public static double Sqrt(double d)
+	{
+		return double.Sqrt(d);
+	}
+
 	[MangledName("memcmp")]
 	public static int memcmp(byte* p1, byte* p2, long count)
 	{
