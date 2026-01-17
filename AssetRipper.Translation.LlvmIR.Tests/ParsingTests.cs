@@ -1,12 +1,11 @@
 ﻿using Antlr4.Runtime;
 using Antlr4.Runtime.Tree;
-using NUnit.Framework;
 
 namespace AssetRipper.Translation.LlvmIR.Tests;
 
 public class ParsingTests
 {
-	static readonly string[] demangledFunctionStrings =
+	public static string[] DemangledFunctionStrings() =>
 	[
 		"void __cdecl fpng::fpng_init(void)",
 		"bool __cdecl fpng::fpng_cpu_supports_sse41(void)",
@@ -45,21 +44,23 @@ public class ParsingTests
 		"public: struct crnd::crn_packed_uint<2> & __cdecl crnd::crn_packed_uint<2>::operator=(unsigned int)",
 	];
 
-	static readonly string[] demangledTypeStrings =
+	public static string[] DemangledTypeStrings() =>
 	[
 		"class std::vector<unsigned char, class std::allocator<unsigned char>>",
 		"struct spirv_cross::CompilerHLSL::<unnamed-type-base_vertex_info>",
 		"enum std::_Iosb<int>::<unnamed-enum-_Openprot>",
 	];
 
-	[TestCaseSource(nameof(demangledFunctionStrings))]
+	[Test]
+	[MethodDataSource(nameof(DemangledFunctionStrings))]
 	public void FunctionParsingSucceeds(string input)
 	{
 		IParseTree tree = DemangledNamesParser.ParseFunction(input);
 		ErrorListener.AssertNoErrors(tree);
 	}
 
-	[TestCaseSource(nameof(demangledTypeStrings))]
+	[Test]
+	[MethodDataSource(nameof(DemangledTypeStrings))]
 	public void TypeParsingSucceeds(string input)
 	{
 		IParseTree tree = DemangledNamesParser.ParseType(input);
@@ -67,7 +68,7 @@ public class ParsingTests
 	}
 
 	[Test]
-	public void ExtractionSucceeds()
+	public async Task ExtractionSucceeds()
 	{
 		string input = "public: unsigned char & __cdecl std::vector<unsigned char, class std::allocator<unsigned char>>::operator[](unsigned __int64)";
 		bool success = DemangledNamesParser.ParseFunction(
@@ -80,28 +81,29 @@ public class ParsingTests
 			out string[]? templateParameters,
 			out string[]? normalParameters);
 
-		Assert.That(success, Is.True);
-		using (Assert.EnterMultipleScope())
+		await Assert.That(success).IsTrue();
+		using (Assert.Multiple())
 		{
-			Assert.That(returnType, Is.EqualTo("unsigned char &"));
-			Assert.That(@namespace, Is.EqualTo("std"));
-			Assert.That(typeName, Is.EqualTo("vector<unsigned char, class std::allocator<unsigned char>>"));
-			Assert.That(functionIdentifier, Is.EqualTo("operator[]"));
-			Assert.That(functionName, Is.EqualTo("operator[]")); // Maybe want operator[] instead?
-			Assert.That(templateParameters, Is.Empty);
-			Assert.That(normalParameters, Is.EqualTo(new[] { "unsigned __int64" }));
+			await Assert.That(returnType).IsEqualTo("unsigned char &");
+			await Assert.That(@namespace).IsEqualTo("std");
+			await Assert.That(typeName).IsEqualTo("vector<unsigned char, class std::allocator<unsigned char>>");
+			await Assert.That(functionIdentifier).IsEqualTo("operator[]");
+			await Assert.That(functionName).IsEqualTo("operator[]"); // Maybe want operator[] instead?
+			await Assert.That(templateParameters).IsEmpty();
+			await Assert.That(normalParameters).IsEquivalentTo(["unsigned __int64"]);
 		}
 	}
 
-	[TestCase(6, "bool __cdecl fpng::fpng_encode_image_to_memory(void const *, unsigned int, unsigned int, unsigned int, class std::vector<unsigned char, class std::allocator<unsigned char>> &, unsigned int)")]
-	public void ExtractionHasCorrectParameterCount(int expectedCount, string input)
+	[Test]
+	[Arguments(6, "bool __cdecl fpng::fpng_encode_image_to_memory(void const *, unsigned int, unsigned int, unsigned int, class std::vector<unsigned char, class std::allocator<unsigned char>> &, unsigned int)")]
+	public async Task ExtractionHasCorrectParameterCount(int expectedCount, string input)
 	{
 		bool success = DemangledNamesParser.ParseFunction(input, out _, out _, out _, out _, out _, out _, out string[]? normalParameters);
 
-		Assert.That(success, Is.True);
-		using (Assert.EnterMultipleScope())
+		await Assert.That(success).IsTrue();
+		using (Assert.Multiple())
 		{
-			Assert.That(normalParameters, Has.Length.EqualTo(expectedCount));
+			await Assert.That(normalParameters).Count().IsEqualTo(expectedCount);
 		}
 	}
 
@@ -123,7 +125,7 @@ public class ParsingTests
 
 		void IParseTreeListener.VisitErrorNode(IErrorNode node)
 		{
-			Assert.Fail($"Parsing error: {node}");
+			Fail.Test($"Parsing error: {node}");
 		}
 
 		void IParseTreeListener.VisitTerminal(ITerminalNode node)

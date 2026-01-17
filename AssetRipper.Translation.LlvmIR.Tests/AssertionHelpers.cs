@@ -2,7 +2,6 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Emit;
-using NUnit.Framework;
 using System.Collections.Concurrent;
 using System.Numerics.Tensors;
 using System.Text;
@@ -11,16 +10,14 @@ namespace AssetRipper.Translation.LlvmIR.Tests;
 
 internal static class AssertionHelpers
 {
-	public static void AssertSavesSuccessfully(ModuleDefinition module)
+	public static Task AssertSavesSuccessfully(ModuleDefinition module)
 	{
-		Assert.DoesNotThrow(() =>
-		{
-			using MemoryStream stream = new();
-			module.Write(stream);
-		});
+		using MemoryStream stream = new();
+		module.Write(stream);
+		return Task.CompletedTask;
 	}
 
-	public static void AssertDecompilesSuccessfully(ModuleDefinition module)
+	public static async Task AssertDecompilesSuccessfully(ModuleDefinition module)
 	{
 		string directory = Path.GetRandomFileName();
 		Directory.CreateDirectory(directory);
@@ -28,26 +25,16 @@ internal static class AssertionHelpers
 		{
 			new TranslationProjectDecompiler().DecompileProject(module, directory);
 
-			using (Assert.EnterMultipleScope())
+			using (Assert.Multiple())
 			{
-				Assert.That(Directory.GetFiles(directory, "*.cs", SearchOption.AllDirectories), Has.Length.GreaterThan(0));
-				Assert.That(SuccessfullyCompiles(directory));
+				await Assert.That(Directory.GetFiles(directory, "*.cs", SearchOption.AllDirectories)).Count().IsGreaterThan(0);
+				await Assert.That(SuccessfullyCompiles(directory)).IsTrue();
 			}
 		}
 		finally
 		{
 			Directory.Delete(directory, true);
 		}
-	}
-
-	public static void AssertPublicMethodCount(TypeDefinition type, int count)
-	{
-		Assert.That(type.Methods.Count(m => m.IsPublic), Is.EqualTo(count));
-	}
-
-	public static void AssertPublicFieldCount(TypeDefinition type, int count)
-	{
-		Assert.That(type.Fields.Count(f => f.IsPublic), Is.EqualTo(count));
 	}
 
 	private static bool SuccessfullyCompiles(string directory)

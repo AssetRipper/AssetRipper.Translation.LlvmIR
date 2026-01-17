@@ -1,5 +1,4 @@
 ﻿using AsmResolver.DotNet;
-using NUnit.Framework;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Runtime.Loader;
@@ -21,7 +20,7 @@ internal static class ExecutionHelpers
 		return context.LoadFromStream(stream);
 	}
 
-	public static unsafe void RunTest(ModuleDefinition module, Action<Assembly> testAction)
+	public static async Task RunTest(ModuleDefinition module, Func<Assembly, Task> testAction)
 	{
 		AssemblyLoadContext context = CreateLoadContext();
 		
@@ -31,7 +30,7 @@ internal static class ExecutionHelpers
 
 			try
 			{
-				testAction.Invoke(assembly);
+				await testAction.Invoke(assembly);
 			}
 			finally
 			{
@@ -46,11 +45,14 @@ internal static class ExecutionHelpers
 						continue;
 					}
 
-					Pointer pointer = (Pointer)field.GetValue(null)!;
-					IntPtr value = (IntPtr)Pointer.Unbox(pointer);
-					if (value != IntPtr.Zero)
+					unsafe
 					{
-						Marshal.FreeHGlobal(value);
+						Pointer pointer = (Pointer)field.GetValue(null)!;
+						IntPtr value = (IntPtr)Pointer.Unbox(pointer);
+						if (value != IntPtr.Zero)
+						{
+							Marshal.FreeHGlobal(value);
+						}
 					}
 				}
 			}
@@ -65,10 +67,8 @@ internal static class ExecutionHelpers
 
 	public static MethodInfo GetMethod(Assembly assembly, string name)
 	{
-		Type? type = assembly.GetType("GlobalMembers");
-		Assert.That(type, Is.Not.Null);
-		MethodInfo? method = type.GetMethod(name, BindingFlags.Public | BindingFlags.Static);
-		Assert.That(method, Is.Not.Null);
+		Type type = assembly.GetType("GlobalMembers") ?? throw new NullReferenceException(nameof(type));
+		MethodInfo method = type.GetMethod(name, BindingFlags.Public | BindingFlags.Static) ?? throw new NullReferenceException(nameof(method));
 		return method;
 	}
 

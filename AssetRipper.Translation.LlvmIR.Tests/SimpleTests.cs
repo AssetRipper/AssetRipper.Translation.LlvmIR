@@ -1,13 +1,9 @@
-﻿using NUnit.Framework;
-using System.Reflection;
+﻿using System.Reflection;
 
 namespace AssetRipper.Translation.LlvmIR.Tests;
 
-[NonParallelizable]
 public partial class SimpleTests
 {
-	[SavesSuccessfully]
-	[DecompilesSuccessfully]
 	private const string Noop = """
 		define dso_local i32 @do_nothing(i32 noundef %0) {
 		  %2 = alloca i32, align 4
@@ -18,17 +14,15 @@ public partial class SimpleTests
 		""";
 
 	[Test]
-	public void Noop_ExecutesCorrectly()
+	public async Task Noop_ExecutesCorrectly()
 	{
-		ExecutionHelpers.RunTest(Noop.TranslateToCIL(), assembly =>
+		await ExecutionHelpers.RunTest(Noop.TranslateToCIL(), async assembly =>
 		{
 			Func<int, int> method = ExecutionHelpers.GetMethod<Func<int, int>>(assembly, "do_nothing");
-			Assert.That(method.Invoke(42), Is.EqualTo(42));
+			await Assert.That(method.Invoke(42)).IsEqualTo(42);
 		});
 	}
 
-	[SavesSuccessfully]
-	[DecompilesSuccessfully]
 	private const string BitCast = """
 		define dso_local noundef i32 @"?bitcastExample@@YAHM@Z"(float noundef %0) {
 		  %2 = alloca float, align 4
@@ -51,8 +45,6 @@ public partial class SimpleTests
 		}
 		""";
 
-	[SavesSuccessfully]
-	[DecompilesSuccessfully]
 	private const string FloatMathWithConstant = """
 		define dso_local float @incrementF(float noundef %0) {
 		  %2 = alloca float, align 4
@@ -71,8 +63,6 @@ public partial class SimpleTests
 		}
 		""";
 
-	[SavesSuccessfully]
-	[DecompilesSuccessfully]
 	private const string IntegerCasts = """
 		define dso_local i64 @i32_to_i64(i32 noundef %0) {
 		  %2 = alloca i32, align 4
@@ -115,8 +105,6 @@ public partial class SimpleTests
 		}
 		""";
 
-	[SavesSuccessfully]
-	[DecompilesSuccessfully]
 	private const string BooleanCasts = """
 		define dso_local i8 @i1_to_i8(i1 noundef %0) {
 		  %2 = sext i1 %0 to i8
@@ -179,49 +167,48 @@ public partial class SimpleTests
 		}
 		""";
 
-	[TestCase(["i1_to_i8", false, (sbyte)0])]
-	[TestCase(["i1_to_i8", true, (sbyte)1])]
-	[TestCase(["u1_to_u8", false, (sbyte)0])]
-	[TestCase(["u1_to_u8", true, (sbyte)1])]
-	[TestCase(["i1_to_i16", false, (short)0])]
-	[TestCase(["i1_to_i16", true, (short)1])]
-	[TestCase(["u1_to_u16", false, (ushort)0])]
-	[TestCase(["u1_to_u16", true, (ushort)1])]
-	[TestCase(["i1_to_i32", false, 0])]
-	[TestCase(["i1_to_i32", true, 1])]
-	[TestCase(["u1_to_u32", false, 0])]
-	[TestCase(["u1_to_u32", true, 1])]
-	[TestCase(["i1_to_i64", false, 0L])]
-	[TestCase(["i1_to_i64", true, 1L])]
-	[TestCase(["u1_to_u64", false, 0L])]
-	[TestCase(["u1_to_u64", true, 1L])]
-	[TestCase(["i8_to_i1", (sbyte)0, false])]
-	[TestCase(["i8_to_i1", (sbyte)1, true])]
-	[TestCase(["i8_to_i1", (sbyte)2, false])]
-	[TestCase(["i8_to_i1", (sbyte)3, true])]
-	[TestCase(["i16_to_i1", (short)0, false])]
-	[TestCase(["i16_to_i1", (short)1, true])]
-	[TestCase(["i16_to_i1", (short)2, false])]
-	[TestCase(["i16_to_i1", (short)3, true])]
-	[TestCase(["i32_to_i1", 0, false])]
-	[TestCase(["i32_to_i1", 1, true])]
-	[TestCase(["i32_to_i1", 2, false])]
-	[TestCase(["i32_to_i1", 3, true])]
-	[TestCase(["i64_to_i1", 0L, false])]
-	[TestCase(["i64_to_i1", 1L, true])]
-	[TestCase(["i64_to_i1", 2L, false])]
-	[TestCase(["i64_to_i1", 3L, true])]
-	public void BooleanCasts_ExecutesCorrectly(string methodName, object input, object expectedOutput)
+	[Test]
+	[Arguments(["i1_to_i8", false, (sbyte)0])]
+	[Arguments(["i1_to_i8", true, (sbyte)1])]
+	[Arguments(["u1_to_u8", false, (sbyte)0])]
+	[Arguments(["u1_to_u8", true, (sbyte)1])]
+	[Arguments(["i1_to_i16", false, (short)0])]
+	[Arguments(["i1_to_i16", true, (short)1])]
+	[Arguments(["u1_to_u16", false, (short)0])]
+	[Arguments(["u1_to_u16", true, (short)1])]
+	[Arguments(["i1_to_i32", false, 0])]
+	[Arguments(["i1_to_i32", true, 1])]
+	[Arguments(["u1_to_u32", false, 0])]
+	[Arguments(["u1_to_u32", true, 1])]
+	[Arguments(["i1_to_i64", false, 0L])]
+	[Arguments(["i1_to_i64", true, 1L])]
+	[Arguments(["u1_to_u64", false, 0L])]
+	[Arguments(["u1_to_u64", true, 1L])]
+	[Arguments(["i8_to_i1", (sbyte)0, false])]
+	[Arguments(["i8_to_i1", (sbyte)1, true])]
+	[Arguments(["i8_to_i1", (sbyte)2, false])]
+	[Arguments(["i8_to_i1", (sbyte)3, true])]
+	[Arguments(["i16_to_i1", (short)0, false])]
+	[Arguments(["i16_to_i1", (short)1, true])]
+	[Arguments(["i16_to_i1", (short)2, false])]
+	[Arguments(["i16_to_i1", (short)3, true])]
+	[Arguments(["i32_to_i1", 0, false])]
+	[Arguments(["i32_to_i1", 1, true])]
+	[Arguments(["i32_to_i1", 2, false])]
+	[Arguments(["i32_to_i1", 3, true])]
+	[Arguments(["i64_to_i1", 0L, false])]
+	[Arguments(["i64_to_i1", 1L, true])]
+	[Arguments(["i64_to_i1", 2L, false])]
+	[Arguments(["i64_to_i1", 3L, true])]
+	public Task BooleanCasts_ExecutesCorrectly(string methodName, object input, object expectedOutput)
 	{
-		ExecutionHelpers.RunTest(BooleanCasts.TranslateToCIL(), assembly =>
+		return ExecutionHelpers.RunTest(BooleanCasts.TranslateToCIL(), async assembly =>
 		{
 			MethodInfo method = ExecutionHelpers.GetMethod(assembly, methodName);
-			Assert.That(method.Invoke(null, [input]), Is.EqualTo(expectedOutput));
+			await Assert.That(method.Invoke(null, [input])).IsEqualTo(expectedOutput);
 		});
 	}
 
-	[SavesSuccessfully]
-	[DecompilesSuccessfully]
 	private const string ForLoop = """
 		define dso_local i32 @sum(ptr noundef %0, i32 noundef %1) {
 		  %3 = alloca i32, align 4
@@ -263,8 +250,6 @@ public partial class SimpleTests
 		}
 		""";
 
-	[SavesSuccessfully]
-	[DecompilesSuccessfully]
 	private const string HalfAdd = """
 		define dso_local half @add(half noundef %0, half noundef %1) {
 		  %3 = fadd half %0, %1
@@ -272,8 +257,6 @@ public partial class SimpleTests
 		}
 		""";
 
-	[SavesSuccessfully]
-	[DecompilesSuccessfully]
 	private const string Int128Add = """
 		define dso_local i128 @add(i128 noundef %0, i128 noundef %1) {
 		  %3 = add i128 %0, %1
@@ -281,8 +264,6 @@ public partial class SimpleTests
 		}
 		""";
 
-	[SavesSuccessfully]
-	[DecompilesSuccessfully]
 	private const string VectorAdd = """
 		define linkonce_odr dso_local noundef <4 x i32> @add(<4 x i32> noundef %0, <4 x i32> noundef %1) {
 		  %3 = add <4 x i32> %0, %1
@@ -290,8 +271,6 @@ public partial class SimpleTests
 		}
 		""";
 
-	[SavesSuccessfully]
-	[DecompilesSuccessfully]
 	private const string VectorVariableSizeAdd = """
 		define linkonce_odr dso_local noundef <vscale x 4 x i32> @add(<vscale x 4 x i32> noundef %0, <vscale x 4 x i32> noundef %1) {
 		  %3 = add <vscale x 4 x i32> %0, %1
@@ -299,8 +278,6 @@ public partial class SimpleTests
 		}
 		""";
 
-	[SavesSuccessfully]
-	[DecompilesSuccessfully]
 	private const string VectorExtractElement = """
 		define linkonce_odr dso_local noundef i32 @extract(<4 x i32> noundef %0) {
 		  %3 = extractelement <4 x i32> %0, i64 2
@@ -308,8 +285,6 @@ public partial class SimpleTests
 		}
 		""";
 
-	[SavesSuccessfully]
-	[DecompilesSuccessfully]
 	private const string VectorInsertElement = """
 		define linkonce_odr dso_local noundef <4 x i32> @insert(<4 x i32> noundef %0, i32 noundef %1) {
 		  %3 = insertelement <4 x i32> %0, i32 %1, i16 2
@@ -317,8 +292,6 @@ public partial class SimpleTests
 		}
 		""";
 
-	[SavesSuccessfully]
-	[DecompilesSuccessfully]
 	private const string ArrayExtractValue = """
 		define linkonce_odr dso_local noundef i32 @extract([4 x i32] noundef %0) {
 		  %3 = extractvalue [4 x i32] %0, 2
@@ -326,8 +299,6 @@ public partial class SimpleTests
 		}
 		""";
 
-	[SavesSuccessfully]
-	[DecompilesSuccessfully]
 	private const string ArrayInsertValue = """
 		define linkonce_odr dso_local noundef [4 x i32] @insert([4 x i32] noundef %0, i32 noundef %1) {
 		  %3 = insertvalue [4 x i32] %0, i32 %1, 2
@@ -335,8 +306,6 @@ public partial class SimpleTests
 		}
 		""";
 
-	[SavesSuccessfully]
-	[DecompilesSuccessfully]
 	private const string StaticIntVariable = """
 		@value = internal global i32 1, align 4
 
@@ -369,12 +338,40 @@ public partial class SimpleTests
 		""";
 
 	[Test]
-	public void StaticIntVariable_ExecutesCorrectly()
+	public Task StaticIntVariable_ExecutesCorrectly()
 	{
-		ExecutionHelpers.RunTest(StaticIntVariable.TranslateToCIL(), assembly =>
+		return ExecutionHelpers.RunTest(StaticIntVariable.TranslateToCIL(), async assembly =>
 		{
 			Func<int> method = ExecutionHelpers.GetMethod<Func<int>>(assembly, "get");
-			Assert.That(method.Invoke(), Is.EqualTo(1));
+			await Assert.That(method.Invoke()).IsEqualTo(1);
 		});
+	}
+
+	public static IEnumerable<TestDataRow<string>> GetTestCases()
+	{
+		foreach (FieldInfo field in typeof(SimpleTests).GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static))
+		{
+			if (field.FieldType != typeof(string))
+			{
+				continue;
+			}
+
+			string llvmCode = (string)field.GetValue(null)!;
+			yield return new TestDataRow<string>(llvmCode) { DisplayName = field.Name };
+		}
+	}
+
+	[Test]
+	[MethodDataSource(nameof(GetTestCases))]
+	public Task SavesSuccessfully(string llvmCode)
+	{
+		return AssertionHelpers.AssertSavesSuccessfully(llvmCode.TranslateToCIL());
+	}
+
+	[Test]
+	[MethodDataSource(nameof(GetTestCases))]
+	public Task DecompilesSuccessfully(string llvmCode)
+	{
+		return AssertionHelpers.AssertDecompilesSuccessfully(llvmCode.TranslateToCIL());
 	}
 }

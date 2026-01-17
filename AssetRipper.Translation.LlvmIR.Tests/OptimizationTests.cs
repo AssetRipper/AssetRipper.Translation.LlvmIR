@@ -3,25 +3,24 @@ using AsmResolver.DotNet.Signatures;
 using AsmResolver.PE.DotNet.Cil;
 using AssetRipper.Translation.LlvmIR.Instructions;
 using AssetRipper.Translation.LlvmIR.Variables;
-using NUnit.Framework;
 
 namespace AssetRipper.Translation.LlvmIR.Tests;
 
 internal class OptimizationTests
 {
-	public ModuleDefinition Module { get; private set; }
+	public ModuleDefinition Module { get; private set; } = null!;
 	public TypeSignature Void => Module.CorLibTypeFactory.Void;
 	public TypeSignature Int32 => Module.CorLibTypeFactory.Int32;
 	public TypeSignature Int64 => Module.CorLibTypeFactory.Int64;
 
-	[SetUp]
+	[Before(HookType.Test)]
 	public void SetUp()
 	{
 		Module = new("TestModule");
 	}
 
 	[Test]
-	public void LoadIndirect()
+	public async Task LoadIndirect()
 	{
 		ImportantVariable data = new(Int32);
 
@@ -38,11 +37,11 @@ internal class OptimizationTests
 
 		Optimize(instructions);
 
-		Assert.That(instructions, Is.EqualTo(optimizedInstructions));
+		await Assert.That(instructions).IsEquivalentTo(optimizedInstructions);
 	}
 
 	[Test]
-	public void StoreIndirect_1()
+	public async Task StoreIndirect_1()
 	{
 		ImportantVariable data = new(Int32);
 		ImportantVariable x = new(Int32);
@@ -67,11 +66,11 @@ internal class OptimizationTests
 
 		Optimize(instructions);
 
-		Assert.That(instructions, Is.EqualTo(optimizedInstructions));
+		await Assert.That(instructions).IsEquivalentTo(optimizedInstructions);
 	}
 
 	[Test]
-	public void StoreIndirect_2()
+	public async Task StoreIndirect_2()
 	{
 		ImportantVariable data = new(Int32);
 		ImportantVariable x = new(Int32);
@@ -102,11 +101,11 @@ internal class OptimizationTests
 
 		Optimize(instructions);
 
-		Assert.That(instructions, Is.EqualTo(optimizedInstructions));
+		await Assert.That(instructions).IsEquivalentTo(optimizedInstructions);
 	}
 
 	[Test]
-	public void StoreIndirect_3()
+	public async Task StoreIndirect_3()
 	{
 		ImportantVariable data = new(Int64);
 		ImportantVariable x = new(Int32);
@@ -127,11 +126,11 @@ internal class OptimizationTests
 
 		Optimize(instructions);
 
-		Assert.That(instructions, Is.EqualTo(optimizedInstructions));
+		await Assert.That(instructions).IsEquivalentTo(optimizedInstructions);
 	}
 
 	[Test]
-	public void Pop_1()
+	public async Task Pop_1()
 	{
 		LocalVariable data = new(Int32);
 		ImportantVariable x = new(Int32);
@@ -155,11 +154,11 @@ internal class OptimizationTests
 
 		Optimize(instructions);
 
-		Assert.That(instructions, Is.EqualTo(optimizedInstructions));
+		await Assert.That(instructions).IsEquivalentTo(optimizedInstructions);
 	}
 
 	[Test]
-	public void Pop_2()
+	public async Task Pop_2()
 	{
 		LocalVariable data = new(Int32);
 		ImportantVariable x = new(Int32);
@@ -176,11 +175,11 @@ internal class OptimizationTests
 
 		Optimize(instructions);
 
-		Assert.That(instructions, Is.EqualTo(optimizedInstructions));
+		await Assert.That(instructions).IsEquivalentTo(optimizedInstructions);
 	}
 
 	[Test]
-	public void Initialize_ShouldBeRemovedIfItsTheOnlyInstruction()
+	public async Task Initialize_ShouldBeRemovedIfItsTheOnlyInstruction()
 	{
 		LocalVariable data = new(Int32);
 
@@ -195,42 +194,42 @@ internal class OptimizationTests
 
 		Optimize(instructions);
 
-		Assert.That(instructions, Is.EqualTo(optimizedInstructions));
+		await Assert.That(instructions).IsEquivalentTo(optimizedInstructions);
 	}
 
 	[Test]
-	public void Initialize_ShouldNotBeRemovedIfAddressStoredBefore()
-	{
-		LocalVariable data = new(Int32);
-		ImportantVariable pointer = new(Int32.MakePointerType());
-
-		BasicBlock instructions =
-		[
-			new AddressOfInstruction(data),
-			new StoreVariableInstruction(pointer),
-			new InitializeInstruction(data),
-		];
-
-		BasicBlock optimizedInstructions =
-		[
-			new AddressOfInstruction(data),
-			new StoreVariableInstruction(pointer),
-			new InitializeInstruction(data),
-		];
-
-		Optimize(instructions);
-
-		Assert.That(instructions, Is.EqualTo(optimizedInstructions));
-	}
-
-	[Test]
-	public void Initialize_ShouldNotBeRemovedIfAddressOccursAfter()
+	public async Task Initialize_ShouldNotBeRemovedIfAddressStoredBefore()
 	{
 		LocalVariable data = new(Int32);
 		ImportantVariable pointer = new(Int32.MakePointerType());
 
 		BasicBlock instructions =
 		[
+			new AddressOfInstruction(data),
+			new StoreVariableInstruction(pointer),
+			new InitializeInstruction(data),
+		];
+
+		BasicBlock optimizedInstructions =
+		[
+			new AddressOfInstruction(data),
+			new StoreVariableInstruction(pointer),
+			new InitializeInstruction(data),
+		];
+
+		Optimize(instructions);
+
+		await Assert.That(instructions).IsEquivalentTo(optimizedInstructions);
+	}
+
+	[Test]
+	public async Task Initialize_ShouldNotBeRemovedIfAddressOccursAfter()
+	{
+		LocalVariable data = new(Int32);
+		ImportantVariable pointer = new(Int32.MakePointerType());
+
+		BasicBlock instructions =
+		[
 			new InitializeInstruction(data),
 			new AddressOfInstruction(data),
 			new StoreVariableInstruction(pointer),
@@ -245,11 +244,11 @@ internal class OptimizationTests
 
 		Optimize(instructions);
 
-		Assert.That(instructions, Is.EqualTo(optimizedInstructions));
+		await Assert.That(instructions).IsEquivalentTo(optimizedInstructions);
 	}
 
 	[Test]
-	public void Initialize_ShouldWorkOnMultipleVariables()
+	public async Task Initialize_ShouldWorkOnMultipleVariables()
 	{
 		LocalVariable data1 = new(Int32);
 		LocalVariable data2 = new(Int32);
@@ -266,11 +265,11 @@ internal class OptimizationTests
 
 		Optimize(instructions);
 
-		Assert.That(instructions, Is.EqualTo(optimizedInstructions));
+		await Assert.That(instructions).IsEquivalentTo(optimizedInstructions);
 	}
 
 	[Test]
-	public void Initialize_ShouldBeRemovedIfStoreOccursAfter_1()
+	public async Task Initialize_ShouldBeRemovedIfStoreOccursAfter_1()
 	{
 		LocalVariable data = new(Int32);
 		ImportantVariable x = new(Int32);
@@ -298,11 +297,11 @@ internal class OptimizationTests
 
 		Optimize(instructions);
 
-		Assert.That(instructions, Is.EqualTo(optimizedInstructions));
+		await Assert.That(instructions).IsEquivalentTo(optimizedInstructions);
 	}
 
 	[Test]
-	public void Initialize_ShouldBeRemovedIfStoreOccursAfter_2()
+	public async Task Initialize_ShouldBeRemovedIfStoreOccursAfter_2()
 	{
 		LocalVariable data = new(Int32);
 		ImportantVariable x = new(Int32);
@@ -327,11 +326,11 @@ internal class OptimizationTests
 
 		Optimize(instructions);
 
-		Assert.That(instructions, Is.EqualTo(optimizedInstructions));
+		await Assert.That(instructions).IsEquivalentTo(optimizedInstructions);
 	}
 
 	[Test]
-	public void Initialize_ShouldNotBeRemovedIfLoadOccursAfter()
+	public async Task Initialize_ShouldNotBeRemovedIfLoadOccursAfter()
 	{
 		LocalVariable data = new(Int32);
 		ImportantVariable x = new(Int32);
@@ -352,11 +351,11 @@ internal class OptimizationTests
 
 		Optimize(instructions);
 
-		Assert.That(instructions, Is.EqualTo(optimizedInstructions));
+		await Assert.That(instructions).IsEquivalentTo(optimizedInstructions);
 	}
 
 	[Test]
-	public void Initialize_DoubleInitializationShouldBeRemoved()
+	public async Task Initialize_DoubleInitializationShouldBeRemoved()
 	{
 		LocalVariable data = new(Int32);
 		ImportantVariable x = new(Int32);
@@ -378,11 +377,11 @@ internal class OptimizationTests
 
 		Optimize(instructions);
 
-		Assert.That(instructions, Is.EqualTo(optimizedInstructions));
+		await Assert.That(instructions).IsEquivalentTo(optimizedInstructions);
 	}
 
 	[Test]
-	public void Initialize_ShouldNotRemoveAcrossBasicBlocksWithoutTwoStores()
+	public async Task Initialize_ShouldNotRemoveAcrossBasicBlocksWithoutTwoStores()
 	{
 		LocalVariable temp = new(Int32);
 
@@ -410,15 +409,15 @@ internal class OptimizationTests
 
 		Optimize(instructions1, instructions2);
 
-		using (Assert.EnterMultipleScope())
+		using (Assert.Multiple())
 		{
-			Assert.That(instructions1, Is.EqualTo(optimizedInstructions1));
-			Assert.That(instructions2, Is.EqualTo(optimizedInstructions2));
+			await Assert.That(instructions1).IsEquivalentTo(optimizedInstructions1);
+			await Assert.That(instructions2).IsEquivalentTo(optimizedInstructions2);
 		}
 	}
 
 	[Test]
-	public void Temporary_1()
+	public async Task Temporary_1()
 	{
 		LocalVariable data = new(Int32);
 		ImportantVariable x = new(Int32);
@@ -440,11 +439,11 @@ internal class OptimizationTests
 
 		Optimize(instructions);
 
-		Assert.That(instructions, Is.EqualTo(optimizedInstructions));
+		await Assert.That(instructions).IsEquivalentTo(optimizedInstructions);
 	}
 
 	[Test]
-	public void Temporary_2()
+	public async Task Temporary_2()
 	{
 		ImportantVariable x = new(Int32);
 		ImportantVariable y = new(Int32);
@@ -487,11 +486,11 @@ internal class OptimizationTests
 
 		Optimize(instructions);
 
-		Assert.That(instructions, Is.EqualTo(optimizedInstructions));
+		await Assert.That(instructions).IsEquivalentTo(optimizedInstructions);
 	}
 
 	[Test]
-	public void Temporary_3()
+	public async Task Temporary_3()
 	{
 		ImportantVariable x = new(Int32);
 		ImportantVariable y = new(Int32);
@@ -523,11 +522,11 @@ internal class OptimizationTests
 
 		Optimize(instructions);
 
-		Assert.That(instructions, Is.EqualTo(optimizedInstructions));
+		await Assert.That(instructions).IsEquivalentTo(optimizedInstructions);
 	}
 
 	[Test]
-	public void Temporary_4()
+	public async Task Temporary_4()
 	{
 		ImportantVariable x = new(Int32);
 		ImportantVariable y = new(Int32);
@@ -557,11 +556,11 @@ internal class OptimizationTests
 
 		Optimize(instructions);
 
-		Assert.That(instructions, Is.EqualTo(optimizedInstructions));
+		await Assert.That(instructions).IsEquivalentTo(optimizedInstructions);
 	}
 
 	[Test]
-	public void Temporary_5()
+	public async Task Temporary_5()
 	{
 		ImportantVariable x = new(Int32);
 		ImportantVariable y = new(Int32);
@@ -605,7 +604,7 @@ internal class OptimizationTests
 
 		Optimize(instructions);
 
-		Assert.That(instructions, Is.EqualTo(optimizedInstructions_1).Or.EqualTo(optimizedInstructions_2));
+		await Assert.That(instructions).IsEquivalentTo(optimizedInstructions_1).Or.IsEquivalentTo(optimizedInstructions_2);
 	}
 
 	private static void Optimize(BasicBlock instructions) => InstructionOptimizer.Optimize([instructions]);
