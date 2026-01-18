@@ -17,7 +17,7 @@ internal static unsafe partial class IntrinsicFunctions
 		try
 		{
 			string? s = Marshal.PtrToStringAnsi((IntPtr)str); // Maybe UTF-8?
-			Console.Write(s);
+			Console.WriteLine(s);
 			return s?.Length ?? 0;
 		}
 		catch
