@@ -76,7 +76,7 @@ internal static unsafe partial class IntrinsicFunctions
 			if (_standardInput == null)
 			{
 				// Allocate a dummy value to represent standard input
-				_standardInput = (void*)Marshal.AllocHGlobal(sizeof(byte));
+				_standardInput = NativeMemoryHelper.Allocate(sizeof(byte));
 			}
 			return _standardInput;
 		}
@@ -90,7 +90,7 @@ internal static unsafe partial class IntrinsicFunctions
 			if (_standardOutput == null)
 			{
 				// Allocate a dummy value to represent standard output
-				_standardOutput = (void*)Marshal.AllocHGlobal(sizeof(byte));
+				_standardOutput = NativeMemoryHelper.Allocate(sizeof(byte));
 			}
 			return _standardOutput;
 		}
@@ -104,7 +104,7 @@ internal static unsafe partial class IntrinsicFunctions
 			if (_standardError == null)
 			{
 				// Allocate a dummy value to represent standard error
-				_standardError = (void*)Marshal.AllocHGlobal(sizeof(byte));
+				_standardError = NativeMemoryHelper.Allocate(sizeof(byte));
 			}
 			return _standardError;
 		}

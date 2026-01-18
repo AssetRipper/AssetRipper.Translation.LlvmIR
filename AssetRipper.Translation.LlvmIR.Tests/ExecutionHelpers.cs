@@ -48,10 +48,10 @@ internal static class ExecutionHelpers
 					unsafe
 					{
 						Pointer pointer = (Pointer)field.GetValue(null)!;
-						IntPtr value = (IntPtr)Pointer.Unbox(pointer);
-						if (value != IntPtr.Zero)
+						void* value = Pointer.Unbox(pointer);
+						if (value != null)
 						{
-							Marshal.FreeHGlobal(value);
+							NativeMemory.Free(value);
 						}
 					}
 				}

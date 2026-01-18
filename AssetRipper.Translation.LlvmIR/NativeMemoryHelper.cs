@@ -7,14 +7,14 @@ internal static unsafe class NativeMemoryHelper
 {
 	private static readonly ConcurrentDictionary<nint, long> allocationSizes = new();
 
-	private static void SetAllocation(nint ptr, long size)
+	private static void SetAllocation(void* ptr, long size)
 	{
-		allocationSizes[ptr] = size;
+		allocationSizes[new(ptr)] = size;
 	}
 
-	private static void RemoveAllocation(nint ptr)
+	private static void RemoveAllocation(void* ptr)
 	{
-		allocationSizes.TryRemove(ptr, out _);
+		allocationSizes.TryRemove(new(ptr), out _);
 	}
 
 	public static void* Allocate(int size)
@@ -24,16 +24,15 @@ internal static unsafe class NativeMemoryHelper
 
 	public static void* Allocate(long size)
 	{
-		nint result = Marshal.AllocHGlobal((nint)size);
+		void* result = NativeMemory.AllocZeroed((nuint)size);
 		SetAllocation(result, size);
-		return result.ToPointer();
+		return result;
 	}
 
 	public static void Free(void* ptr)
 	{
-		nint value = (nint)ptr;
-		RemoveAllocation(value);
-		Marshal.FreeHGlobal(value);
+		RemoveAllocation(ptr);
+		NativeMemory.Free(ptr);
 	}
 
 	public static void* Reallocate(void* ptr, int newSize)
@@ -43,14 +42,13 @@ internal static unsafe class NativeMemoryHelper
 
 	public static void* Reallocate(void* ptr, long newSize)
 	{
-		nint value = (nint)ptr;
-		nint result = Marshal.ReAllocHGlobal(value, (nint)newSize);
+		void* result = NativeMemory.Realloc(ptr, (nuint)newSize);
 		SetAllocation(result, newSize);
-		if (result != value)
+		if (result != ptr)
 		{
-			RemoveAllocation(value);
+			RemoveAllocation(ptr);
 		}
-		return result.ToPointer();
+		return result;
 	}
 
 	public static long Size(void* ptr)
