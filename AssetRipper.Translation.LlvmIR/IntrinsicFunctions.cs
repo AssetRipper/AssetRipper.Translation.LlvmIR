@@ -68,15 +68,9 @@ internal static unsafe partial class IntrinsicFunctions
 		throw new NotSupportedException("C++ string formatting is not supported.");
 	}
 
-	private static void* GenerateDummyPointer()
-	{
-		// Generate a unique dummy pointer value
-		return unchecked((void*)Random.Shared.NextInt64());
-	}
-
-	private static void* StandardInput { get; } = GenerateDummyPointer();
-	private static void* StandardOutput { get; } = GenerateDummyPointer();
-	private static void* StandardError { get; } = GenerateDummyPointer();
+	private static void* StandardInput => (void*)1;
+	private static void* StandardOutput => (void*)2;
+	private static void* StandardError => (void*)3;
 
 	[MangledName("__acrt_iob_func")]
 	public static void* GetSystemStream(int identifier)
