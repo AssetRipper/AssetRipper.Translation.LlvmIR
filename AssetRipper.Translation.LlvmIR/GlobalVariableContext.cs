@@ -10,6 +10,7 @@ using AssetRipper.Translation.LlvmIR.Variables;
 using LLVMSharp.Interop;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
+using System.Runtime.CompilerServices;
 
 namespace AssetRipper.Translation.LlvmIR;
 
@@ -38,18 +39,15 @@ internal sealed class GlobalVariableContext : IHasName, IVariable
 	public bool HasSingleOperand => GlobalVariable.OperandCount == 1;
 	public LLVMValueRef Operand => !HasSingleOperand ? default : GlobalVariable.GetOperand(0);
 	public unsafe LLVMTypeRef Type => LLVM.GlobalGetValueType(GlobalVariable);
-	public TypeSignature PointerType => PointerField?.Signature?.FieldType ?? DataGetMethod.Signature!.ReturnType.MakePointerType();
+	public TypeSignature PointerType => PointerMethod?.Signature?.ReturnType ?? DataGetMethod.Signature!.ReturnType.MakePointerType();
 	TypeSignature IVariable.VariableType => DataGetMethod.Signature!.ReturnType;
 	bool IVariable.SupportsLoadAddress => true;
 	public TypeDefinition DeclaringType { get; set; } = null!;
-	private FieldDefinition PointerField { get; set; } = null!;
+	private FieldDefinition DataField { get; set; } = null!;
+	private MethodDefinition PointerMethod { get; set; } = null!;
 	public MethodDefinition DataGetMethod { get; set; } = null!;
 	public MethodDefinition DataSetMethod { get; set; } = null!;
 	private bool PointerIsUsed { get; set; } = false;
-	/// <summary>
-	/// The number of instructions in the static constructor for initializing the pointer field.
-	/// </summary>
-	private int PointerInstructionsCount { get; set; } = 0;
 
 	public void CreateProperties()
 	{
@@ -60,10 +58,25 @@ internal sealed class GlobalVariableContext : IHasName, IVariable
 		Module.Definition.TopLevelTypes.Add(DeclaringType);
 		this.AddNameAttributes(DeclaringType);
 
-		// Pointer field
+		// Data field
 		{
-			PointerField = new FieldDefinition("__pointer", FieldAttributes.Public | FieldAttributes.Static, pointerType);
-			DeclaringType.Fields.Add(PointerField);
+			DataField = new("__value", FieldAttributes.Private | FieldAttributes.Static, underlyingType);
+			DeclaringType.Fields.Add(DataField);
+		}
+
+		// Pointer property
+		{
+			PropertyDefinition property = new("Pointer", PropertyAttributes.None, PropertySignature.CreateStatic(pointerType));
+			DeclaringType.Properties.Add(property);
+			PointerMethod = new MethodDefinition("get_Pointer", MethodAttributes.Public | MethodAttributes.Static | MethodAttributes.HideBySig | MethodAttributes.SpecialName, MethodSignature.CreateStatic(pointerType));
+			DeclaringType.Methods.Add(PointerMethod);
+			PointerMethod.CilMethodBody = new();
+			{
+				CilInstructionCollection instructions = PointerMethod.CilMethodBody.Instructions;
+				instructions.Add(CilOpCodes.Ldsflda, DataField);
+				instructions.Add(CilOpCodes.Ret);
+			}
+			property.SetSemanticMethods(PointerMethod, null);
 		}
 
 		// Data property
@@ -77,8 +90,7 @@ internal sealed class GlobalVariableContext : IHasName, IVariable
 			DataGetMethod.CilMethodBody = new();
 			{
 				CilInstructionCollection instructions = DataGetMethod.CilMethodBody.Instructions;
-				instructions.Add(CilOpCodes.Ldsfld, PointerField);
-				instructions.AddLoadIndirect(underlyingType);
+				instructions.Add(CilOpCodes.Ldsfld, DataField);
 				instructions.Add(CilOpCodes.Ret);
 			}
 
@@ -89,9 +101,8 @@ internal sealed class GlobalVariableContext : IHasName, IVariable
 			DataSetMethod.CilMethodBody = new();
 			{
 				CilInstructionCollection instructions = DataSetMethod.CilMethodBody.Instructions;
-				instructions.Add(CilOpCodes.Ldsfld, PointerField);
 				instructions.Add(CilOpCodes.Ldarg_0);
-				instructions.AddStoreIndirect(underlyingType);
+				instructions.Add(CilOpCodes.Stsfld, DataField);
 				instructions.Add(CilOpCodes.Ret);
 			}
 
@@ -101,38 +112,17 @@ internal sealed class GlobalVariableContext : IHasName, IVariable
 
 	public void InitializeData()
 	{
-		TypeSignature underlyingType = Module.GetTypeSignature(Type);
 		MethodDefinition staticConstructor = DeclaringType.GetOrCreateStaticConstructor();
 
 		CilInstructionCollection instructions = staticConstructor.CilMethodBody!.Instructions;
 		instructions.Clear();
 
-		// Initialize pointer field
-		{
-			instructions.Add(CilOpCodes.Sizeof, underlyingType.ToTypeDefOrRef());
-			instructions.Add(CilOpCodes.Call, Module.InjectedTypes[typeof(NativeMemoryHelper)].Methods.First(m =>
-			{
-				return m.Name == nameof(NativeMemoryHelper.Allocate) && m.Parameters[0].ParameterType.ElementType is ElementType.I4;
-			}));
-			instructions.Add(CilOpCodes.Call, Module.InjectedTypes[typeof(PointerIndices)].GetMethodByName(nameof(PointerIndices.Register)));
-			instructions.Add(CilOpCodes.Stsfld, PointerField);
-		}
-
 		// Initialize data
 		if (HasSingleOperand)
 		{
-			PointerInstructionsCount = instructions.Count;
-
 			BasicBlock basicBlock = InstructionLifter.Initialize(this);
 			InstructionOptimizer.Optimize([basicBlock]);
 			basicBlock.AddInstructions(instructions);
-		}
-		else
-		{
-			instructions.AddDefaultValue(underlyingType);
-			instructions.Add(CilOpCodes.Call, DataSetMethod);
-
-			PointerInstructionsCount = instructions.Count;
 		}
 
 		instructions.Add(CilOpCodes.Ret);
@@ -187,37 +177,50 @@ internal sealed class GlobalVariableContext : IHasName, IVariable
 	public void AddLoadAddress(CilInstructionCollection instructions)
 	{
 		PointerIsUsed = true;
-		instructions.Add(CilOpCodes.Ldsfld, PointerField);
+		instructions.Add(CilOpCodes.Call, PointerMethod);
 	}
 
 	public void RemovePointerFieldIfNotUsed()
 	{
-		if (!PointerIsUsed)
+		if (PointerIsUsed)
 		{
-			DeclaringType.Fields.Remove(PointerField);
-			PointerField = null!;
-			DeclaringType.GetStaticConstructor()!.CilMethodBody!.Instructions.RemoveRange(0, PointerInstructionsCount);
-			PointerInstructionsCount = 0;
-
-			FieldDefinition backingField = new("__value", FieldAttributes.Private | FieldAttributes.Static, DataGetMethod.Signature!.ReturnType);
-			DeclaringType.Fields.Add(backingField);
-
-			// Update the get method
+			// Add FixedAddressValueType attribute
 			{
-				CilInstructionCollection instructions = DataGetMethod.CilMethodBody!.Instructions;
-				instructions.Clear();
-				instructions.Add(CilOpCodes.Ldsfld, backingField);
-				instructions.Add(CilOpCodes.Ret);
+				// https://learn.microsoft.com/en-us/dotnet/api/system.runtime.compilerservices.fixedaddressvaluetypeattribute
+
+				// Despite the name, this attribute is applicable to fields of any type, not just value types.
+				// The name seems to originate from .NET Framework. When I tested this attribute with the documented example code on .NET Framework 4.7.2,
+				// unattributed static fields with struct types were not given fixed addresses. However, primitive types, reference types, and pointer types
+				// were given fixed addresses even without the attribute.
+
+				// When I tested the same example code on .NET 10, all static fields were given fixed addresses regardless of the attribute.
+				// This behavior is supposedly an implementation detail and should not be relied upon, so we add the attribute to enforce a fixed address,
+				// in case a future version of .NET changes the default behavior for fields without the attribute.
+
+				System.Reflection.ConstructorInfo constructorInfo = typeof(FixedAddressValueTypeAttribute).GetConstructors().Single();
+				IMethodDescriptor inlineArrayAttributeConstructor = Module.Definition.DefaultImporter.ImportMethod(constructorInfo);
+				DataField.CustomAttributes.Add(new CustomAttribute((ICustomAttributeType)inlineArrayAttributeConstructor, new CustomAttributeSignature()));
 			}
 
-			// Update the set method
+			// Register pointer in static constructor
 			{
-				CilInstructionCollection instructions = DataSetMethod.CilMethodBody!.Instructions;
-				instructions.Clear();
-				instructions.Add(CilOpCodes.Ldarg_0);
-				instructions.Add(CilOpCodes.Stsfld, backingField);
+				CilInstructionCollection instructions = DeclaringType.GetStaticConstructor()!.CilMethodBody!.Instructions;
+
+				// Pop return instruction
+				instructions.Pop();
+
+				instructions.Add(CilOpCodes.Call, PointerMethod);
+				instructions.Add(CilOpCodes.Call, Module.InjectedTypes[typeof(PointerIndices)].GetMethodByName(nameof(PointerIndices.Register)));
+				instructions.Add(CilOpCodes.Pop);
+
 				instructions.Add(CilOpCodes.Ret);
 			}
+		}
+		else
+		{
+			// Remove pointer property and method
+			DeclaringType.Properties.Remove(DeclaringType.Properties.First(p => p.Name == "Pointer"));
+			DeclaringType.Methods.Remove(PointerMethod);
 		}
 	}
 
