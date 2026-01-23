@@ -47,12 +47,10 @@ internal sealed class GlobalVariableContext : IHasName, IVariable
 	private MethodDefinition PointerMethod { get; set; } = null!;
 	private MethodDefinition DataGetMethod { get; set; } = null!;
 	private MethodDefinition DataSetMethod { get; set; } = null!;
-	private bool PointerIsUsed { get; set; } = false;
 
 	public void CreateProperties()
 	{
 		TypeSignature underlyingType = Module.GetTypeSignature(Type);
-		TypeSignature pointerType = underlyingType.MakePointerType();
 
 		DeclaringType = new TypeDefinition(Module.Options.GetNamespace("GlobalVariables"), Name, TypeAttributes.NotPublic | TypeAttributes.Class | TypeAttributes.Abstract | TypeAttributes.Sealed, Module.Definition.CorLibTypeFactory.Object.ToTypeDefOrRef());
 		Module.Definition.TopLevelTypes.Add(DeclaringType);
@@ -62,21 +60,6 @@ internal sealed class GlobalVariableContext : IHasName, IVariable
 		{
 			DataField = new("__value", FieldAttributes.Private | FieldAttributes.Static, underlyingType);
 			DeclaringType.Fields.Add(DataField);
-		}
-
-		// Pointer property
-		{
-			PropertyDefinition property = new("Pointer", PropertyAttributes.None, PropertySignature.CreateStatic(pointerType));
-			DeclaringType.Properties.Add(property);
-			PointerMethod = new MethodDefinition("get_Pointer", MethodAttributes.Public | MethodAttributes.Static | MethodAttributes.HideBySig | MethodAttributes.SpecialName, MethodSignature.CreateStatic(pointerType));
-			DeclaringType.Methods.Add(PointerMethod);
-			PointerMethod.CilMethodBody = new();
-			{
-				CilInstructionCollection instructions = PointerMethod.CilMethodBody.Instructions;
-				instructions.Add(CilOpCodes.Ldsflda, DataField);
-				instructions.Add(CilOpCodes.Ret);
-			}
-			property.SetSemanticMethods(PointerMethod, null);
 		}
 
 		// Data property
@@ -176,13 +159,27 @@ internal sealed class GlobalVariableContext : IHasName, IVariable
 
 	public void AddLoadAddress(CilInstructionCollection instructions)
 	{
-		PointerIsUsed = true;
+		if (PointerMethod is null)
+		{
+			TypeSignature returnType = PointerType;
+			PropertyDefinition property = new("Pointer", PropertyAttributes.None, PropertySignature.CreateStatic(returnType));
+			DeclaringType.Properties.Insert(0, property); // Prefer to have Pointer property first
+			PointerMethod = new MethodDefinition("get_Pointer", MethodAttributes.Public | MethodAttributes.Static | MethodAttributes.HideBySig | MethodAttributes.SpecialName, MethodSignature.CreateStatic(returnType));
+			DeclaringType.Methods.Add(PointerMethod);
+			PointerMethod.CilMethodBody = new();
+			{
+				CilInstructionCollection instructions2 = PointerMethod.CilMethodBody.Instructions;
+				instructions2.Add(CilOpCodes.Ldsflda, DataField);
+				instructions2.Add(CilOpCodes.Ret);
+			}
+			property.SetSemanticMethods(PointerMethod, null);
+		}
 		instructions.Add(CilOpCodes.Call, PointerMethod);
 	}
 
 	public void RemovePointerFieldIfNotUsed()
 	{
-		if (PointerIsUsed)
+		if (PointerMethod is not null)
 		{
 			// Add FixedAddressValueType attribute
 			{
@@ -215,12 +212,6 @@ internal sealed class GlobalVariableContext : IHasName, IVariable
 
 				instructions.Add(CilOpCodes.Ret);
 			}
-		}
-		else
-		{
-			// Remove pointer property and method
-			DeclaringType.Properties.Remove(DeclaringType.Properties.First(p => p.Name == "Pointer"));
-			DeclaringType.Methods.Remove(PointerMethod);
 		}
 	}
 
