@@ -1,6 +1,5 @@
 ﻿using AsmResolver.DotNet;
 using System.Reflection;
-using System.Runtime.InteropServices;
 using System.Runtime.Loader;
 
 namespace AssetRipper.Translation.LlvmIR.Tests;
@@ -27,35 +26,7 @@ internal static class ExecutionHelpers
 		try
 		{
 			Assembly assembly = LoadAssembly(context, module);
-
-			try
-			{
-				await testAction.Invoke(assembly);
-			}
-			finally
-			{
-				// Free unmanaged resources
-
-				foreach (Type type in assembly.GetTypes().Where(t => t.Namespace == "GlobalVariables"))
-				{
-					FieldInfo? field = type.GetField("__pointer", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
-					if (field is null)
-					{
-						// Some global variables don't have a pointer field because the pointer is never used.
-						continue;
-					}
-
-					unsafe
-					{
-						Pointer pointer = (Pointer)field.GetValue(null)!;
-						void* value = Pointer.Unbox(pointer);
-						if (value != null)
-						{
-							NativeMemory.Free(value);
-						}
-					}
-				}
-			}
+			await testAction.Invoke(assembly);
 		}
 		finally
 		{
