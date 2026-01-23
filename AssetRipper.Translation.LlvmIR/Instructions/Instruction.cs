@@ -1,5 +1,6 @@
 ﻿using AsmResolver.DotNet.Code.Cil;
 using AsmResolver.PE.DotNet.Cil;
+using System.Collections.Concurrent;
 
 namespace AssetRipper.Translation.LlvmIR.Instructions;
 
@@ -38,7 +39,7 @@ public abstract record class Instruction
 
 	private sealed record class CilOpCodeInstruction(CilOpCode OpCode) : Instruction
 	{
-		internal static readonly Dictionary<CilOpCode, CilOpCodeInstruction> Cache = new();
+		internal static readonly ConcurrentDictionary<CilOpCode, CilOpCodeInstruction> Cache = new();
 
 		public override int PopCount => OpCode.StackBehaviourPop switch
 		{
