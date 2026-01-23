@@ -900,7 +900,7 @@ internal unsafe readonly struct InstructionLifter
 					// These are not currently supported.
 					// https://llvm.org/docs/LangRef.html#atomicrmw-instruction
 					TypeSignature type = module.GetTypeSignature(instruction);
-					LoadVariable(basicBlock, new DefaultVariable(type));
+					LoadVariable(basicBlock, ConstantVariable.CreateDefault(type));
 					StoreResult(basicBlock, instruction);
 					Console.WriteLine($"Warning: LLVM AtomicRMW instruction is not currently supported; it is being ignored inside {function?.Name}.");
 				}
@@ -910,7 +910,7 @@ internal unsafe readonly struct InstructionLifter
 					// These are not currently supported.
 					// https://llvm.org/docs/LangRef.html#cmpxchg-instruction
 					TypeSignature type = module.GetTypeSignature(instruction);
-					LoadVariable(basicBlock, new DefaultVariable(type));
+					LoadVariable(basicBlock, ConstantVariable.CreateDefault(type));
 					StoreResult(basicBlock, instruction);
 					Console.WriteLine($"Warning: LLVM CmpXchg instruction is not currently supported; it is being ignored inside {function?.Name}.");
 				}
