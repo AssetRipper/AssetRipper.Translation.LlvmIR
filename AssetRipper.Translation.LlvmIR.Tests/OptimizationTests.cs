@@ -10,8 +10,11 @@ internal class OptimizationTests
 {
 	public ModuleDefinition Module { get; private set; } = null!;
 	public TypeSignature Void => Module.CorLibTypeFactory.Void;
+	public TypeSignature Int8 => Module.CorLibTypeFactory.SByte;
 	public TypeSignature Int32 => Module.CorLibTypeFactory.Int32;
 	public TypeSignature Int64 => Module.CorLibTypeFactory.Int64;
+	public TypeSignature Single => Module.CorLibTypeFactory.Single;
+	public TypeSignature Double => Module.CorLibTypeFactory.Double;
 
 	[Before(HookType.Test)]
 	public void SetUp()
@@ -122,6 +125,111 @@ internal class OptimizationTests
 			new AddressOfInstruction(data),
 			new LoadVariableInstruction(x),
 			new StoreIndirectInstruction(Int32),
+		];
+
+		Optimize(instructions);
+
+		await Assert.That(instructions).IsEquivalentTo(optimizedInstructions);
+	}
+
+	[Test]
+	public async Task StoreZero_Int32()
+	{
+		ImportantVariable x = new(Int32);
+
+		BasicBlock instructions =
+		[
+			new LoadVariableInstruction(new ConstantI4(0, Module)),
+			new StoreVariableInstruction(x),
+		];
+
+		BasicBlock optimizedInstructions =
+		[
+			new InitializeInstruction(x),
+		];
+
+		Optimize(instructions);
+
+		await Assert.That(instructions).IsEquivalentTo(optimizedInstructions);
+	}
+
+	[Test]
+	public async Task StoreZero_Int8()
+	{
+		ImportantVariable x = new(Int8);
+
+		BasicBlock instructions =
+		[
+			new LoadVariableInstruction(new ConstantI4(0, Module)),
+			new StoreVariableInstruction(x),
+		];
+
+		BasicBlock optimizedInstructions =
+		[
+			new InitializeInstruction(x),
+		];
+
+		Optimize(instructions);
+
+		await Assert.That(instructions).IsEquivalentTo(optimizedInstructions);
+	}
+
+	[Test]
+	public async Task StoreZero_Int64()
+	{
+		ImportantVariable x = new(Int64);
+
+		BasicBlock instructions =
+		[
+			new LoadVariableInstruction(new ConstantI8(0, Module)),
+			new StoreVariableInstruction(x),
+		];
+
+		BasicBlock optimizedInstructions =
+		[
+			new InitializeInstruction(x),
+		];
+
+		Optimize(instructions);
+
+		await Assert.That(instructions).IsEquivalentTo(optimizedInstructions);
+	}
+
+	[Test]
+	public async Task StoreZero_Single()
+	{
+		ImportantVariable x = new(Single);
+
+		BasicBlock instructions =
+		[
+			new LoadVariableInstruction(new ConstantR4(0, Module)),
+			new StoreVariableInstruction(x),
+		];
+
+		BasicBlock optimizedInstructions =
+		[
+			new InitializeInstruction(x),
+		];
+
+		Optimize(instructions);
+
+		await Assert.That(instructions).IsEquivalentTo(optimizedInstructions);
+	}
+
+	[Test]
+	public async Task StoreZero_Double()
+	{
+		ImportantVariable x = new(Double);
+
+		BasicBlock instructions =
+		[
+			new LoadVariableInstruction(new ConstantR8(0, Module)),
+			new StoreVariableInstruction(x),
+		];
+
+		BasicBlock optimizedInstructions =
+		[
+			new InitializeInstruction(x),
 		];
 
 		Optimize(instructions);
@@ -433,8 +541,7 @@ internal class OptimizationTests
 
 		BasicBlock optimizedInstructions =
 		[
-			new LoadVariableInstruction(zero),
-			new StoreVariableInstruction(x),
+			new InitializeInstruction(x),
 		];
 
 		Optimize(instructions);
