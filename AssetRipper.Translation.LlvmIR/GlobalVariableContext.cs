@@ -39,8 +39,9 @@ internal sealed class GlobalVariableContext : IHasName, IVariable
 	public bool HasSingleOperand => GlobalVariable.OperandCount == 1;
 	public LLVMValueRef Operand => !HasSingleOperand ? default : GlobalVariable.GetOperand(0);
 	public unsafe LLVMTypeRef Type => LLVM.GlobalGetValueType(GlobalVariable);
-	public TypeSignature PointerType => PointerMethod?.Signature?.ReturnType ?? DataGetMethod.Signature!.ReturnType.MakePointerType();
-	TypeSignature IVariable.VariableType => DataGetMethod.Signature!.ReturnType;
+	public TypeSignature DataType => DataGetMethod.Signature!.ReturnType;
+	public TypeSignature PointerType => PointerMethod?.Signature?.ReturnType ?? DataType.MakePointerType();
+	TypeSignature IVariable.VariableType => DataType;
 	bool IVariable.SupportsLoadAddress => true;
 	public TypeDefinition DeclaringType { get; set; } = null!;
 	private FieldDefinition DataField { get; set; } = null!;
@@ -58,6 +59,7 @@ internal sealed class GlobalVariableContext : IHasName, IVariable
 
 		// Data field
 		{
+			// Note: the field type might be changed later if it needs a fixed address.
 			DataField = new("__value", FieldAttributes.Private | FieldAttributes.Static, underlyingType);
 			DeclaringType.Fields.Add(DataField);
 		}
@@ -70,24 +72,9 @@ internal sealed class GlobalVariableContext : IHasName, IVariable
 			DataGetMethod = new MethodDefinition("get_Value", MethodAttributes.Public | MethodAttributes.Static | MethodAttributes.HideBySig | MethodAttributes.SpecialName, MethodSignature.CreateStatic(underlyingType));
 			DeclaringType.Methods.Add(DataGetMethod);
 
-			DataGetMethod.CilMethodBody = new();
-			{
-				CilInstructionCollection instructions = DataGetMethod.CilMethodBody.Instructions;
-				instructions.Add(CilOpCodes.Ldsfld, DataField);
-				instructions.Add(CilOpCodes.Ret);
-			}
-
 			DataSetMethod = new MethodDefinition("set_Value", MethodAttributes.Public | MethodAttributes.Static | MethodAttributes.HideBySig | MethodAttributes.SpecialName, MethodSignature.CreateStatic(Module.Definition.CorLibTypeFactory.Void, underlyingType));
 			DataSetMethod.Parameters[0].GetOrCreateDefinition().Name = "value";
 			DeclaringType.Methods.Add(DataSetMethod);
-
-			DataSetMethod.CilMethodBody = new();
-			{
-				CilInstructionCollection instructions = DataSetMethod.CilMethodBody.Instructions;
-				instructions.Add(CilOpCodes.Ldarg_0);
-				instructions.Add(CilOpCodes.Stsfld, DataField);
-				instructions.Add(CilOpCodes.Ret);
-			}
 
 			property.SetSemanticMethods(DataGetMethod, DataSetMethod);
 		}
@@ -210,6 +197,55 @@ internal sealed class GlobalVariableContext : IHasName, IVariable
 				instructions.Add(CilOpCodes.Call, Module.InjectedTypes[typeof(PointerIndices)].GetMethodByName(nameof(PointerIndices.Register)));
 				instructions.Add(CilOpCodes.Pop);
 
+				instructions.Add(CilOpCodes.Ret);
+			}
+		}
+
+		if (PointerMethod is not null && DataType is PointerTypeSignature or CorLibTypeSignature)
+		{
+			// Static fields cannot be pinned if they are not a struct type, so we need to change the field type to a struct type.
+
+			TypeDefinition wrapperType = new(
+				null,
+				"__WrapperType",
+				TypeAttributes.NestedPrivate | TypeAttributes.Sealed | TypeAttributes.SequentialLayout | TypeAttributes.AnsiClass,
+				Module.Definition.DefaultImporter.ImportType(typeof(ValueType)));
+			DeclaringType.NestedTypes.Add(wrapperType);
+
+			FieldDefinition pointerField = new("__value", FieldAttributes.Public, DataType);
+			wrapperType.Fields.Add(pointerField);
+
+			DataField.Signature!.FieldType = wrapperType.ToTypeSignature();
+
+			DataGetMethod.CilMethodBody = new();
+			{
+				CilInstructionCollection instructions = DataGetMethod.CilMethodBody.Instructions;
+				instructions.Add(CilOpCodes.Ldsflda, DataField);
+				instructions.Add(CilOpCodes.Ldfld, pointerField);
+				instructions.Add(CilOpCodes.Ret);
+			}
+			DataSetMethod.CilMethodBody = new();
+			{
+				CilInstructionCollection instructions = DataSetMethod.CilMethodBody.Instructions;
+				instructions.Add(CilOpCodes.Ldsflda, DataField);
+				instructions.Add(CilOpCodes.Ldarg_0);
+				instructions.Add(CilOpCodes.Stfld, pointerField);
+				instructions.Add(CilOpCodes.Ret);
+			}
+		}
+		else
+		{
+			DataGetMethod.CilMethodBody = new();
+			{
+				CilInstructionCollection instructions = DataGetMethod.CilMethodBody.Instructions;
+				instructions.Add(CilOpCodes.Ldsfld, DataField);
+				instructions.Add(CilOpCodes.Ret);
+			}
+			DataSetMethod.CilMethodBody = new();
+			{
+				CilInstructionCollection instructions = DataSetMethod.CilMethodBody.Instructions;
+				instructions.Add(CilOpCodes.Ldarg_0);
+				instructions.Add(CilOpCodes.Stsfld, DataField);
 				instructions.Add(CilOpCodes.Ret);
 			}
 		}
