@@ -102,7 +102,7 @@ internal unsafe readonly struct InstructionLifter
 
 		BasicBlock instructions = new();
 		lifter.LoadValue(instructions, globalVariable.Operand);
-		Call(instructions, globalVariable.DataSetMethod);
+		instructions.Add(new StoreVariableInstruction(globalVariable));
 
 		return instructions;
 	}

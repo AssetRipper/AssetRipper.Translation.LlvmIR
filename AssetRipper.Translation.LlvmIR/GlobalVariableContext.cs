@@ -45,8 +45,8 @@ internal sealed class GlobalVariableContext : IHasName, IVariable
 	public TypeDefinition DeclaringType { get; set; } = null!;
 	private FieldDefinition DataField { get; set; } = null!;
 	private MethodDefinition PointerMethod { get; set; } = null!;
-	public MethodDefinition DataGetMethod { get; set; } = null!;
-	public MethodDefinition DataSetMethod { get; set; } = null!;
+	private MethodDefinition DataGetMethod { get; set; } = null!;
+	private MethodDefinition DataSetMethod { get; set; } = null!;
 	private bool PointerIsUsed { get; set; } = false;
 
 	public void CreateProperties()
