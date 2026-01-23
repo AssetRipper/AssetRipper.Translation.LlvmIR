@@ -6,6 +6,7 @@ namespace AssetRipper.Translation.LlvmIR.Variables;
 public abstract class ConstantVariable(TypeSignature type) : IVariable
 {
 	public TypeSignature VariableType { get; } = type;
+	public abstract bool IsDefault { get; }
 	public bool IsTemporary => false; // Constants are not temporary variables; they are fixed values.
 	public bool SupportsLoad => true;
 	public bool SupportsStore => false;

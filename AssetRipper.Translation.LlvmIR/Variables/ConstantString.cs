@@ -8,6 +8,7 @@ namespace AssetRipper.Translation.LlvmIR.Variables;
 public sealed class ConstantString(string value, ModuleDefinition module) : ConstantVariable(module.CorLibTypeFactory.String)
 {
 	public string Value { get; } = value;
+	public override bool IsDefault => false;
 	public override void AddLoad(CilInstructionCollection instructions)
 	{
 		instructions.Add(CilOpCodes.Ldstr, Value);

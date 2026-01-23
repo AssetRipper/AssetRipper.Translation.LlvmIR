@@ -82,16 +82,18 @@ internal sealed class GlobalVariableContext : IHasName, IVariable
 
 	public void InitializeData()
 	{
-		MethodDefinition staticConstructor = DeclaringType.GetOrCreateStaticConstructor();
+		if (!HasSingleOperand)
+		{
+			return;
+		}
 
-		CilInstructionCollection instructions = staticConstructor.CilMethodBody!.Instructions;
+		CilInstructionCollection instructions = DeclaringType.GetOrCreateStaticConstructor().CilMethodBody!.Instructions;
 		instructions.Clear();
 
-		// Initialize data
-		if (HasSingleOperand)
+		BasicBlock basicBlock = InstructionLifter.Initialize(this);
+		InstructionOptimizer.Optimize([basicBlock]);
+		if (basicBlock.Instructions.Count is not 1 || basicBlock.Instructions[0] is not InitializeInstruction)
 		{
-			BasicBlock basicBlock = InstructionLifter.Initialize(this);
-			InstructionOptimizer.Optimize([basicBlock]);
 			basicBlock.AddInstructions(instructions);
 		}
 
@@ -188,7 +190,7 @@ internal sealed class GlobalVariableContext : IHasName, IVariable
 
 			// Register pointer in static constructor
 			{
-				CilInstructionCollection instructions = DeclaringType.GetStaticConstructor()!.CilMethodBody!.Instructions;
+				CilInstructionCollection instructions = DeclaringType.GetOrCreateStaticConstructor().CilMethodBody!.Instructions;
 
 				// Pop return instruction
 				instructions.Pop();
@@ -248,6 +250,11 @@ internal sealed class GlobalVariableContext : IHasName, IVariable
 				instructions.Add(CilOpCodes.Stsfld, DataField);
 				instructions.Add(CilOpCodes.Ret);
 			}
+		}
+
+		if (DeclaringType.GetStaticConstructor() is { CilMethodBody: { Instructions.Count: 1 } body } staticConstructor && body.Instructions[0].OpCode == CilOpCodes.Ret)
+		{
+			DeclaringType.Methods.Remove(staticConstructor);
 		}
 	}
 

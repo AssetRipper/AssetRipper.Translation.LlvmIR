@@ -1,5 +1,5 @@
 ﻿using AsmResolver.DotNet.Signatures;
-using AssetRipper.Translation.LlvmIR.Extensions;
+using AsmResolver.PE.DotNet.Metadata.Tables;
 using AssetRipper.Translation.LlvmIR.Variables;
 using System.Diagnostics;
 
@@ -165,6 +165,7 @@ public static class InstructionOptimizer
 		changed |= RunPass_MergeIndirect(basicBlock);
 		changed |= RunPass_EliminateUnnessaryInitialization(basicBlock, temporaryVariables, false);
 		changed |= RunPass_RemoveUnnecessaryTemporaryVariables(basicBlock, temporaryVariables);
+		changed |= RunPass_MergeConstantStore(basicBlock);
 		return changed;
 	}
 
@@ -285,6 +286,42 @@ public static class InstructionOptimizer
 								}
 								break;
 						}
+					}
+					break;
+			}
+		}
+		return changed;
+	}
+
+	private static bool RunPass_MergeConstantStore(BasicBlock basicBlock)
+	{
+		bool changed = false;
+		for (int i = basicBlock.Count - 1; i >= 0; i--)
+		{
+			switch (basicBlock[i])
+			{
+				case StoreVariableInstruction store:
+					{
+						Debug.Assert(i > 0);
+						if (basicBlock[i - 1] is not LoadVariableInstruction { Variable: ConstantVariable { IsDefault: true } constant })
+						{
+							break;
+						}
+
+						if (AreCompatible(constant.VariableType, store.Variable.VariableType))
+						{
+						}
+						else if (constant is ConstantI4 && IsI4Compatible(store.Variable.VariableType))
+						{
+						}
+						else
+						{
+							break;
+						}
+
+						basicBlock[i - 1] = new InitializeInstruction(store.Variable);
+						basicBlock.RemoveAt(i);
+						changed = true;
 					}
 					break;
 			}
@@ -704,6 +741,26 @@ public static class InstructionOptimizer
 			return type2 is PointerTypeSignature;
 		}
 		return SignatureComparer.Default.Equals(type1, type2);
+	}
+
+	private static bool IsI4Compatible(TypeSignature? type)
+	{
+		if (type is CorLibTypeSignature corLibType)
+		{
+			switch (corLibType.ElementType)
+			{
+				case ElementType.I4:
+				case ElementType.U4:
+				case ElementType.Boolean:
+				case ElementType.Char:
+				case ElementType.I1:
+				case ElementType.U1:
+				case ElementType.I2:
+				case ElementType.U2:
+					return true;
+			}
+		}
+		return false;
 	}
 
 	private static bool UsesFunctionFieldVariable(Instruction instruction)

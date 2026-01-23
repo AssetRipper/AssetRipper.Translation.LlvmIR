@@ -7,6 +7,7 @@ namespace AssetRipper.Translation.LlvmIR.Variables;
 public sealed class ConstantI4(int value, ModuleDefinition module) : ConstantVariable(module.CorLibTypeFactory.Int32)
 {
 	public int Value { get; } = value;
+	public override bool IsDefault => Value is 0;
 	public override void AddLoad(CilInstructionCollection instructions)
 	{
 		instructions.Add(CilOpCodes.Ldc_I4, Value);
