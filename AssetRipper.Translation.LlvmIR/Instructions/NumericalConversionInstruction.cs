@@ -28,8 +28,8 @@ internal sealed record class NumericalConversionInstruction : Instruction
 			Opcode = instruction.GetOpcode(),
 			SourceTypeSignature = module.GetTypeSignature(instruction.GetOperand(0)),
 			ResultTypeSignature = module.GetTypeSignature(instruction),
-			NoSignedWrap = LibLLVMSharp.InstructionHasNoSignedWrap(instruction),
-			NoUnsignedWrap = LibLLVMSharp.InstructionHasNoUnsignedWrap(instruction),
+			NoSignedWrap = instruction.HasNoSignedWrap,
+			NoUnsignedWrap = instruction.HasNoUnsignedWrap,
 		};
 	}
 

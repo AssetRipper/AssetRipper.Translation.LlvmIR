@@ -95,7 +95,7 @@ internal static class LLVMModuleRefExtensions
 		HashSet<LLVMMetadataRef> visitedMetadata = new();
 		foreach (LLVMValueRef global in module.GetGlobals())
 		{
-			metadataToVisit.Enqueue(LibLLVMSharp.GlobalVariableGetGlobalVariableExpression(global));
+			metadataToVisit.Enqueue(global.GlobalVariableExpression);
 		}
 		foreach (LLVMValueRef function in module.GetFunctions())
 		{
@@ -114,7 +114,7 @@ internal static class LLVMModuleRefExtensions
 			{
 				continue;
 			}
-			foreach (LLVMMetadataRef operand in metadata.Operands)
+			foreach (LLVMMetadataRef operand in metadata.GetOperands())
 			{
 				metadataToVisit.Enqueue(operand);
 			}

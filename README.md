@@ -77,7 +77,3 @@ Use `--help` to see additional options.
 ## NuGet tool
 
 There are [plans](https://github.com/AssetRipper/AssetRipper.Translation.LlvmIR/issues/44) to ship this as a NuGet tool for easy installation and usage.
-
-## Building
-
-The `libLLVMSharp` dependency is not included in the repository. The source code for it can be found [here](https://github.com/dotnet/LLVMSharp).

@@ -15,8 +15,8 @@ internal static class BinaryMathInstruction
 		Debug.Assert(Supported(opcode), $"Unsupported binary math instruction: {opcode}");
 
 		TypeSignature resultTypeSignature = Module.GetTypeSignature(instruction);
-		bool noSignedWrap = LibLLVMSharp.InstructionHasNoSignedWrap(instruction);
-		bool noUnsignedWrap = LibLLVMSharp.InstructionHasNoUnsignedWrap(instruction);
+		bool noSignedWrap = instruction.HasNoSignedWrap;
+		bool noUnsignedWrap = instruction.HasNoUnsignedWrap;
 
 		if (resultTypeSignature is CorLibTypeSignature)
 		{

@@ -133,7 +133,7 @@ public static unsafe class Translator
 		}
 
 		{
-			List<LLVMMetadataRef> types = module.GetAllMetadata().Where(m => m.IsType).ToList();
+			List<LLVMMetadataRef> types = module.GetAllMetadata().Where(m => m.IsADIType != default).ToList();
 
 			CreateEnumerations(moduleContext, types);
 
@@ -141,7 +141,7 @@ public static unsafe class Translator
 
 			foreach (GlobalVariableContext globalVariableContext in moduleContext.GlobalVariables.Values)
 			{
-				LLVMMetadataRef metadata = LibLLVMSharp.GlobalVariableGetGlobalVariableExpression(globalVariableContext.GlobalVariable);
+				LLVMMetadataRef metadata = globalVariableContext.GlobalVariable.GlobalVariableExpression;
 				LLVMMetadataRef type = metadata.Variable.Type;
 				if (type.Handle == IntPtr.Zero)
 				{

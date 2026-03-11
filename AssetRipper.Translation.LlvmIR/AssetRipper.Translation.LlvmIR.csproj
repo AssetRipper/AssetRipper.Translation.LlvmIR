@@ -3,15 +3,14 @@
 	<PropertyGroup>
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 		<EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
-		<RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == '' AND '$(PackAsTool)' != 'true'">$(NETCoreSdkRuntimeIdentifier)</RuntimeIdentifier>
 	</PropertyGroup>
 
 	<ItemGroup>
 		<PackageReference Include="Antlr4.Runtime.Standard" Version="4.13.1" />
+		<PackageReference Include="AssetRipper.Bindings.LLVM" Version="1.0.1" />
 		<PackageReference Include="AssetRipper.CIL" Version="1.2.2" />
 		<PackageReference Include="AssetRipper.ICSharpCode.Decompiler" Version="10.0.0.8231-preview2" />
 		<PackageReference Include="HarmonyX" Version="2.16.0" />
-		<PackageReference Include="LLVMSharp" Version="20.1.2" />
 		<PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="5.0.0" />
 		<PackageReference Include="System.IO.Hashing" Version="10.0.0" />
 		<PackageReference Include="System.Numerics.Tensors" Version="10.0.0" />
@@ -19,13 +18,6 @@
 
 	<ItemGroup>
 		<ProjectReference Include="..\AssetRipper.Translation.LlvmIR.SourceGenerator\AssetRipper.Translation.LlvmIR.SourceGenerator.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
-	</ItemGroup>
-
-	<ItemGroup>
-		<ContentWithTargetPath Include="bin\libLLVMSharp.dll">
-			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-			<TargetPath>libLLVMSharp.dll</TargetPath>
-		</ContentWithTargetPath>
 	</ItemGroup>
 
 </Project>

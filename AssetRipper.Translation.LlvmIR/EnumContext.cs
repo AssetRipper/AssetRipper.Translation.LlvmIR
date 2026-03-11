@@ -1,6 +1,7 @@
 ﻿using AsmResolver.DotNet;
 using AsmResolver.DotNet.Signatures;
 using AsmResolver.PE.DotNet.Metadata.Tables;
+using AssetRipper.Translation.LlvmIR.Extensions;
 using LLVMSharp.Interop;
 
 namespace AssetRipper.Translation.LlvmIR;
@@ -81,7 +82,7 @@ internal sealed class EnumContext : IHasName
 			{
 				continue;
 			}
-			long value = LibLLVMSharp.DIEnumeratorGetValueSExt(element);
+			long value = element.ValueSExt;
 			FieldDefinition field = new(name, FieldAttributes.Public | FieldAttributes.Static | FieldAttributes.Literal | FieldAttributes.HasDefault, fieldType);
 			field.Constant = elementType switch
 			{
