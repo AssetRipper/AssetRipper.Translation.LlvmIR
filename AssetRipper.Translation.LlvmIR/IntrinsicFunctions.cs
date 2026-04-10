@@ -10,6 +10,11 @@ namespace AssetRipper.Translation.LlvmIR;
 #pragma warning disable IDE0060 // Remove unused parameter
 internal static unsafe partial class IntrinsicFunctions
 {
+	[MangledName("llvm.experimental.noalias.scope.decl")]
+	public static void DoNothing(object parameter)
+	{
+	}
+
 	[MangledName("puts")]
 	public static int PutString(sbyte* str)
 	{
