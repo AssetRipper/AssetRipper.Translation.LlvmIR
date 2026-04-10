@@ -64,6 +64,28 @@ internal static partial class NumericHelper
 	}
 
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	public static T FShL<T>(T x, T y, T z)
+		where T : unmanaged, IShiftOperators<T, int, T>, IBitwiseOperators<T, T, T>
+	{
+		// https://llvm.org/docs/LangRef.html#llvm-fshl-intrinsic
+		// Funnel shift left
+		int shiftLeft = ConvertToInt32(z) % (Unsafe.SizeOf<T>() * 8);
+		int shiftRight = (Unsafe.SizeOf<T>() * 8) - shiftLeft;
+		return (x << shiftLeft) | (y >>> shiftRight);
+	}
+
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	public static T FShR<T>(T x, T y, T z)
+		where T : unmanaged, IShiftOperators<T, int, T>, IBitwiseOperators<T, T, T>
+	{
+		// https://llvm.org/docs/LangRef.html#llvm-fshr-intrinsic
+		// Funnel shift right
+		int shiftRight = ConvertToInt32(z) % (Unsafe.SizeOf<T>() * 8);
+		int shiftLeft = (Unsafe.SizeOf<T>() * 8) - shiftRight;
+		return (x >>> shiftRight) | (y << shiftLeft);
+	}
+
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public static bool IsOrdered<T>(T x, T y)
 		where T : INumberBase<T>
 	{

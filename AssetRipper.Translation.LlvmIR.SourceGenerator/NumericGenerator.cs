@@ -78,6 +78,7 @@ public partial class NumericGenerator() : IncrementalGenerator(nameof(NumericGen
 		("Floor", null, "IFloatingPoint<T>"),
 		("Round", null, "IFloatingPoint<T>"),
 		("CtLz", "LeadingZeroCount", "IBinaryInteger<T>"),
+		("CtTz", "TrailingZeroCount", "IBinaryInteger<T>"),
 	];
 
 	private static IEnumerable<(string LlvmName, string? DotNetName, string? RequiredInterfaces)> BinaryInterfaceOperations =>
@@ -290,6 +291,8 @@ public partial class NumericGenerator() : IncrementalGenerator(nameof(NumericGen
 			WriteBinaryNumericHelperMethod(writer, "ShiftRightLogical", "IShiftOperators<TElement, int, TElement>");
 			WriteBinaryNumericHelperMethod(writer, "ShiftRightArithmetic", "IShiftOperators<TElement, int, TElement>");
 			WriteUnaryNumericHelperMethod(writer, "CtPop", "unmanaged");
+			WriteTertiaryNumericHelperMethod(writer, "FShL", "unmanaged, IShiftOperators<TElement, int, TElement>, IBitwiseOperators<TElement, TElement, TElement>");
+			WriteTertiaryNumericHelperMethod(writer, "FShR", "unmanaged, IShiftOperators<TElement, int, TElement>, IBitwiseOperators<TElement, TElement, TElement>");
 
 			// These are excluded from the list above because they require custom implementations in NumericHelper.
 			WriteUnaryTensorPrimitivesMethod(writer, "Negate", null, "IUnaryNegationOperators<TElement, TElement>");
@@ -422,6 +425,29 @@ public partial class NumericGenerator() : IncrementalGenerator(nameof(NumericGen
 			{
 				writer.WriteLine("TBuffer result = default;");
 				writer.WriteLine($"TensorPrimitives.{(string.IsNullOrEmpty(dotNetName) ? llvmName : dotNetName)}(x.AsReadOnlySpan<TBuffer, TElement>(), y.AsReadOnlySpan<TBuffer, TElement>(), z.AsReadOnlySpan<TBuffer, TElement>(), result.AsSpan<TBuffer, TElement>());");
+				writer.WriteLine("return result;");
+			}
+		}
+
+		static void WriteTertiaryNumericHelperMethod(IndentedTextWriter writer, string methodName, string? requiredInterfaces)
+		{
+			writer.WriteLineNoTabs();
+			writer.WriteLine($"public static TBuffer {methodName}<TBuffer, TElement>(TBuffer x, TBuffer y, TBuffer z)");
+			using (new Indented(writer))
+			{
+				writer.WriteLine("where TBuffer : struct, IInlineArray<TElement>");
+				if (!string.IsNullOrEmpty(requiredInterfaces))
+				{
+					writer.WriteLine($"where TElement : {requiredInterfaces}");
+				}
+			}
+			using (new CurlyBrackets(writer))
+			{
+				writer.WriteLine("TBuffer result = default;");
+				using (new For(writer, "int i = 0", "i < TBuffer.Length", "i++"))
+				{
+					writer.WriteLine($"result.SetElement(i, NumericHelper.{methodName}<TElement>(x.GetElement<TBuffer, TElement>(i), y.GetElement<TBuffer, TElement>(i), z.GetElement<TBuffer, TElement>(i)));");
+				}
 				writer.WriteLine("return result;");
 			}
 		}
