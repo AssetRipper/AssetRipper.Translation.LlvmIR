@@ -1346,6 +1346,7 @@ internal unsafe readonly struct InstructionLifter
 				}
 				break;
 			case LLVMValueKind.LLVMConstantArrayValueKind:
+			case LLVMValueKind.LLVMConstantVectorValueKind:
 				{
 					TypeSignature underlyingType = GetTypeSignature(value.TypeOf);
 
@@ -1470,6 +1471,7 @@ internal unsafe readonly struct InstructionLifter
 			case LLVMValueKind.LLVMConstantPointerNullValueKind:
 			case LLVMValueKind.LLVMConstantAggregateZeroValueKind:
 			case LLVMValueKind.LLVMUndefValueValueKind:
+			case LLVMValueKind.LLVMPoisonValueValueKind:
 				{
 					TypeSignature typeSignature = GetTypeSignature(value.TypeOf);
 					LoadVariable(basicBlock, new DefaultVariable(typeSignature));
