@@ -367,6 +367,8 @@ internal unsafe readonly struct InstructionLifter
 
 					LoadValue(basicBlock, operands[0]);
 					Call(basicBlock, method);
+
+					StoreResult(basicBlock, instruction);
 				}
 				break;
 			case LLVMOpcode.LLVMVAArg:
